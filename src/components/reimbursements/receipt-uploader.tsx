@@ -88,7 +88,7 @@ export function ReceiptUploader({ requestId }: { requestId: string }) {
     <div className="space-y-4">
       <div
         onClick={() => fileInputRef.current?.click()}
-        className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-indigo-400 hover:bg-indigo-50/50 transition cursor-pointer"
+        className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-emerald-400 hover:bg-emerald-50/50 transition cursor-pointer"
       >
         <svg className="mx-auto h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
@@ -98,7 +98,7 @@ export function ReceiptUploader({ requestId }: { requestId: string }) {
         </p>
         <p className="mt-1 text-xs text-slate-500">PDF or images accepted</p>
         {files.length > 0 ? (
-          <p className="mt-2 text-sm text-indigo-600 font-medium">
+          <p className="mt-2 text-sm text-emerald-600 font-medium">
             {files.length} file{files.length > 1 ? "s" : ""} selected
           </p>
         ) : null}
