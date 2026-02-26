@@ -2,6 +2,9 @@ import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { RequestForm } from "@/components/reimbursements/request-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
 
 export default async function NewRequestPage() {
   const session = await auth();
@@ -18,14 +21,22 @@ export default async function NewRequestPage() {
   }));
 
   return (
-    <section>
-      <h1>New reimbursement request</h1>
+    <div className="space-y-6">
+      <PageHeader
+        title="New Reimbursement Request"
+        description="Create a draft request, then upload receipts and submit for approval."
+      />
       {teams.length === 0 ? (
-        <p>Complete onboarding and team membership before creating requests.</p>
+        <Alert variant="warning">
+          Complete onboarding and team membership before creating requests.
+        </Alert>
       ) : (
-        <RequestForm teams={teams} />
+        <Card>
+          <CardContent>
+            <RequestForm teams={teams} />
+          </CardContent>
+        </Card>
       )}
-      <p>After creating a draft, open /student/requests/&lt;requestId&gt; to upload and submit.</p>
-    </section>
+    </div>
   );
 }
