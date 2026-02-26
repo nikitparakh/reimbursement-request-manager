@@ -6,30 +6,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form-field";
 import { Alert } from "@/components/ui/alert";
 
-export function TeamRequestDecision({ requestId }: { requestId: string }) {
+type Decision = "APPROVE" | "REJECT" | "MARK_PAID";
+
+export function ApprovalDecision({
+  requestId,
+  endpoint,
+  allowMarkPaid = false,
+}: {
+  requestId: string;
+  endpoint: string;
+  allowMarkPaid?: boolean;
+}) {
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
-  async function handleDecision(decision: "APPROVE" | "REJECT") {
+  async function handleDecision(decision: Decision) {
     setMessage("");
-    const response = await fetch(`/api/admin/team-requests/${requestId}/decision`, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision, comment }),
     });
+
     if (!response.ok) {
       setMessage("Decision failed.");
       setIsError(true);
       return;
     }
-    setMessage("Decision saved.");
+    setMessage(`Decision recorded: ${decision.replace("_", " ")}`);
     setIsError(false);
   }
 
   return (
     <div className="space-y-3">
-      <FormField label="Comment" htmlFor={`comment-${requestId}`}>
+      <FormField label="Comment" htmlFor={`comment-${requestId}`} helpText="Required for rejection">
         <Textarea
           id={`comment-${requestId}`}
           value={comment}
@@ -45,6 +56,11 @@ export function TeamRequestDecision({ requestId }: { requestId: string }) {
         <Button variant="danger" size="sm" onClick={() => handleDecision("REJECT")}>
           Reject
         </Button>
+        {allowMarkPaid ? (
+          <Button variant="primary" size="sm" onClick={() => handleDecision("MARK_PAID")}>
+            Mark Paid
+          </Button>
+        ) : null}
       </div>
       {message ? (
         <Alert variant={isError ? "error" : "success"}>{message}</Alert>

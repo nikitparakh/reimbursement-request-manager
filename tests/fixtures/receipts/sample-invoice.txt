@@ -1,0 +1,5 @@
+INVOICE
+Vendor: ACME Promotional and Apparel
+Date: 03/25/2025
+Description: Team spirit wear
+Total: $1603.61
