@@ -8,7 +8,11 @@ function extraction(documentType: string, total: number | null) {
 describe("aggregate reimbursement totals", () => {
   it("includes check request forms in reimbursement totals", () => {
     const total = aggregateReimbursableTotals([
-      extraction("CHECK_REQUEST_FORM", 9817.48),
+      {
+        documentType: "CHECK_REQUEST_FORM",
+        total: 9817.48,
+        lineItems: [{ lineTotal: 9817.48 }],
+      },
       extraction("OTHER", 999),
     ]);
 

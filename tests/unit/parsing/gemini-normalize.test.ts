@@ -88,7 +88,7 @@ describe("gemini payload normalization", () => {
     });
   });
 
-  it("merges itemization across reimbursement documents", () => {
+  it("prefers receipt/invoice line items over check request form summaries", () => {
     const payload = {
       response: [
         {
@@ -122,8 +122,8 @@ describe("gemini payload normalization", () => {
     };
 
     const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
-    expect(normalized.lineItems).toHaveLength(2);
-    expect(normalized.lineItems.map((item) => item.description)).toContain("Team spirit wear");
-    expect(normalized.lineItems.map((item) => item.description)).toContain("Track Jackets");
+    // When invoice line items exist, CHECK_REQUEST_FORM summary items are skipped
+    expect(normalized.lineItems).toHaveLength(1);
+    expect(normalized.lineItems[0]?.description).toBe("Track Jackets");
   });
 });

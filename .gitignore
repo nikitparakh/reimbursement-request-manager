@@ -7,3 +7,6 @@ node_modules
 .next
 coverage
 dist
+prisma/test.db
+prisma/test.db-journal
+data/test-uploads

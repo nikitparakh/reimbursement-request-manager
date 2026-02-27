@@ -1,0 +1,291 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import "../helpers/auth-mock";
+import { setMockUser, clearMockSession } from "../helpers/auth-mock";
+import {
+  GET as getRequests,
+  POST as postRequest,
+} from "@/app/api/requests/route";
+import {
+  GET as getRequest,
+  DELETE as deleteRequest,
+} from "@/app/api/requests/[requestId]/route";
+import { cleanDatabase } from "../helpers/db-clean";
+import {
+  createUser,
+  createTeam,
+  createMembership,
+  createRequest,
+} from "../helpers/factory";
+import { callRouteJSON } from "../helpers/call-route";
+
+describe("POST /api/requests", () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+    clearMockSession();
+  });
+
+  it("team member creates draft → 201", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    await createMembership({
+      userId: student.id,
+      teamId: team.id,
+      roleInTeam: "STUDENT",
+    });
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status, data } = await callRouteJSON(postRequest, {
+      method: "POST",
+      body: { title: "New Request", teamId: team.id },
+    });
+
+    expect(status).toBe(201);
+    expect((data as any).status).toBe("DRAFT");
+    expect((data as any).title).toBe("New Request");
+  });
+
+  it("auto-assigns team manager", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const manager = await createUser({ role: "MANAGER" });
+    const team = await createTeam();
+    await createMembership({
+      userId: student.id,
+      teamId: team.id,
+      roleInTeam: "STUDENT",
+    });
+    await createMembership({
+      userId: manager.id,
+      teamId: team.id,
+      roleInTeam: "MANAGER",
+    });
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { data } = await callRouteJSON(postRequest, {
+      method: "POST",
+      body: { title: "Request", teamId: team.id },
+    });
+
+    expect((data as any).managerId).toBe(manager.id);
+  });
+
+  it("unauthenticated → 401", async () => {
+    const { status } = await callRouteJSON(postRequest, {
+      method: "POST",
+      body: { title: "Request", teamId: "x" },
+    });
+    expect(status).toBe(401);
+  });
+
+  it("non-member → 403", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(postRequest, {
+      method: "POST",
+      body: { title: "Request", teamId: team.id },
+    });
+    expect(status).toBe(403);
+  });
+
+  it("missing title → 400", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    await createMembership({
+      userId: student.id,
+      teamId: team.id,
+      roleInTeam: "STUDENT",
+    });
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(postRequest, {
+      method: "POST",
+      body: { teamId: team.id },
+    });
+    expect(status).toBe(400);
+  });
+});
+
+describe("GET /api/requests", () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+    clearMockSession();
+  });
+
+  it("returns own requests → 200", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const other = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    await createRequest({ teamId: team.id, createdById: student.id });
+    await createRequest({ teamId: team.id, createdById: student.id });
+    await createRequest({ teamId: team.id, createdById: other.id });
+
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status, data } = await callRouteJSON(getRequests);
+    expect(status).toBe(200);
+    expect((data as any[]).length).toBe(2);
+  });
+
+  it("unauthenticated → 401", async () => {
+    const { status } = await callRouteJSON(getRequests);
+    expect(status).toBe(401);
+  });
+});
+
+describe("GET /api/requests/[requestId]", () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+    clearMockSession();
+  });
+
+  it("creator views → 200", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+    });
+
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status, data } = await callRouteJSON(
+      getRequest,
+      {},
+      { requestId: req.id }
+    );
+    expect(status).toBe(200);
+    expect((data as any).id).toBe(req.id);
+  });
+
+  it("team member (non-creator) views → 200", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const teammate = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    await createMembership({
+      userId: teammate.id,
+      teamId: team.id,
+      roleInTeam: "STUDENT",
+    });
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+    });
+
+    setMockUser({ id: teammate.id, email: teammate.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      getRequest,
+      {},
+      { requestId: req.id }
+    );
+    expect(status).toBe(200);
+  });
+
+  it("non-team-member → 403", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const outsider = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+    });
+
+    setMockUser({ id: outsider.id, email: outsider.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      getRequest,
+      {},
+      { requestId: req.id }
+    );
+    expect(status).toBe(403);
+  });
+
+  it("nonexistent → 404", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      getRequest,
+      {},
+      { requestId: "nonexistent" }
+    );
+    expect(status).toBe(404);
+  });
+});
+
+describe("DELETE /api/requests/[requestId]", () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+    clearMockSession();
+  });
+
+  it("creator deletes draft → 200", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+    });
+
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status, data } = await callRouteJSON(
+      deleteRequest,
+      { method: "DELETE" },
+      { requestId: req.id }
+    );
+    expect(status).toBe(200);
+    expect((data as any).deleted).toBe(true);
+  });
+
+  it("non-creator → 403", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const other = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+    });
+
+    setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      deleteRequest,
+      { method: "DELETE" },
+      { requestId: req.id }
+    );
+    expect(status).toBe(403);
+  });
+
+  it("non-draft (SUBMITTED) → 400", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+      status: "SUBMITTED",
+    });
+
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      deleteRequest,
+      { method: "DELETE" },
+      { requestId: req.id }
+    );
+    expect(status).toBe(400);
+  });
+
+  it("nonexistent → 404", async () => {
+    const student = await createUser({ role: "STUDENT" });
+    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+
+    const { status } = await callRouteJSON(
+      deleteRequest,
+      { method: "DELETE" },
+      { requestId: "nonexistent" }
+    );
+    expect(status).toBe(404);
+  });
+});
