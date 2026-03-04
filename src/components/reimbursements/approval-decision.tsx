@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form-field";
@@ -20,6 +21,7 @@ export function ApprovalDecision({
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const router = useRouter();
 
   async function handleDecision(decision: Decision) {
     setMessage("");
@@ -36,6 +38,7 @@ export function ApprovalDecision({
     }
     setMessage(`Decision recorded: ${decision.replace("_", " ")}`);
     setIsError(false);
+    router.refresh();
   }
 
   return (

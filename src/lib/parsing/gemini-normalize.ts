@@ -180,10 +180,23 @@ function scoreCandidate(candidate: JsonRecord) {
 }
 
 function collectLineItems(source: JsonRecord, candidates: JsonRecord[]) {
-  const relevantCandidates = [source, ...candidates].filter((candidate) => {
-    const type = normalizeDocumentType(candidate.documentType);
-    return type === "RECEIPT" || type === "INVOICE" || type === "CHECK_REQUEST_FORM";
+  const allCandidates = [source, ...candidates];
+
+  const receiptInvoice = allCandidates.filter((c) => {
+    const type = normalizeDocumentType(c.documentType);
+    return type === "RECEIPT" || type === "INVOICE";
   });
+  const checkRequestForm = allCandidates.filter((c) => {
+    return normalizeDocumentType(c.documentType) === "CHECK_REQUEST_FORM";
+  });
+
+  // If receipt/invoice candidates have line items, use those (skip CHECK_REQUEST_FORM
+  // summaries which duplicate the detailed items from actual receipts)
+  const receiptItems = receiptInvoice.flatMap((c) =>
+    LINE_ITEM_ARRAY_KEYS.flatMap((key) => toLineItems(c[key]))
+  );
+  const relevantCandidates =
+    receiptItems.length > 0 ? receiptInvoice : [...checkRequestForm, ...receiptInvoice];
 
   const merged = relevantCandidates.flatMap((candidate) =>
     LINE_ITEM_ARRAY_KEYS.flatMap((key) => toLineItems(candidate[key]))
@@ -205,12 +218,25 @@ export function normalizeGeminiPayload(payload: unknown, model: string) {
   const source = selected ?? (isRecord(payload) ? payload : {});
   const lineItems = collectLineItems(source, candidates);
 
+  // Aggregate tax from receipt/invoice candidates when selected document lacks it
+  const selectedTax = toNumberOrNull(source.tax);
+  const aggregatedTax = candidates.reduce(
+    (sum, c) => sum + (toNumberOrNull(c.tax) ?? 0),
+    0
+  );
+  const tax =
+    selectedTax && selectedTax > 0
+      ? selectedTax
+      : aggregatedTax > 0
+        ? aggregatedTax
+        : null;
+
   return normalizedReceiptSchema.parse({
     documentType: normalizeDocumentType(source.documentType),
     merchant: typeof source.merchant === "string" ? source.merchant : null,
     receiptDate: toIsoDateOrNull(source.receiptDate),
     subtotal: toNumberOrNull(source.subtotal),
-    tax: toNumberOrNull(source.tax),
+    tax,
     total: toNumberOrNull(source.total),
     currency: typeof source.currency === "string" && source.currency ? source.currency : "USD",
     confidence: toConfidenceOrNull(source.confidence) ?? 0.5,

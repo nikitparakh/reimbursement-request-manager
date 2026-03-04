@@ -56,8 +56,8 @@ export function TeamSelector({ teams }: { teams: Team[] }) {
           value={roleIntent}
           onChange={(event) => setRoleIntent(event.target.value as "STUDENT" | "MANAGER")}
         >
-          <option value="STUDENT">Student</option>
-          <option value="MANAGER">Manager</option>
+          <option value="STUDENT">Parent/Mentor</option>
+          <option value="MANAGER">Coach</option>
         </Select>
       </FormField>
 

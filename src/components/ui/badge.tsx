@@ -17,6 +17,15 @@ const colorMap: Record<string, string> = {
   REJECT: "bg-red-100 text-red-800",
   REOPEN: "bg-amber-100 text-amber-800",
   MARK_PAID: "bg-indigo-100 text-indigo-800",
+  STUDENT: "bg-blue-100 text-blue-800",
+  MANAGER: "bg-purple-100 text-purple-800",
+};
+
+const labelMap: Record<string, string> = {
+  STUDENT: "PARENT/MENTOR",
+  MANAGER: "COACH",
+  MANAGER_APPROVED: "COACH APPROVED",
+  MANAGER_REJECTED: "COACH REJECTED",
 };
 
 type BadgeProps = {
@@ -24,13 +33,16 @@ type BadgeProps = {
   className?: string;
 };
 
+const pulsingStatuses = new Set(["QUEUED", "PROCESSING"]);
+
 export function Badge({ status, className = "" }: BadgeProps) {
   const colors = colorMap[status] ?? "bg-slate-100 text-slate-700";
-  const label = status.replace(/_/g, " ");
+  const pulse = pulsingStatuses.has(status) ? "animate-pulse" : "";
+  const label = labelMap[status] ?? status.replace(/_/g, " ");
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors} ${className}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors} ${pulse} ${className}`}
     >
       {label}
     </span>

@@ -2,7 +2,9 @@ import { notFound, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { ExtractionReview } from "@/components/reimbursements/extraction-review";
+import { ReceiptPollingWrapper } from "@/components/reimbursements/receipt-polling-wrapper";
 import { RequestActions } from "@/components/reimbursements/request-actions";
+import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { RequestTimeline } from "@/components/reimbursements/request-timeline";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +32,13 @@ export default async function StudentRequestDetailPage({
     notFound();
   }
 
+  const hasExtractions = requestRecord.receiptFiles.some((f) => f.extraction !== null);
+  const hasUnparsedReceipts = requestRecord.receiptFiles.some(
+    (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING" || f.parseStatus === "FAILED"
+  );
+
+  const receiptsWithExtractions = serializeReceipts(requestRecord.receiptFiles);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -42,7 +51,7 @@ export default async function StudentRequestDetailPage({
           <CardContent>
             <div className="text-sm text-slate-500">Requested Total</div>
             <div className="text-2xl font-bold text-slate-900">
-              ${requestRecord.requestedTotal.toString()}
+              ${Number(requestRecord.requestedTotal).toFixed(2)}
             </div>
           </CardContent>
         </Card>
@@ -65,12 +74,30 @@ export default async function StudentRequestDetailPage({
       {requestRecord.status === "DRAFT" ? (
         <Card>
           <CardContent>
-            <RequestActions requestId={requestRecord.id} />
+            <RequestActions
+              requestId={requestRecord.id}
+              existingReceipts={requestRecord.receiptFiles.map((f) => ({
+                id: f.id,
+                fileName: f.fileName,
+              }))}
+              hasExtractions={hasExtractions}
+              hasUnparsedReceipts={hasUnparsedReceipts}
+              receiptsWithExtractions={receiptsWithExtractions}
+            />
           </CardContent>
         </Card>
       ) : null}
 
-      <ExtractionReview receipts={requestRecord.receiptFiles} />
+      {requestRecord.status !== "DRAFT" ? (
+        <ReceiptPollingWrapper
+          requestId={requestRecord.id}
+          hasProcessing={requestRecord.receiptFiles.some(
+            (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
+          )}
+        >
+          <ExtractionReview receipts={requestRecord.receiptFiles} />
+        </ReceiptPollingWrapper>
+      ) : null}
 
       <RequestTimeline
         items={requestRecord.approvals.map((approval) => ({

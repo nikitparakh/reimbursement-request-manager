@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { uploadReceiptFile } from "@/lib/storage";
-import { enqueueReceiptParseJob } from "@/lib/jobs/enqueue-parse";
 
 export async function POST(
   request: Request,
@@ -57,7 +56,6 @@ export async function POST(
       },
     });
     created.push(receipt);
-    void enqueueReceiptParseJob(receipt.id);
   }
 
   return NextResponse.json({ receipts: created }, { status: 201 });

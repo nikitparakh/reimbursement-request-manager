@@ -35,7 +35,7 @@ export default async function OnboardingPage() {
       <Card className="border-dashed">
         <CardHeader>
           <h2 className="text-lg font-semibold text-slate-900">Team Not Listed?</h2>
-          <p className="text-sm text-slate-500">Managers can propose a team for admin approval.</p>
+          <p className="text-sm text-slate-500">Coaches can propose a team for admin approval.</p>
         </CardHeader>
         <CardContent>
           <TeamRegistrationForm />

@@ -18,23 +18,29 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
   const [requestId, setRequestId] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   async function createDraft() {
     setMessage("");
-    const response = await fetch("/api/requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, teamId }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setMessage(payload.error ?? "Failed to create request");
-      setIsError(true);
-      return;
+    setIsCreating(true);
+    try {
+      const response = await fetch("/api/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description, teamId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setMessage(payload.error ?? "Failed to create request");
+        setIsError(true);
+        return;
+      }
+      setRequestId(payload.id);
+      setMessage("Draft created successfully.");
+      setIsError(false);
+    } finally {
+      setIsCreating(false);
     }
-    setRequestId(payload.id);
-    setMessage("Draft created successfully.");
-    setIsError(false);
   }
 
   return (
@@ -68,7 +74,9 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
         </Select>
       </FormField>
 
-      <Button onClick={createDraft}>Create Draft</Button>
+      <Button onClick={createDraft} disabled={isCreating}>
+        {isCreating ? "Creating..." : "Create Draft"}
+      </Button>
 
       {message ? (
         <Alert variant={isError ? "error" : "success"}>

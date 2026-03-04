@@ -33,11 +33,21 @@ async function parseWithGemini(input: ParseProviderInput) {
             parts: [
               {
                 text:
-                  "Extract reimbursement-relevant fields from this document and return ONLY JSON. " +
-                  'Keys: documentType, merchant, receiptDate, subtotal, tax, total, currency, confidence, flags, lineItems, raw. ' +
-                  "lineItems must be an array of expense rows with keys: description, quantity, unitPrice, lineTotal, category. " +
-                  'documentType must be one of RECEIPT, INVOICE, W9, CHECK_REQUEST_FORM, OTHER. ' +
-                  "receiptDate should be ISO date when possible. confidence must be 0..1.",
+                  "Extract reimbursement-relevant fields from this document. Return ONLY valid JSON.\n\n" +
+                  "If the document contains multiple receipts/invoices (e.g. a check request form with attached receipts), " +
+                  "return a JSON array with one object per document.\n\n" +
+                  "Each object keys: documentType, merchant, receiptDate, subtotal, tax, total, currency, confidence, flags, lineItems, raw.\n\n" +
+                  "Rules:\n" +
+                  "- documentType: RECEIPT, INVOICE, W9, CHECK_REQUEST_FORM, or OTHER.\n" +
+                  "- lineItems: array with keys description, quantity, unitPrice, lineTotal, category.\n" +
+                  "- DISCOUNTS: lineTotal MUST be the net amount AFTER discounts. If a product costs $960 with a $144 discount, " +
+                  "lineTotal must be $816, NOT $960. Reflect what was actually charged.\n" +
+                  "- SHIPPING: Include shipping/handling charges as a separate line item.\n" +
+                  "- TAX: Put sales tax in the 'tax' field. Do NOT include tax as a line item.\n" +
+                  "- CHECK_REQUEST_FORM: These are cover forms, NOT receipts. Set lineItems to [] (empty). " +
+                  "The actual items come from attached receipts/invoices.\n" +
+                  "- subtotal: pre-tax sum of line items. total: grand total including tax.\n" +
+                  "- receiptDate: ISO date. confidence: 0 to 1.",
               },
               {
                 inlineData: {

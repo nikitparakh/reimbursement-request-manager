@@ -34,3 +34,34 @@ export async function GET(
 
   return NextResponse.json(record);
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ requestId: string }> }
+) {
+  let userId = "";
+  try {
+    userId = (await requireUser()).id;
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { requestId } = await params;
+
+  const record = await db.reimbursementRequest.findUnique({
+    where: { id: requestId },
+    select: { createdById: true, status: true },
+  });
+
+  if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (record.createdById !== userId)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (record.status !== "DRAFT")
+    return NextResponse.json(
+      { error: "Only draft requests can be deleted" },
+      { status: 400 }
+    );
+
+  await db.reimbursementRequest.delete({ where: { id: requestId } });
+
+  return NextResponse.json({ deleted: true });
+}

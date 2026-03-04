@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { assertTransition } from "@/lib/reimbursements/status";
 import { logAuditEvent } from "@/lib/audit/log";
+import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 
 export async function transitionRequestStatus(input: {
   requestId: string;
@@ -14,22 +15,28 @@ export async function transitionRequestStatus(input: {
     | "ADMIN_REJECTED"
     | "PAID"
     | "DRAFT";
-  action: "APPROVE" | "REJECT" | "REOPEN" | "MARK_PAID";
+  action: "APPROVE" | "REJECT" | "REOPEN" | "MARK_PAID" | "SUBMIT";
   comment?: string;
 }) {
   return db.$transaction(async (tx) => {
     const request = await tx.reimbursementRequest.findUniqueOrThrow({
       where: { id: input.requestId },
-      include: { receiptFiles: { include: { extraction: true } } },
+      include: {
+        receiptFiles: {
+          include: { extraction: { include: { lineItems: true } } },
+        },
+      },
     });
 
     assertTransition(request.status, input.nextStatus);
 
+    const extractions = request.receiptFiles
+      .map((f) => f.extraction)
+      .filter((e): e is NonNullable<typeof e> => Boolean(e));
     const requestedTotal =
-      request.receiptFiles.reduce((sum, file) => {
-        const amount = file.extraction?.total ? Number(file.extraction.total) : 0;
-        return sum + amount;
-      }, 0) || Number(request.requestedTotal);
+      extractions.length > 0
+        ? aggregateReimbursableTotals(extractions)
+        : Number(request.requestedTotal);
 
     const updated = await tx.reimbursementRequest.update({
       where: { id: request.id },

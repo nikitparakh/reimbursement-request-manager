@@ -1,5 +1,4 @@
 node_modules
-# Keep environment variables out of version control
 .env
 .env.local
 
@@ -7,6 +6,15 @@ node_modules
 .next
 coverage
 dist
+*.tsbuildinfo
+.DS_Store
+
+prisma/dev.db
+prisma/dev.db-journal
 prisma/test.db
 prisma/test.db-journal
+
+data/uploads/
+data/cover-pages/
+data/*.pdf
 data/test-uploads

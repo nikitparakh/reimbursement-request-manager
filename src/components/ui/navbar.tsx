@@ -5,16 +5,22 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 type NavLink = { href: string; label: string };
 
 const studentLinks: NavLink[] = [
+  { href: "/team", label: "My Team" },
   { href: "/student/requests/new", label: "New Request" },
+  { href: "/student/requests", label: "My Requests" },
 ];
 
 const managerLinks: NavLink[] = [
+  { href: "/team", label: "My Team" },
   { href: "/student/requests/new", label: "New Request" },
-  { href: "/manager/inbox", label: "Manager Inbox" },
+  { href: "/student/requests", label: "My Requests" },
+  { href: "/manager/inbox", label: "Coach Inbox" },
+  { href: "/manager/team-reimbursements", label: "Team Reimbursements" },
 ];
 
 const adminLinks: NavLink[] = [
-  { href: "/manager/inbox", label: "Manager Inbox" },
+  { href: "/team", label: "My Team" },
+  { href: "/manager/inbox", label: "Coach Inbox" },
   { href: "/admin/inbox", label: "Admin Inbox" },
   { href: "/admin/team-requests", label: "Team Requests" },
 ];

@@ -61,6 +61,7 @@ enum DecisionAction {
   REJECT
   REOPEN
   MARK_PAID
+  SUBMIT
 }
 
 model User {

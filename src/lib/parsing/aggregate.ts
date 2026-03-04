@@ -17,9 +17,7 @@ export function aggregateReimbursableTotals(extractions: ExtractionForTotals[]) 
   const totals = extractions
     .filter((item) => allowed.has(item.documentType))
     .map((item) => {
-      const extractedTotal = toNumber(item.total);
-      if (extractedTotal !== null) return extractedTotal;
-
+      // Always use line item totals — excludes tax, reflects user edits
       const lineItemTotal =
         item.lineItems
           ?.map((line) => toNumber(line.lineTotal) ?? 0)

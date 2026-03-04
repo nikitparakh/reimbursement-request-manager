@@ -13,7 +13,7 @@ export default async function HomePage() {
         <img src="/frogforce-shield.jpg" alt="Frog Force 503" className="h-24 w-auto mx-auto mb-4" />
         <h1 className="text-4xl font-bold text-slate-900">Frog Force 503</h1>
         <p className="mt-3 text-lg text-slate-500 max-w-md">
-          Submit team reimbursements, route approvals to your manager, then admin.
+          Submit team reimbursements, route approvals to your coach, then admin.
         </p>
         <div className="mt-8 flex gap-4">
           <Link href="/sign-in">
@@ -38,22 +38,33 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(role === "STUDENT" || role === "MANAGER") ? (
-          <Link href="/student/requests/new" className="block">
-            <Card className="hover:border-emerald-300 transition">
-              <CardContent>
-                <div className="text-sm font-medium text-slate-500">Quick Action</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">New Request</div>
-                <p className="mt-1 text-sm text-slate-500">Create a new reimbursement request</p>
-              </CardContent>
-            </Card>
-          </Link>
+          <>
+            <Link href="/team" className="block">
+              <Card className="hover:border-emerald-300 transition">
+                <CardContent>
+                  <div className="text-sm font-medium text-slate-500">Team</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">My Team</div>
+                  <p className="mt-1 text-sm text-slate-500">View your team members and coach</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/student/requests/new" className="block">
+              <Card className="hover:border-emerald-300 transition">
+                <CardContent>
+                  <div className="text-sm font-medium text-slate-500">Quick Action</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">New Request</div>
+                  <p className="mt-1 text-sm text-slate-500">Create a new reimbursement request</p>
+                </CardContent>
+              </Card>
+            </Link>
+          </>
         ) : null}
 
         {role === "MANAGER" ? (
           <Link href="/manager/inbox" className="block">
             <Card className="hover:border-emerald-300 transition">
               <CardContent>
-                <div className="text-sm font-medium text-slate-500">Manager</div>
+                <div className="text-sm font-medium text-slate-500">Coach</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">Review Inbox</div>
                 <p className="mt-1 text-sm text-slate-500">Review submitted reimbursement requests</p>
               </CardContent>
@@ -68,7 +79,7 @@ export default async function HomePage() {
                 <CardContent>
                   <div className="text-sm font-medium text-slate-500">Admin</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">Admin Inbox</div>
-                  <p className="mt-1 text-sm text-slate-500">Review manager-approved requests</p>
+                  <p className="mt-1 text-sm text-slate-500">Review coach-approved requests</p>
                 </CardContent>
               </Card>
             </Link>
@@ -85,8 +96,8 @@ export default async function HomePage() {
               <Card className="hover:border-emerald-300 transition">
                 <CardContent>
                   <div className="text-sm font-medium text-slate-500">Admin</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">Manager Inbox</div>
-                  <p className="mt-1 text-sm text-slate-500">View manager review queue</p>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">Coach Inbox</div>
+                  <p className="mt-1 text-sm text-slate-500">View coach review queue</p>
                 </CardContent>
               </Card>
             </Link>

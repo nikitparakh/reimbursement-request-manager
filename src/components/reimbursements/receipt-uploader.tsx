@@ -2,121 +2,172 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 
-export function ReceiptUploader({ requestId }: { requestId: string }) {
-  const [files, setFiles] = useState<File[]>([]);
+type UploadedReceipt = {
+  id: string;
+  fileName: string;
+};
+
+type ReceiptUploaderProps = {
+  requestId: string;
+  existingReceipts?: UploadedReceipt[];
+};
+
+type UploadingFile = {
+  key: string;
+  fileName: string;
+  status: "uploading" | "uploaded" | "failed";
+};
+
+export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUploaderProps) {
+  const [uploads, setUploads] = useState<UploadingFile[]>([]);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  async function readErrorMessage(response: Response) {
-    const text = await response.text();
-    if (!text) return "Failed to upload receipts.";
-    try {
-      const payload = JSON.parse(text) as { error?: string };
-      return payload.error ?? "Failed to upload receipts.";
-    } catch {
-      return text;
-    }
+  function updateUpload(key: string, patch: Partial<UploadingFile>) {
+    setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, ...patch } : u)));
   }
 
-  async function waitForParsingCompletion() {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const statusResponse = await fetch(`/api/requests/${requestId}`, { cache: "no-store" });
-      if (!statusResponse.ok) continue;
-
-      const payload = (await statusResponse.json()) as {
-        receiptFiles?: Array<{ parseStatus: string }>;
-      };
-      const statuses = payload.receiptFiles?.map((item) => item.parseStatus) ?? [];
-      if (statuses.length === 0) return;
-
-      const hasPending = statuses.some(
-        (status) => status === "QUEUED" || status === "PROCESSING"
-      );
-      if (hasPending) continue;
-
-      router.refresh();
-      if (statuses.some((status) => status === "FAILED")) {
-        setMessage("Receipts processed, but at least one parse failed.");
-        setIsError(true);
-      } else {
-        setMessage("Receipts parsed and totals recalculated.");
-        setIsError(false);
-      }
-      return;
-    }
-
-    setMessage("Receipts uploaded. Parsing is still running, refresh shortly.");
-    setIsError(false);
-  }
-
-  async function upload() {
-    if (files.length === 0) {
-      setMessage("Please select one or more files.");
-      setIsError(true);
-      return;
-    }
+  async function uploadFile(file: File) {
+    const key = `${Date.now()}-${file.name}`;
+    setUploads((prev) => [...prev, { key, fileName: file.name, status: "uploading" }]);
 
     const formData = new FormData();
-    for (const file of files) {
-      formData.append("files", file);
-    }
+    formData.append("files", file);
 
-    const response = await fetch(`/api/requests/${requestId}/receipts`, {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const response = await fetch(`/api/requests/${requestId}/receipts`, {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      setMessage(await readErrorMessage(response));
+      if (!response.ok) {
+        updateUpload(key, { status: "failed" });
+        const text = await response.text();
+        try {
+          const payload = JSON.parse(text) as { error?: string };
+          setMessage(payload.error ?? "Upload failed.");
+        } catch {
+          setMessage("Upload failed.");
+        }
+        setIsError(true);
+        return;
+      }
+
+      updateUpload(key, { status: "uploaded" });
+      setMessage("");
+      router.refresh();
+    } catch {
+      updateUpload(key, { status: "failed" });
+      setMessage("Upload failed. Please try again.");
       setIsError(true);
-      return;
     }
-    setMessage("Receipts uploaded and queued for parsing.");
-    setIsError(false);
-    router.refresh();
-    void waitForParsingCompletion();
   }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? []);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    for (const file of selected) {
+      void uploadFile(file);
+    }
+  }
+
+  const uploadedFileNames = new Set(uploads.map((u) => u.fileName));
+  const serverOnly = existingReceipts.filter((r) => !uploadedFileNames.has(r.fileName));
 
   return (
     <div className="space-y-4">
+      {(serverOnly.length > 0 || uploads.length > 0) ? (
+        <div className="flex flex-wrap gap-2">
+          {serverOnly.map((receipt) => (
+            <a
+              key={receipt.id}
+              href={`/api/receipts/${receipt.id}/download`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition text-sm max-w-xs"
+            >
+              <FileIcon />
+              <span className="truncate text-slate-700">{receipt.fileName}</span>
+              <CheckIcon />
+            </a>
+          ))}
+
+          {uploads.map((upload) => (
+            <div
+              key={upload.key}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm max-w-xs"
+            >
+              <FileIcon />
+              <span className="truncate text-slate-700">{upload.fileName}</span>
+              <UploadStatusIndicator status={upload.status} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div
         onClick={() => fileInputRef.current?.click()}
-        className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-emerald-400 hover:bg-emerald-50/50 transition cursor-pointer"
+        className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-emerald-400 hover:bg-emerald-50/50 transition cursor-pointer"
       >
-        <svg className="mx-auto h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+        <svg className="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
-        <p className="mt-2 text-sm font-medium text-slate-700">
-          Click to upload receipts
-        </p>
-        <p className="mt-1 text-xs text-slate-500">PDF or images accepted</p>
-        {files.length > 0 ? (
-          <p className="mt-2 text-sm text-emerald-600 font-medium">
-            {files.length} file{files.length > 1 ? "s" : ""} selected
-          </p>
-        ) : null}
+        <p className="mt-1 text-sm font-medium text-slate-700">Add receipts</p>
+        <p className="text-xs text-slate-500">PDF or images accepted</p>
         <input
           ref={fileInputRef}
           type="file"
           multiple
           accept=".pdf,image/*"
           className="hidden"
-          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+          onChange={handleFileChange}
         />
       </div>
-      {files.length > 0 ? (
-        <Button onClick={upload}>Upload {files.length} file{files.length > 1 ? "s" : ""}</Button>
-      ) : null}
+
       {message ? (
         <Alert variant={isError ? "error" : "success"}>{message}</Alert>
       ) : null}
     </div>
   );
+}
+
+function FileIcon() {
+  return (
+    <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg className="h-4 w-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
+
+function UploadStatusIndicator({ status }: { status: UploadingFile["status"] }) {
+  if (status === "uploading") {
+    return (
+      <svg className="h-4 w-4 animate-spin text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+      </svg>
+    );
+  }
+  return <CheckIcon />;
 }

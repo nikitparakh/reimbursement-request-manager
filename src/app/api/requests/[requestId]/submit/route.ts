@@ -25,7 +25,7 @@ export async function POST(
     requestId,
     actorId: userId,
     nextStatus: "SUBMITTED",
-    action: "APPROVE",
+    action: "SUBMIT",
     comment: "Submitted by student",
   });
 
