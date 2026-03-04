@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 
 export async function cleanDatabase() {
   // Delete in reverse dependency order to avoid FK violations
+  await db.notification.deleteMany();
   await db.auditLog.deleteMany();
   await db.approvalAction.deleteMany();
   await db.receiptLineItem.deleteMany();

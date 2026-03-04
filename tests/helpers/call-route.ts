@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 type RouteHandler = (
   request: Request,
-  context: { params: Promise<any> }
+  context: { params: Promise<Record<string, string>> }
 ) => Promise<Response> | Response;
 
 type CallOptions = {

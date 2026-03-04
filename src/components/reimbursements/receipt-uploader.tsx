@@ -22,10 +22,39 @@ type UploadingFile = {
 
 export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUploaderProps) {
   const [uploads, setUploads] = useState<UploadingFile[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  async function deleteReceipt(receiptId: string) {
+    setDeletedIds((prev) => new Set(prev).add(receiptId));
+    try {
+      const res = await fetch(`/api/requests/${requestId}/receipts/${receiptId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setDeletedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(receiptId);
+          return next;
+        });
+        setMessage("Failed to delete receipt.");
+        setIsError(true);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setDeletedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(receiptId);
+        return next;
+      });
+      setMessage("Failed to delete receipt.");
+      setIsError(true);
+    }
+  }
 
   function updateUpload(key: string, patch: Partial<UploadingFile>) {
     setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, ...patch } : u)));
@@ -78,24 +107,38 @@ export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUpl
   }
 
   const uploadedFileNames = new Set(uploads.map((u) => u.fileName));
-  const serverOnly = existingReceipts.filter((r) => !uploadedFileNames.has(r.fileName));
+  const serverOnly = existingReceipts.filter(
+    (r) => !uploadedFileNames.has(r.fileName) && !deletedIds.has(r.id)
+  );
 
   return (
     <div className="space-y-4">
       {(serverOnly.length > 0 || uploads.length > 0) ? (
         <div className="flex flex-wrap gap-2">
           {serverOnly.map((receipt) => (
-            <a
+            <div
               key={receipt.id}
-              href={`/api/receipts/${receipt.id}/download`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition text-sm max-w-xs"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm max-w-xs"
             >
-              <FileIcon />
-              <span className="truncate text-slate-700">{receipt.fileName}</span>
-              <CheckIcon />
-            </a>
+              <a
+                href={`/api/receipts/${receipt.id}/download`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:opacity-80 transition min-w-0"
+              >
+                <FileIcon />
+                <span className="truncate text-slate-700">{receipt.fileName}</span>
+                <CheckIcon />
+              </a>
+              <button
+                type="button"
+                onClick={() => void deleteReceipt(receipt.id)}
+                className="ml-1 shrink-0 text-slate-400 hover:text-red-500 transition"
+                aria-label={`Delete ${receipt.fileName}`}
+              >
+                <DeleteIcon />
+              </button>
+            </div>
           ))}
 
           {uploads.map((upload) => (
@@ -149,6 +192,14 @@ function CheckIcon() {
   return (
     <svg className="h-4 w-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
 }

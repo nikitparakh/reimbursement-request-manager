@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +11,7 @@ export default async function HomePage() {
   if (!session?.user) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <img src="/frogforce-shield.jpg" alt="Frog Force 503" className="h-24 w-auto mx-auto mb-4" />
+        <Image src="/frogforce-shield.jpg" alt="Frog Force 503" width={96} height={96} className="h-24 w-auto mx-auto mb-4" />
         <h1 className="text-4xl font-bold text-slate-900">Frog Force 503</h1>
         <p className="mt-3 text-lg text-slate-500 max-w-md">
           Submit team reimbursements, route approvals to your coach, then admin.
@@ -79,7 +80,7 @@ export default async function HomePage() {
                 <CardContent>
                   <div className="text-sm font-medium text-slate-500">Admin</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">Admin Inbox</div>
-                  <p className="mt-1 text-sm text-slate-500">Review coach-approved requests</p>
+                  <p className="mt-1 text-sm text-slate-500">Review, approve, and process requests</p>
                 </CardContent>
               </Card>
             </Link>
@@ -92,12 +93,12 @@ export default async function HomePage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/manager/inbox" className="block">
+            <Link href="/student/requests/new" className="block">
               <Card className="hover:border-emerald-300 transition">
                 <CardContent>
-                  <div className="text-sm font-medium text-slate-500">Admin</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">Coach Inbox</div>
-                  <p className="mt-1 text-sm text-slate-500">View coach review queue</p>
+                  <div className="text-sm font-medium text-slate-500">Quick Action</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">New Request</div>
+                  <p className="mt-1 text-sm text-slate-500">Create a new reimbursement request</p>
                 </CardContent>
               </Card>
             </Link>

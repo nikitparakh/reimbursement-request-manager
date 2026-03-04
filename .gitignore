@@ -18,3 +18,7 @@ data/uploads/
 data/cover-pages/
 data/*.pdf
 data/test-uploads
+
+*.log
+.playwright-mcp/
+test-results/

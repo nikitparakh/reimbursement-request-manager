@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 type NavLink = { href: string; label: string };
 
@@ -20,9 +22,11 @@ const managerLinks: NavLink[] = [
 
 const adminLinks: NavLink[] = [
   { href: "/team", label: "My Team" },
-  { href: "/manager/inbox", label: "Coach Inbox" },
+  { href: "/student/requests/new", label: "New Request" },
+  { href: "/student/requests", label: "My Requests" },
   { href: "/admin/inbox", label: "Admin Inbox" },
   { href: "/admin/team-requests", label: "Team Requests" },
+  { href: "/admin/users", label: "Manage Users" },
 ];
 
 function getLinksForRole(role: string): NavLink[] {
@@ -43,7 +47,7 @@ export async function NavBar() {
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-          <img src="/frogforce-shield.jpg" alt="Frog Force 503" className="h-10 w-auto" />
+          <Image src="/frogforce-shield.jpg" alt="Frog Force 503" width={40} height={40} className="h-10 w-auto" />
           <span className="text-lg font-bold text-emerald-600">Frog Force 503</span>
         </Link>
 
@@ -61,6 +65,7 @@ export async function NavBar() {
               ))}
             </div>
             <div className="flex items-center gap-4">
+              <NotificationBell />
               <span className="text-sm text-slate-500">{session.user.email}</span>
               <SignOutButton />
             </div>

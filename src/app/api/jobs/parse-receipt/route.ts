@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { parseReceiptWithProvider } from "@/lib/parsing/provider";
 import { readStoredObject } from "@/lib/storage";
@@ -11,6 +12,11 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${env.INTERNAL_JOB_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

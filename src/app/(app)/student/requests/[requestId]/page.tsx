@@ -6,6 +6,7 @@ import { ReceiptPollingWrapper } from "@/components/reimbursements/receipt-polli
 import { RequestActions } from "@/components/reimbursements/request-actions";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { RequestTimeline } from "@/components/reimbursements/request-timeline";
+import { EditableRequestHeader } from "@/components/reimbursements/editable-request-header";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,10 +42,18 @@ export default async function StudentRequestDetailPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={requestRecord.title}
-        badge={<Badge status={requestRecord.status} />}
-      />
+      {requestRecord.status === "DRAFT" ? (
+        <EditableRequestHeader
+          requestId={requestRecord.id}
+          initialTitle={requestRecord.title}
+          initialDescription={requestRecord.description}
+        />
+      ) : (
+        <PageHeader
+          title={requestRecord.title}
+          badge={<Badge status={requestRecord.status} />}
+        />
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>

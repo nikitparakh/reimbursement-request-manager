@@ -60,15 +60,19 @@ export async function POST(
   if (creator?.email && actor?.email) {
     const event =
       body.data.decision === "APPROVE"
-        ? "ADMIN_APPROVED"
+        ? "ADMIN_APPROVED" as const
         : body.data.decision === "REJECT"
-          ? "ADMIN_REJECTED"
-          : "ADMIN_APPROVED";
+          ? "ADMIN_REJECTED" as const
+          : "MARKED_PAID" as const;
+    const message =
+      body.data.decision === "MARK_PAID"
+        ? `Reimbursement marked as paid: ${current.title}`
+        : `Admin ${body.data.decision.toLowerCase()}d reimbursement: ${current.title}`;
     await sendNotification(event, {
       requestId,
       actorEmail: actor.email,
       recipients: [creator.email],
-      message: `Admin decision ${body.data.decision.toLowerCase()} for ${current.title}`,
+      message,
     });
   }
 

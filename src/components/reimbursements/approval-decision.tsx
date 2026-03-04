@@ -13,10 +13,12 @@ export function ApprovalDecision({
   requestId,
   endpoint,
   allowMarkPaid = false,
+  showApproveReject = true,
 }: {
   requestId: string;
   endpoint: string;
   allowMarkPaid?: boolean;
+  showApproveReject?: boolean;
 }) {
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
@@ -53,12 +55,16 @@ export function ApprovalDecision({
         />
       </FormField>
       <div className="flex gap-2">
-        <Button variant="success" size="sm" onClick={() => handleDecision("APPROVE")}>
-          Approve
-        </Button>
-        <Button variant="danger" size="sm" onClick={() => handleDecision("REJECT")}>
-          Reject
-        </Button>
+        {showApproveReject && (
+          <>
+            <Button variant="success" size="sm" onClick={() => handleDecision("APPROVE")}>
+              Approve
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => handleDecision("REJECT")}>
+              Reject
+            </Button>
+          </>
+        )}
         {allowMarkPaid ? (
           <Button variant="primary" size="sm" onClick={() => handleDecision("MARK_PAID")}>
             Mark Paid

@@ -84,6 +84,7 @@ model User {
   reviewedTeamRequests TeamRegistrationRequest[] @relation("TeamRequestReviewedBy")
   approvals       ApprovalAction[]
   auditLogs       AuditLog[]
+  notifications   Notification[]
 }
 
 model Team {
@@ -151,6 +152,7 @@ model ReimbursementRequest {
   receiptFiles   ReceiptFile[]
   approvals      ApprovalAction[]
   auditLogs      AuditLog[]
+  notifications  Notification[]
 
   @@index([teamId, status, createdAt])
   @@index([managerId, status])
@@ -232,6 +234,20 @@ model AuditLog {
 
   @@index([requestId, createdAt])
   @@index([eventType, createdAt])
+}
+
+model Notification {
+  id        String                @id @default(cuid())
+  userId    String
+  event     String
+  message   String
+  requestId String?
+  read      Boolean               @default(false)
+  createdAt DateTime              @default(now())
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request   ReimbursementRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read, createdAt])
 }
 
 model Account {

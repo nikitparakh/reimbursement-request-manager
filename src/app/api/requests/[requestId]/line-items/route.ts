@@ -12,10 +12,6 @@ async function authorizeForRequest(requestId: string) {
   });
   if (!request) return null;
 
-  // Owner can edit
-  if (request.createdById === user.id) return request;
-
-  // Team manager can edit
   const managerMembership = await db.teamMembership.findFirst({
     where: {
       userId: user.id,
@@ -24,9 +20,21 @@ async function authorizeForRequest(requestId: string) {
       approved: true,
     },
   });
-  if (managerMembership) return request;
+
+  if (request.createdById === user.id || managerMembership) {
+    return { request, isManager: !!managerMembership };
+  }
 
   return null;
+}
+
+function assertLineItemEditable(
+  status: string,
+  isManager: boolean,
+): string | null {
+  if (status === "DRAFT") return null;
+  if (status === "SUBMITTED" && isManager) return null;
+  return "Can only edit line items on draft or submitted requests";
 }
 
 async function recalculateRequestTotal(requestId: string) {
@@ -57,17 +65,18 @@ export async function PUT(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let reimbursementRequest;
+  let authResult;
   try {
-    reimbursementRequest = await authorizeForRequest(requestId);
+    authResult = await authorizeForRequest(requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!reimbursementRequest) {
+  if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (reimbursementRequest.status !== "DRAFT") {
-    return NextResponse.json({ error: "Can only edit line items on draft requests" }, { status: 400 });
+  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  if (editError) {
+    return NextResponse.json({ error: editError }, { status: 400 });
   }
 
   const body = updateSchema.safeParse(await request.json());
@@ -110,17 +119,18 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let reimbursementRequest;
+  let authResult;
   try {
-    reimbursementRequest = await authorizeForRequest(requestId);
+    authResult = await authorizeForRequest(requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!reimbursementRequest) {
+  if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (reimbursementRequest.status !== "DRAFT") {
-    return NextResponse.json({ error: "Can only edit line items on draft requests" }, { status: 400 });
+  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  if (editError) {
+    return NextResponse.json({ error: editError }, { status: 400 });
   }
 
   const body = createSchema.safeParse(await request.json());
@@ -163,17 +173,18 @@ export async function DELETE(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let reimbursementRequest;
+  let authResult;
   try {
-    reimbursementRequest = await authorizeForRequest(requestId);
+    authResult = await authorizeForRequest(requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!reimbursementRequest) {
+  if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (reimbursementRequest.status !== "DRAFT") {
-    return NextResponse.json({ error: "Can only edit line items on draft requests" }, { status: 400 });
+  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  if (editError) {
+    return NextResponse.json({ error: editError }, { status: 400 });
   }
 
   const body = deleteSchema.safeParse(await request.json());
