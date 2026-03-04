@@ -3,6 +3,7 @@ type ExtractionForTotals = {
   total: number | { toString(): string } | null;
   lineItems?: Array<{
     lineTotal: number | { toString(): string } | null;
+    excludedAt?: Date | string | null;
   }>;
 };
 
@@ -20,7 +21,8 @@ export function aggregateReimbursableTotals(extractions: ExtractionForTotals[]) 
       // Always use line item totals — excludes tax, reflects user edits
       const lineItemTotal =
         item.lineItems
-          ?.map((line) => toNumber(line.lineTotal) ?? 0)
+          ?.filter((line) => !line.excludedAt)
+          .map((line) => toNumber(line.lineTotal) ?? 0)
           .reduce((sum, amount) => sum + amount, 0) ?? 0;
       return lineItemTotal;
     });

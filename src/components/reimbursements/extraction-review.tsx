@@ -33,8 +33,11 @@ export function ExtractionReview({ receipts }: { receipts: ReceiptWithExtraction
       {receipts.map((receipt) => {
         const ext = receipt.extraction;
         const currency = ext?.currency ?? "USD";
-        const lineItemsSum = ext ? ext.lineItems.reduce((sum, li) => sum + toNumber(li.lineTotal), 0) : 0;
-        const tax = inferTax(ext ? toNumber(ext.tax) : 0, ext ? toNumber(ext.total) : 0, lineItemsSum);
+        const activeItems = ext ? ext.lineItems.filter((li) => !li.excludedAt) : [];
+        const excludedItems = ext ? ext.lineItems.filter((li) => li.excludedAt) : [];
+        const lineItemsSum = activeItems.reduce((sum, li) => sum + toNumber(li.lineTotal), 0);
+        const excludedSum = excludedItems.reduce((sum, li) => sum + toNumber(li.lineTotal), 0);
+        const tax = inferTax(ext ? toNumber(ext.tax) : 0, ext ? toNumber(ext.total) : 0, lineItemsSum + excludedSum);
         const receiptTotal = lineItemsSum;
 
         return (
@@ -75,23 +78,29 @@ export function ExtractionReview({ receipts }: { receipts: ReceiptWithExtraction
                         </tr>
                       </thead>
                       <tbody>
-                        {ext.lineItems.map((item) => (
-                          <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-2 px-3 text-slate-700">{item.description}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{item.quantity?.toString() ?? "-"}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">
-                              {item.unitPrice
-                                ? `${currency} ${item.unitPrice.toString()}`
-                                : "-"}
-                            </td>
-                            <td className="py-2 px-3 text-right text-slate-700">
-                              {item.lineTotal
-                                ? `${currency} ${item.lineTotal.toString()}`
-                                : "-"}
-                            </td>
-                            <td className="py-2 px-3 text-slate-700">{item.category ?? "-"}</td>
-                          </tr>
-                        ))}
+                        {ext.lineItems.map((item) => {
+                          const isExcluded = !!item.excludedAt;
+                          return (
+                            <tr key={item.id} className={isExcluded
+                              ? "border-b border-slate-100 bg-red-50/40"
+                              : "border-b border-slate-100 hover:bg-slate-50"
+                            }>
+                              <td className={`py-2 px-3 ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.description}</td>
+                              <td className={`py-2 px-3 text-right ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.quantity?.toString() ?? "-"}</td>
+                              <td className={`py-2 px-3 text-right ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                                {item.unitPrice
+                                  ? `${currency} ${item.unitPrice.toString()}`
+                                  : "-"}
+                              </td>
+                              <td className={`py-2 px-3 text-right ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                                {item.lineTotal
+                                  ? `${currency} ${item.lineTotal.toString()}`
+                                  : "-"}
+                              </td>
+                              <td className={`py-2 px-3 ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.category ?? "-"}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -100,16 +109,24 @@ export function ExtractionReview({ receipts }: { receipts: ReceiptWithExtraction
                 )}
 
                 <div className="border-t border-slate-200 pt-3 space-y-1">
-                  {tax > 0 && (
+                  {(tax > 0 || excludedSum > 0) && (
                     <>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Subtotal</span>
-                        <span className="font-medium text-slate-700">{currency} {lineItemsSum.toFixed(2)}</span>
+                        <span className="font-medium text-slate-700">{currency} {(lineItemsSum + excludedSum).toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Sales Tax <span className="text-xs text-amber-600">(not reimbursable)</span></span>
-                        <span className="font-medium text-slate-400 line-through">{currency} {tax.toFixed(2)}</span>
-                      </div>
+                      {excludedSum > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500">Manager Excluded <span className="text-xs text-red-500">(removed)</span></span>
+                          <span className="font-medium text-slate-400 line-through">{currency} {excludedSum.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {tax > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500">Sales Tax <span className="text-xs text-amber-600">(not reimbursable)</span></span>
+                          <span className="font-medium text-slate-400 line-through">{currency} {tax.toFixed(2)}</span>
+                        </div>
+                      )}
                     </>
                   )}
                   {receiptTotal > 0 && (

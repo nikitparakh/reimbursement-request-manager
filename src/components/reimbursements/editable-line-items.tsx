@@ -19,6 +19,7 @@ type EditableRow = {
   lineTotal: string;
   category: string;
   isNew?: boolean;
+  excluded?: boolean;
 };
 
 function toEditableRow(item: SerializedLineItem): EditableRow {
@@ -30,6 +31,7 @@ function toEditableRow(item: SerializedLineItem): EditableRow {
     unitPrice: item.unitPrice ?? "",
     lineTotal: item.lineTotal ?? "",
     category: item.category ?? "",
+    excluded: !!item.excludedAt,
   };
 }
 
@@ -121,15 +123,43 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
 
   async function deleteRow(extractionId: string, rowId: string, isNew?: boolean) {
     if (!isNew) {
-      await fetch(`/api/requests/${requestId}/line-items`, {
+      const res = await fetch(`/api/requests/${requestId}/line-items`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lineItemId: rowId }),
       });
+      const result = (await res.json()) as { soft?: boolean };
+      if (result.soft) {
+        setReceiptRows((prev) => {
+          const next = new Map(prev);
+          const rows = [...(next.get(extractionId) ?? [])];
+          const idx = rows.findIndex((r) => r.id === rowId);
+          if (idx !== -1) rows[idx] = { ...rows[idx], excluded: true };
+          next.set(extractionId, rows);
+          return next;
+        });
+        return;
+      }
     }
     setReceiptRows((prev) => {
       const next = new Map(prev);
       const rows = (next.get(extractionId) ?? []).filter((r) => r.id !== rowId);
+      next.set(extractionId, rows);
+      return next;
+    });
+  }
+
+  async function restoreRow(extractionId: string, rowId: string) {
+    await fetch(`/api/requests/${requestId}/line-items`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lineItemId: rowId, excluded: false }),
+    });
+    setReceiptRows((prev) => {
+      const next = new Map(prev);
+      const rows = [...(next.get(extractionId) ?? [])];
+      const idx = rows.findIndex((r) => r.id === rowId);
+      if (idx !== -1) rows[idx] = { ...rows[idx], excluded: false };
       next.set(extractionId, rows);
       return next;
     });
@@ -192,7 +222,7 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
 
   const grandTotal = receiptsWithExtractions.reduce((sum, receipt) => {
     const rows = receiptRows.get(receipt.extraction!.id) ?? [];
-    return sum + rows.reduce((s, r) => s + parseNum(r.lineTotal), 0);
+    return sum + rows.filter((r) => !r.excluded).reduce((s, r) => s + parseNum(r.lineTotal), 0);
   }, 0);
 
   const receiptCards = receiptsWithExtractions.map((receipt) => {
@@ -200,8 +230,11 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
       const currency = ext.currency ?? "USD";
       const rows = receiptRows.get(ext.id) ?? [];
 
-      const subtotal = rows.reduce((sum, r) => sum + parseNum(r.lineTotal), 0);
-      const tax = inferTax(parseNum(ext.tax ?? "0"), parseNum(ext.total ?? "0"), subtotal);
+      const activeRows = rows.filter((r) => !r.excluded);
+      const excludedRows = rows.filter((r) => r.excluded);
+      const subtotal = activeRows.reduce((sum, r) => sum + parseNum(r.lineTotal), 0);
+      const excludedTotal = excludedRows.reduce((sum, r) => sum + parseNum(r.lineTotal), 0);
+      const tax = inferTax(parseNum(ext.tax ?? "0"), parseNum(ext.total ?? "0"), subtotal + excludedTotal);
       const receiptTotal = subtotal;
 
       return (
@@ -229,7 +262,27 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row) => row.excluded ? (
+                    <tr key={row.id} className="border-b border-slate-100 bg-red-50/40">
+                      <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.description}</td>
+                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.quantity || "-"}</td>
+                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.unitPrice || "-"}</td>
+                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.lineTotal || "-"}</td>
+                      <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.category || "-"}</td>
+                      <td className="py-1.5 px-2">
+                        <button
+                          onClick={() => void restoreRow(ext.id, row.id)}
+                          className="text-amber-500 hover:text-amber-700 transition p-1"
+                          aria-label="Restore line item"
+                          title="Undo exclusion"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
                     <tr key={row.id} className="border-b border-slate-100">
                       <td className="py-1.5 px-2">
                         <input
@@ -312,16 +365,24 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
             </button>
 
             <div className="border-t border-slate-200 pt-3 space-y-1">
-              {tax > 0 && (
+              {(tax > 0 || excludedTotal > 0) && (
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Subtotal</span>
-                    <span className="font-medium text-slate-700">{formatCurrency(subtotal, currency)}</span>
+                    <span className="font-medium text-slate-700">{formatCurrency(subtotal + excludedTotal, currency)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Sales Tax <span className="text-xs text-amber-600">(not reimbursable)</span></span>
-                    <span className="font-medium text-slate-400 line-through">{formatCurrency(tax, currency)}</span>
-                  </div>
+                  {excludedTotal > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Manager Excluded <span className="text-xs text-red-500">(removed)</span></span>
+                      <span className="font-medium text-slate-400 line-through">{formatCurrency(excludedTotal, currency)}</span>
+                    </div>
+                  )}
+                  {tax > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Sales Tax <span className="text-xs text-amber-600">(not reimbursable)</span></span>
+                      <span className="font-medium text-slate-400 line-through">{formatCurrency(tax, currency)}</span>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex justify-between text-sm font-semibold">

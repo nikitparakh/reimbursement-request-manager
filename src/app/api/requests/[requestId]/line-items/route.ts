@@ -22,7 +22,7 @@ async function authorizeForRequest(requestId: string) {
   });
 
   if (request.createdById === user.id || managerMembership) {
-    return { request, isManager: !!managerMembership };
+    return { request, isManager: !!managerMembership, userId: user.id };
   }
 
   return null;
@@ -58,6 +58,7 @@ const updateSchema = z.object({
   unitPrice: z.number().nullable().optional(),
   lineTotal: z.number().nullable().optional(),
   category: z.string().nullable().optional(),
+  excluded: z.boolean().optional(),
 });
 
 export async function PUT(
@@ -84,9 +85,8 @@ export async function PUT(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const { lineItemId, ...updates } = body.data;
+  const { lineItemId, excluded, ...updates } = body.data;
 
-  // Verify the line item belongs to this request
   const lineItem = await db.receiptLineItem.findUnique({
     where: { id: lineItemId },
     include: { receiptExtraction: { include: { receiptFile: true } } },
@@ -95,9 +95,15 @@ export async function PUT(
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
+  const data: Record<string, unknown> = { ...updates };
+  if (excluded === false) {
+    data.excludedAt = null;
+    data.excludedById = null;
+  }
+
   const updated = await db.receiptLineItem.update({
     where: { id: lineItemId },
-    data: updates,
+    data,
   });
 
   await recalculateRequestTotal(requestId);
@@ -192,7 +198,6 @@ export async function DELETE(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  // Verify the line item belongs to this request
   const lineItem = await db.receiptLineItem.findUnique({
     where: { id: body.data.lineItemId },
     include: { receiptExtraction: { include: { receiptFile: true } } },
@@ -201,9 +206,18 @@ export async function DELETE(
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
-  await db.receiptLineItem.delete({ where: { id: body.data.lineItemId } });
+  const isSoftDelete = authResult.isManager && authResult.request.status === "SUBMITTED";
+
+  if (isSoftDelete) {
+    await db.receiptLineItem.update({
+      where: { id: body.data.lineItemId },
+      data: { excludedAt: new Date(), excludedById: authResult.userId },
+    });
+  } else {
+    await db.receiptLineItem.delete({ where: { id: body.data.lineItemId } });
+  }
 
   await recalculateRequestTotal(requestId);
 
-  return NextResponse.json({ deleted: true });
+  return NextResponse.json({ deleted: true, soft: isSoftDelete });
 }

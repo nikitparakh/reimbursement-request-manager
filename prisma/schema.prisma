@@ -85,6 +85,7 @@ model User {
   approvals       ApprovalAction[]
   auditLogs       AuditLog[]
   notifications   Notification[]
+  excludedLineItems ReceiptLineItem[] @relation("LineItemExcludedBy")
 }
 
 model Team {
@@ -201,9 +202,12 @@ model ReceiptLineItem {
   unitPrice           Decimal?
   lineTotal           Decimal?
   category            String?
+  excludedAt          DateTime?
+  excludedById        String?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   receiptExtraction   ReceiptExtraction @relation(fields: [receiptExtractionId], references: [id], onDelete: Cascade)
+  excludedBy          User?             @relation("LineItemExcludedBy", fields: [excludedById], references: [id], onDelete: SetNull)
 
   @@index([receiptExtractionId, position])
 }

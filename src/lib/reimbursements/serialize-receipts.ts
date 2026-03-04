@@ -8,6 +8,7 @@ export type SerializedLineItem = {
   unitPrice: string | null;
   lineTotal: string | null;
   category: string | null;
+  excludedAt: string | null;
 };
 
 export type SerializedExtraction = {
@@ -62,6 +63,7 @@ export function serializeReceipts(
             unitPrice: li.unitPrice?.toString() ?? null,
             lineTotal: li.lineTotal?.toString() ?? null,
             category: li.category,
+            excludedAt: li.excludedAt?.toISOString() ?? null,
           })),
         }
       : null,
