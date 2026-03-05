@@ -8,7 +8,6 @@ const envSchema = z.object({
   GOOGLE_AI_API_KEY: z.string().optional(),
   GOOGLE_AI_MODEL: z.string().default("gemini-2.5-flash"),
   LOCAL_STORAGE_DIR: z.string().default("data/uploads"),
-  INTERNAL_JOB_SECRET: z.string().min(1).default("dev-job-secret"),
 });
 
 export const env = envSchema.parse(process.env);

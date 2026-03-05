@@ -12,19 +12,19 @@ describe("PATCH /api/admin/users/[id]/role", () => {
     clearMockSession();
   });
 
-  it("admin changes role to MANAGER → 200", async () => {
+  it("admin changes role to COACH → 200", async () => {
     const admin = await createUser({ role: "ADMIN" });
     const target = await createUser({ role: "STUDENT" });
     setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
 
     const { status, data } = await callRouteJSON(
       PATCH,
-      { method: "PATCH", body: { role: "MANAGER" } },
+      { method: "PATCH", body: { role: "COACH" } },
       { id: target.id }
     );
 
     expect(status).toBe(200);
-    expect((data as any).role).toBe("MANAGER");
+    expect((data as any).role).toBe("COACH");
   });
 
   it("admin changes role to ADMIN → 200", async () => {
@@ -42,10 +42,10 @@ describe("PATCH /api/admin/users/[id]/role", () => {
     expect((data as any).role).toBe("ADMIN");
   });
 
-  it("student → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+  it("user → 403", async () => {
+    const user = await createUser({ role: "STUDENT" });
     const target = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       PATCH,
@@ -55,10 +55,10 @@ describe("PATCH /api/admin/users/[id]/role", () => {
     expect(status).toBe(403);
   });
 
-  it("manager → 403", async () => {
-    const manager = await createUser({ role: "MANAGER" });
+  it("coach → 403", async () => {
+    const coach = await createUser({ role: "COACH" });
     const target = await createUser({ role: "STUDENT" });
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(
       PATCH,

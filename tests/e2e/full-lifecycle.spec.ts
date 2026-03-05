@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 import { signIn } from "./helpers";
 
 test.describe("Full lifecycle E2E", () => {
-  test("student creates and submits → manager approves → admin approves", async ({
+  test("user creates and submits → coach approves → admin approves", async ({
     page,
   }) => {
-    // --- STUDENT: Create and submit a request ---
-    await signIn(page, "student@team.org", "Student1234");
+    // --- USER: Create and submit a request ---
+    await signIn(page, "user@team.org", "User1234");
     await expect(page.getByText("Dashboard")).toBeVisible();
 
     // Navigate to new request
@@ -37,8 +37,8 @@ test.describe("Full lifecycle E2E", () => {
       ).toBeVisible({ timeout: 10_000 });
     }
 
-    // --- MANAGER: Approve the request ---
-    await signIn(page, "manager@team.org", "Manager1234");
+    // --- COACH: Approve the request ---
+    await signIn(page, "coach@team.org", "Coach1234");
     await expect(page.getByText("Dashboard")).toBeVisible();
 
     await page.getByText("Review Inbox").click();

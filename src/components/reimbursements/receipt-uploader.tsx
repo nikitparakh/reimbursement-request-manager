@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 
@@ -27,6 +27,13 @@ export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUpl
   const [isError, setIsError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setUploads((prev) => {
+      const next = prev.filter((u) => u.status === "uploading");
+      return next.length === prev.length ? prev : next;
+    });
+  }, [existingReceipts]);
 
   async function deleteReceipt(receiptId: string) {
     setDeletedIds((prev) => new Set(prev).add(receiptId));

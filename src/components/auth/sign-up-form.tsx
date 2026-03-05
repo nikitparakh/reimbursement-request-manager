@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
 import { Alert } from "@/components/ui/alert";
 
-export function SignUpForm() {
+type SignUpFormProps = {
+  role?: "STUDENT" | "ADMIN";
+};
+
+export function SignUpForm({ role = "STUDENT" }: SignUpFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +28,7 @@ export function SignUpForm() {
       response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, role }),
       });
     } catch {
       setMessage("Network error while creating account.");

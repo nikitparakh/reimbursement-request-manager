@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
-import { enqueueReceiptParseJob } from "@/lib/jobs/enqueue-parse";
+import { processReceipt, recomputeRequestTotal } from "@/lib/jobs/process-receipt";
 
 export async function POST(
   _request: Request,
@@ -23,7 +23,6 @@ export async function POST(
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
-  // Pick up both QUEUED (first parse) and FAILED (retry) receipts
   const receiptsToProcess = await db.receiptFile.findMany({
     where: { requestId, parseStatus: { in: ["QUEUED", "FAILED"] } },
   });
@@ -32,27 +31,17 @@ export async function POST(
     return NextResponse.json({ queued: 0 });
   }
 
-  // Reset FAILED receipts back to QUEUED before re-enqueuing
-  const failedIds = receiptsToProcess.filter((r) => r.parseStatus === "FAILED").map((r) => r.id);
-  if (failedIds.length > 0) {
-    await db.receiptFile.updateMany({
-      where: { id: { in: failedIds } },
-      data: { parseStatus: "QUEUED" },
-    });
-  }
+  const results = await Promise.allSettled(
+    receiptsToProcess.map((receipt) => processReceipt(receipt.id))
+  );
 
-  const errors: string[] = [];
-  for (const receipt of receiptsToProcess) {
-    try {
-      await enqueueReceiptParseJob(receipt.id);
-    } catch {
-      errors.push(receipt.id);
-    }
-  }
+  await recomputeRequestTotal(requestId);
+
+  const errors = results.filter((r) => r.status === "rejected");
 
   if (errors.length > 0) {
     return NextResponse.json(
-      { error: `Failed to enqueue ${errors.length} receipt(s)`, queued: receiptsToProcess.length - errors.length },
+      { error: `Failed to process ${errors.length} receipt(s)`, queued: receiptsToProcess.length - errors.length },
       { status: 207 }
     );
   }

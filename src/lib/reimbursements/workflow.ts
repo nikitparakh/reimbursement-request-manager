@@ -9,8 +9,8 @@ export async function transitionRequestStatus(input: {
   actorId: string;
   nextStatus:
     | "SUBMITTED"
-    | "MANAGER_APPROVED"
-    | "MANAGER_REJECTED"
+    | "COACH_APPROVED"
+    | "COACH_REJECTED"
     | "ADMIN_APPROVED"
     | "ADMIN_REJECTED"
     | "PAID"

@@ -3,6 +3,7 @@ import { unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
+import { recomputeRequestTotal } from "@/lib/jobs/process-receipt";
 
 export async function DELETE(
   _request: Request,
@@ -42,6 +43,8 @@ export async function DELETE(
   }
 
   await db.receiptFile.delete({ where: { id: receiptId } });
+
+  await recomputeRequestTotal(requestId);
 
   if (receipt.storageUrl.startsWith("file://")) {
     try {

@@ -25,14 +25,14 @@ Parent/Mentor                 Coach                  Admin
                                                  or Mark Paid
 ```
 
-**Statuses:** `DRAFT` → `SUBMITTED` → `MANAGER_APPROVED` / `MANAGER_REJECTED` → `ADMIN_APPROVED` / `ADMIN_REJECTED` → `PAID`
+**Statuses:** `DRAFT` → `SUBMITTED` → `COACH_APPROVED` / `COACH_REJECTED` → `ADMIN_APPROVED` / `ADMIN_REJECTED` → `PAID`
 
 ## Roles
 
 | Role | Label | Capabilities |
 |------|-------|-------------|
 | `STUDENT` | Parent/Mentor | Create requests, upload receipts, edit line items, submit |
-| `MANAGER` | Coach | All student abilities + review/approve/reject submitted requests |
+| `COACH` | Coach | All parent/mentor abilities + review/approve/reject submitted requests |
 | `ADMIN` | Admin | Approve/reject coach-approved requests, mark paid, manage teams |
 
 ## Getting Started
@@ -83,8 +83,8 @@ src/
 │   │   ├── page.tsx            # Dashboard
 │   │   ├── onboarding/         # Team join / registration
 │   │   ├── team/               # Team member view
-│   │   ├── student/requests/   # Create, view, manage requests
-│   │   ├── manager/            # Coach inbox + team reimbursements
+│   │   ├── user/requests/      # Create, view, manage requests
+│   │   ├── coach/              # Coach inbox + team reimbursements
 │   │   └── admin/              # Admin inbox + team approvals
 │   └── api/                    # Route handlers
 │       ├── auth/               # Registration + NextAuth

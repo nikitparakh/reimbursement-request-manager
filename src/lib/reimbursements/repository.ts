@@ -6,7 +6,7 @@ export async function createRequestDraft(input: {
   description?: string;
   teamId: string;
   createdById: string;
-  managerId?: string;
+  coachId?: string;
 }) {
   return db.reimbursementRequest.create({
     data: {
@@ -14,7 +14,7 @@ export async function createRequestDraft(input: {
       description: input.description,
       teamId: input.teamId,
       createdById: input.createdById,
-      managerId: input.managerId,
+      coachId: input.coachId,
       requestedTotal: new Prisma.Decimal(0),
       status: "DRAFT",
     },
@@ -37,8 +37,8 @@ export async function getRequestWithDetails(requestId: string) {
   });
 }
 
-export async function findTeamManager(teamId: string) {
+export async function findTeamCoach(teamId: string) {
   return db.teamMembership.findFirst({
-    where: { teamId, roleInTeam: "MANAGER", approved: true },
+    where: { teamId, roleInTeam: "COACH", approved: true },
   });
 }

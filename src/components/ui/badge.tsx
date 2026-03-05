@@ -1,8 +1,8 @@
 const colorMap: Record<string, string> = {
   DRAFT: "bg-slate-100 text-slate-700",
   SUBMITTED: "bg-amber-100 text-amber-800",
-  MANAGER_APPROVED: "bg-emerald-100 text-emerald-800",
-  MANAGER_REJECTED: "bg-red-100 text-red-800",
+  COACH_APPROVED: "bg-emerald-100 text-emerald-800",
+  COACH_REJECTED: "bg-red-100 text-red-800",
   ADMIN_APPROVED: "bg-emerald-100 text-emerald-800",
   ADMIN_REJECTED: "bg-red-100 text-red-800",
   PAID: "bg-indigo-100 text-indigo-800",
@@ -18,14 +18,14 @@ const colorMap: Record<string, string> = {
   REOPEN: "bg-amber-100 text-amber-800",
   MARK_PAID: "bg-indigo-100 text-indigo-800",
   STUDENT: "bg-blue-100 text-blue-800",
-  MANAGER: "bg-purple-100 text-purple-800",
+  COACH: "bg-purple-100 text-purple-800",
 };
 
 const labelMap: Record<string, string> = {
   STUDENT: "PARENT/MENTOR",
-  MANAGER: "COACH",
-  MANAGER_APPROVED: "COACH APPROVED",
-  MANAGER_REJECTED: "COACH REJECTED",
+  COACH: "COACH",
+  COACH_APPROVED: "COACH APPROVED",
+  COACH_REJECTED: "COACH REJECTED",
 };
 
 type BadgeProps = {

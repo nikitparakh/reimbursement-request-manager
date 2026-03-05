@@ -6,26 +6,22 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 
 type NavLink = { href: string; label: string };
 
-const studentLinks: NavLink[] = [
+const userLinks: NavLink[] = [
   { href: "/team", label: "My Team" },
-  { href: "/student/requests/new", label: "New Request" },
-  { href: "/student/requests", label: "My Requests" },
+  { href: "/user/requests/new", label: "New Request" },
+  { href: "/user/requests", label: "My Requests" },
 ];
 
-const managerLinks: NavLink[] = [
+const coachLinks: NavLink[] = [
   { href: "/team", label: "My Team" },
-  { href: "/student/requests/new", label: "New Request" },
-  { href: "/student/requests", label: "My Requests" },
-  { href: "/manager/inbox", label: "Coach Inbox" },
-  { href: "/manager/team-reimbursements", label: "Team Reimbursements" },
+  { href: "/user/requests/new", label: "New Request" },
+  { href: "/coach/team-reimbursements", label: "Team Reimbursements" },
 ];
 
 const adminLinks: NavLink[] = [
-  { href: "/team", label: "My Team" },
-  { href: "/student/requests/new", label: "New Request" },
-  { href: "/student/requests", label: "My Requests" },
   { href: "/admin/inbox", label: "Admin Inbox" },
-  { href: "/admin/team-requests", label: "Team Requests" },
+  { href: "/admin/requests", label: "Reimbursements" },
+  { href: "/admin/teams", label: "Manage Teams" },
   { href: "/admin/users", label: "Manage Users" },
 ];
 
@@ -33,10 +29,10 @@ function getLinksForRole(role: string): NavLink[] {
   switch (role) {
     case "ADMIN":
       return adminLinks;
-    case "MANAGER":
-      return managerLinks;
+    case "COACH":
+      return coachLinks;
     default:
-      return studentLinks;
+      return userLinks;
   }
 }
 
@@ -65,7 +61,7 @@ export async function NavBar() {
               ))}
             </div>
             <div className="flex items-center gap-4">
-              <NotificationBell />
+              <NotificationBell userRole={session.user.role} />
               <span className="text-sm text-slate-500">{session.user.email}</span>
               <SignOutButton />
             </div>

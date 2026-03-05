@@ -22,6 +22,12 @@ export default function SignUpPage() {
           Sign in
         </Link>
       </p>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        Signing up as an admin?{" "}
+        <Link href="/admin-sign-up" className="font-medium text-emerald-600 hover:text-emerald-500">
+          Register here
+        </Link>
+      </p>
     </div>
   );
 }

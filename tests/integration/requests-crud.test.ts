@@ -25,14 +25,14 @@ describe("POST /api/requests", () => {
   });
 
   it("team member creates draft → 201", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(postRequest, {
       method: "POST",
@@ -44,28 +44,28 @@ describe("POST /api/requests", () => {
     expect((data as any).title).toBe("New Request");
   });
 
-  it("auto-assigns team manager", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    const manager = await createUser({ role: "MANAGER" });
+  it("auto-assigns team coach", async () => {
+    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "COACH" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     await createMembership({
-      userId: manager.id,
+      userId: coach.id,
       teamId: team.id,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
     });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { data } = await callRouteJSON(postRequest, {
       method: "POST",
       body: { title: "Request", teamId: team.id },
     });
 
-    expect((data as any).managerId).toBe(manager.id);
+    expect((data as any).coachId).toBe(coach.id);
   });
 
   it("unauthenticated → 401", async () => {
@@ -77,9 +77,9 @@ describe("POST /api/requests", () => {
   });
 
   it("non-member → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(postRequest, {
       method: "POST",
@@ -89,14 +89,14 @@ describe("POST /api/requests", () => {
   });
 
   it("missing title → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(postRequest, {
       method: "POST",
@@ -113,14 +113,14 @@ describe("GET /api/requests", () => {
   });
 
   it("returns own requests → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const other = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createRequest({ teamId: team.id, createdById: student.id });
-    await createRequest({ teamId: team.id, createdById: student.id });
+    await createRequest({ teamId: team.id, createdById: user.id });
+    await createRequest({ teamId: team.id, createdById: user.id });
     await createRequest({ teamId: team.id, createdById: other.id });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(getRequests);
     expect(status).toBe(200);
@@ -140,14 +140,14 @@ describe("GET /api/requests/[requestId]", () => {
   });
 
   it("creator views → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       getRequest,
@@ -159,7 +159,7 @@ describe("GET /api/requests/[requestId]", () => {
   });
 
   it("team member (non-creator) views → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const teammate = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
@@ -169,7 +169,7 @@ describe("GET /api/requests/[requestId]", () => {
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
     setMockUser({ id: teammate.id, email: teammate.email, role: "STUDENT" });
@@ -183,12 +183,12 @@ describe("GET /api/requests/[requestId]", () => {
   });
 
   it("non-team-member → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const outsider = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
     setMockUser({ id: outsider.id, email: outsider.email, role: "STUDENT" });
@@ -202,8 +202,8 @@ describe("GET /api/requests/[requestId]", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       getRequest,
@@ -221,14 +221,14 @@ describe("DELETE /api/requests/[requestId]", () => {
   });
 
   it("creator deletes draft → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       deleteRequest,
@@ -240,12 +240,12 @@ describe("DELETE /api/requests/[requestId]", () => {
   });
 
   it("non-creator → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const other = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
     setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
@@ -259,15 +259,15 @@ describe("DELETE /api/requests/[requestId]", () => {
   });
 
   it("non-draft (SUBMITTED) → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       deleteRequest,
@@ -278,8 +278,8 @@ describe("DELETE /api/requests/[requestId]", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       deleteRequest,

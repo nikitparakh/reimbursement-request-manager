@@ -18,17 +18,17 @@ describe("transitionRequestStatus", () => {
   });
 
   it("transitions DRAFT → SUBMITTED", async () => {
-    const student = await createUser();
+    const user = await createUser();
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "DRAFT",
     });
 
     const updated = await transitionRequestStatus({
       requestId: req.id,
-      actorId: student.id,
+      actorId: user.id,
       nextStatus: "SUBMITTED",
       action: "SUBMIT",
     });
@@ -38,17 +38,17 @@ describe("transitionRequestStatus", () => {
   });
 
   it("creates an ApprovalAction record", async () => {
-    const student = await createUser();
+    const user = await createUser();
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "DRAFT",
     });
 
     await transitionRequestStatus({
       requestId: req.id,
-      actorId: student.id,
+      actorId: user.id,
       nextStatus: "SUBMITTED",
       action: "SUBMIT",
       comment: "Ready for review",
@@ -63,17 +63,17 @@ describe("transitionRequestStatus", () => {
   });
 
   it("writes an audit log entry", async () => {
-    const student = await createUser();
+    const user = await createUser();
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "DRAFT",
     });
 
     await transitionRequestStatus({
       requestId: req.id,
-      actorId: student.id,
+      actorId: user.id,
       nextStatus: "SUBMITTED",
       action: "SUBMIT",
     });
@@ -86,11 +86,11 @@ describe("transitionRequestStatus", () => {
   });
 
   it("recalculates requestedTotal from extractions", async () => {
-    const student = await createUser();
+    const user = await createUser();
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "DRAFT",
     });
     const receipt = await createReceipt({ requestId: req.id });
@@ -108,7 +108,7 @@ describe("transitionRequestStatus", () => {
 
     const updated = await transitionRequestStatus({
       requestId: req.id,
-      actorId: student.id,
+      actorId: user.id,
       nextStatus: "SUBMITTED",
       action: "SUBMIT",
     });
@@ -117,18 +117,18 @@ describe("transitionRequestStatus", () => {
   });
 
   it("rejects invalid transition", async () => {
-    const student = await createUser();
+    const user = await createUser();
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "DRAFT",
     });
 
     await expect(
       transitionRequestStatus({
         requestId: req.id,
-        actorId: student.id,
+        actorId: user.id,
         nextStatus: "ADMIN_APPROVED",
         action: "APPROVE",
       })

@@ -24,13 +24,13 @@ describe("GET /api/receipts/[receiptId]/download", () => {
   });
 
   it("returns file with correct content-type → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     const receipt = await createReceipt({ requestId: req.id, fileName: "test.pdf" });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const response = await callRoute(GET, {}, { receiptId: receipt.id });
     expect(response.status).toBe(200);
@@ -39,12 +39,12 @@ describe("GET /api/receipts/[receiptId]/download", () => {
   });
 
   it("team member can download → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const teammate = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
     await createMembership({ userId: teammate.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     const receipt = await createReceipt({ requestId: req.id });
 
     setMockUser({ id: teammate.id, email: teammate.email, role: "STUDENT" });
@@ -54,11 +54,11 @@ describe("GET /api/receipts/[receiptId]/download", () => {
   });
 
   it("non-member → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const outsider = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     const receipt = await createReceipt({ requestId: req.id });
 
     setMockUser({ id: outsider.id, email: outsider.email, role: "STUDENT" });
@@ -68,8 +68,8 @@ describe("GET /api/receipts/[receiptId]/download", () => {
   });
 
   it("nonexistent receipt → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const response = await callRoute(GET, {}, { receiptId: "nonexistent" });
     expect(response.status).toBe(404);

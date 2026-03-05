@@ -34,7 +34,7 @@ export default async function TeamPage() {
     },
   });
 
-  // Deduplicate by team (user could have both STUDENT and MANAGER roles in same team)
+  // Deduplicate by team (user could have both STUDENT and COACH roles in same team)
   const teamMap = new Map<
     string,
     {
@@ -60,7 +60,7 @@ export default async function TeamPage() {
         shortCode: membership.team.shortCode,
         myRoles: [membership.roleInTeam],
         coaches: membership.team.memberships
-          .filter((m) => m.roleInTeam === "MANAGER")
+          .filter((m) => m.roleInTeam === "COACH")
           .map((m) => m.user),
         parents: membership.team.memberships
           .filter((m) => m.roleInTeam === "STUDENT")

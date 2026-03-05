@@ -115,7 +115,7 @@ export function RequestActions({
       setIsError(true);
       return;
     }
-    router.push("/student/requests");
+    router.push("/user/requests");
   }
 
   return (
@@ -123,7 +123,7 @@ export function RequestActions({
       <ReceiptUploader requestId={requestId} existingReceipts={existingReceipts} />
 
       {hasExtractions && (
-        <EditableLineItems requestId={requestId} receipts={receiptsWithExtractions} />
+        <EditableLineItems requestId={requestId} receipts={receiptsWithExtractions} allowReceiptDeletion />
       )}
 
       {hasUnparsedReceipts && (
@@ -187,7 +187,7 @@ export function RequestActions({
                       setIsDeleting(false);
                       return;
                     }
-                    router.push("/student/requests");
+                    router.push("/user/requests");
                   } catch {
                     setMessage("Failed to delete request.");
                     setIsError(true);

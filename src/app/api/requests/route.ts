@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createRequestDraft, findTeamManager } from "@/lib/reimbursements/repository";
+import { createRequestDraft, findTeamCoach } from "@/lib/reimbursements/repository";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 
@@ -46,13 +46,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User is not a member of this team" }, { status: 403 });
   }
 
-  const managerMembership = await findTeamManager(body.data.teamId);
+  const coachMembership = await findTeamCoach(body.data.teamId);
   const draft = await createRequestDraft({
     title: body.data.title,
     description: body.data.description,
     teamId: body.data.teamId,
     createdById: userId,
-    managerId: managerMembership?.userId,
+    coachId: coachMembership?.userId,
   });
 
   return NextResponse.json(draft, { status: 201 });

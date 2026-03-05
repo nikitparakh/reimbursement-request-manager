@@ -83,7 +83,7 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
           {message}
           {requestId ? (
             <Link
-              href={`/student/requests/${requestId}`}
+              href={`/user/requests/${requestId}`}
               className="ml-2 font-medium underline"
             >
               Open request to upload receipts

@@ -14,7 +14,7 @@ type Team = {
 
 export function TeamSelector({ teams }: { teams: Team[] }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
-  const [roleIntent, setRoleIntent] = useState<"STUDENT" | "MANAGER">("STUDENT");
+  const [roleIntent, setRoleIntent] = useState<"STUDENT" | "COACH">("STUDENT");
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -54,10 +54,10 @@ export function TeamSelector({ teams }: { teams: Team[] }) {
         <Select
           id="roleIntent"
           value={roleIntent}
-          onChange={(event) => setRoleIntent(event.target.value as "STUDENT" | "MANAGER")}
+          onChange={(event) => setRoleIntent(event.target.value as "STUDENT" | "COACH")}
         >
           <option value="STUDENT">Parent/Mentor</option>
-          <option value="MANAGER">Coach</option>
+          <option value="COACH">Coach</option>
         </Select>
       </FormField>
 

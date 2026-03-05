@@ -1,6 +1,6 @@
-type RouteHandler = (
+type RouteHandler<P extends Record<string, string> = Record<string, string>> = (
   request: Request,
-  context: { params: Promise<Record<string, string>> }
+  context: { params: Promise<P> }
 ) => Promise<Response> | Response;
 
 type CallOptions = {
@@ -10,10 +10,10 @@ type CallOptions = {
   headers?: Record<string, string>;
 };
 
-export async function callRoute(
-  handler: RouteHandler,
+export async function callRoute<P extends Record<string, string>>(
+  handler: RouteHandler<P>,
   options: CallOptions = {},
-  params: Record<string, string> = {}
+  params: P = {} as P
 ): Promise<Response> {
   const method = options.method ?? "GET";
 
@@ -35,10 +35,10 @@ export async function callRoute(
   return handler(request, { params: Promise.resolve(params) });
 }
 
-export async function callRouteJSON<T = unknown>(
-  handler: RouteHandler,
+export async function callRouteJSON<T = unknown, P extends Record<string, string> = Record<string, string>>(
+  handler: RouteHandler<P>,
   options: CallOptions = {},
-  params: Record<string, string> = {}
+  params: P = {} as P
 ): Promise<{ status: number; data: T }> {
   const response = await callRoute(handler, options, params);
   const data = (await response.json()) as T;

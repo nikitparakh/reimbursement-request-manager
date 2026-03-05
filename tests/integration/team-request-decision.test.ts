@@ -56,14 +56,14 @@ describe("POST /api/admin/team-requests/[id]/decision", () => {
     expect((data as any).rejectionReason).toBe("Not needed");
   });
 
-  it("student → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
+  it("user → 403", async () => {
+    const user = await createUser({ role: "STUDENT" });
     const requester = await createUser();
     const req = await createTeamRegistrationRequest({
       teamName: "Team",
       requestedById: requester.id,
     });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -73,14 +73,14 @@ describe("POST /api/admin/team-requests/[id]/decision", () => {
     expect(status).toBe(403);
   });
 
-  it("manager → 403", async () => {
-    const manager = await createUser({ role: "MANAGER" });
+  it("coach → 403", async () => {
+    const coach = await createUser({ role: "COACH" });
     const requester = await createUser();
     const req = await createTeamRegistrationRequest({
       teamName: "Team",
       requestedById: requester.id,
     });
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(
       POST,

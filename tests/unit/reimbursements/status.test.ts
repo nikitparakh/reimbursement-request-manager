@@ -4,8 +4,8 @@ import { assertTransition, canTransition } from "@/lib/reimbursements/status";
 describe("request status transitions", () => {
   it("allows valid transitions", () => {
     expect(canTransition("DRAFT", "SUBMITTED")).toBe(true);
-    expect(canTransition("SUBMITTED", "MANAGER_APPROVED")).toBe(true);
-    expect(canTransition("MANAGER_APPROVED", "ADMIN_APPROVED")).toBe(true);
+    expect(canTransition("SUBMITTED", "COACH_APPROVED")).toBe(true);
+    expect(canTransition("COACH_APPROVED", "ADMIN_APPROVED")).toBe(true);
   });
 
   it("rejects invalid transitions", () => {

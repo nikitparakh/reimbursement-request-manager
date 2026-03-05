@@ -4,13 +4,13 @@ import { hash } from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const [adminPassword, managerPassword, studentPassword] = await Promise.all([
+  const [adminPassword, coachPassword, userPassword] = await Promise.all([
     hash("Admin1234", 12),
-    hash("Manager1234", 12),
-    hash("Student1234", 12),
+    hash("Coach1234", 12),
+    hash("User1234", 12),
   ]);
 
-  const [admin, manager, student] = await Promise.all([
+  const [admin, coach, user] = await Promise.all([
     prisma.user.upsert({
       where: { email: "admin@school.org" },
       update: { role: "ADMIN", onboardingDone: true, passwordHash: adminPassword },
@@ -23,25 +23,25 @@ async function main() {
       },
     }),
     prisma.user.upsert({
-      where: { email: "manager@team.org" },
-      update: { role: "MANAGER", onboardingDone: true, passwordHash: managerPassword },
+      where: { email: "coach@team.org" },
+      update: { role: "COACH", onboardingDone: true, passwordHash: coachPassword },
       create: {
-        email: "manager@team.org",
-        name: "Team Manager",
-        role: "MANAGER",
+        email: "coach@team.org",
+        name: "Team Coach",
+        role: "COACH",
         onboardingDone: true,
-        passwordHash: managerPassword,
+        passwordHash: coachPassword,
       },
     }),
     prisma.user.upsert({
-      where: { email: "student@team.org" },
-      update: { role: "STUDENT", onboardingDone: true, passwordHash: studentPassword },
+      where: { email: "user@team.org" },
+      update: { role: "STUDENT", onboardingDone: true, passwordHash: userPassword },
       create: {
-        email: "student@team.org",
-        name: "Student Member",
+        email: "user@team.org",
+        name: "Team Member",
         role: "STUDENT",
         onboardingDone: true,
-        passwordHash: studentPassword,
+        passwordHash: userPassword,
       },
     }),
   ]);
@@ -55,30 +55,30 @@ async function main() {
   await prisma.teamMembership.upsert({
     where: {
       userId_teamId_roleInTeam: {
-        userId: manager.id,
+        userId: coach.id,
         teamId: team.id,
-        roleInTeam: "MANAGER",
+        roleInTeam: "COACH",
       },
     },
     update: {},
     create: {
-      userId: manager.id,
+      userId: coach.id,
       teamId: team.id,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
     },
   });
 
   await prisma.teamMembership.upsert({
     where: {
       userId_teamId_roleInTeam: {
-        userId: student.id,
+        userId: user.id,
         teamId: team.id,
         roleInTeam: "STUDENT",
       },
     },
     update: {},
     create: {
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     },
@@ -91,8 +91,8 @@ async function main() {
       title: "Robot Parts - Week 3",
       description: "Aluminum extrusions and motor controllers from AndyMark",
       teamId: team.id,
-      createdById: student.id,
-      managerId: manager.id,
+      createdById: user.id,
+      coachId: coach.id,
       status: "DRAFT",
       requestedTotal: new Prisma.Decimal("0.00"),
     },
@@ -103,8 +103,8 @@ async function main() {
       title: "Field Trip Supplies",
       description: "Snacks and water for competition travel",
       teamId: team.id,
-      createdById: student.id,
-      managerId: manager.id,
+      createdById: user.id,
+      coachId: coach.id,
       status: "SUBMITTED",
       requestedTotal: new Prisma.Decimal("47.83"),
       submittedAt: new Date(),
@@ -116,9 +116,9 @@ async function main() {
       title: "Safety Equipment",
       description: "Safety glasses and gloves for the shop",
       teamId: team.id,
-      createdById: student.id,
-      managerId: manager.id,
-      status: "MANAGER_APPROVED",
+      createdById: user.id,
+      coachId: coach.id,
+      status: "COACH_APPROVED",
       requestedTotal: new Prisma.Decimal("89.95"),
       submittedAt: new Date(Date.now() - 3 * 86_400_000),
     },
@@ -189,21 +189,21 @@ async function main() {
     ],
   });
 
-  // --- Approval for manager-approved request ---
+  // --- Approval for coach-approved request ---
 
   await prisma.approvalAction.create({
     data: {
       requestId: submittedRequest.id,
-      actorId: student.id,
+      actorId: user.id,
       action: "SUBMIT",
-      comment: "Submitted by student",
+      comment: "Submitted for review",
     },
   });
 
   await prisma.approvalAction.create({
     data: {
       requestId: approvedRequest.id,
-      actorId: student.id,
+      actorId: user.id,
       action: "SUBMIT",
     },
   });
@@ -211,7 +211,7 @@ async function main() {
   await prisma.approvalAction.create({
     data: {
       requestId: approvedRequest.id,
-      actorId: manager.id,
+      actorId: coach.id,
       action: "APPROVE",
       comment: "Looks good, safety first!",
     },
@@ -224,7 +224,7 @@ async function main() {
       teamName: "Iron Panthers 4180",
       shortCode: "IP4180",
       notes: "New team from West High School. We have 15 members and a coach sponsor.",
-      requestedById: student.id,
+      requestedById: user.id,
     },
   });
 

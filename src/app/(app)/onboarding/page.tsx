@@ -1,4 +1,4 @@
-import { unauthorized } from "next/navigation";
+import { redirect, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { TeamSelector } from "@/components/onboarding/team-selector";
@@ -10,6 +10,19 @@ export default async function OnboardingPage() {
   const session = await auth();
   if (!session?.user) {
     unauthorized();
+  }
+
+  if (session.user.role === "ADMIN") {
+    redirect("/");
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { onboardingDone: true },
+  });
+
+  if (user?.onboardingDone) {
+    redirect("/");
   }
 
   const teams = await db.team.findMany({

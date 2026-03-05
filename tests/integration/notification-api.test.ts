@@ -20,7 +20,7 @@ describe("GET /api/notifications", () => {
     await db.notification.createMany({
       data: [
         { userId: user.id, event: "REQUEST_SUBMITTED", message: "Notif 1" },
-        { userId: user.id, event: "MANAGER_APPROVED", message: "Notif 2", read: true },
+        { userId: user.id, event: "COACH_APPROVED", message: "Notif 2", read: true },
       ],
     });
 

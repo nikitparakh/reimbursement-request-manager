@@ -40,21 +40,21 @@ describe("POST /api/onboarding/complete", () => {
     expect(updated!.onboardingDone).toBe(true);
   });
 
-  it("joins team as MANAGER → 200", async () => {
+  it("joins team as COACH → 200", async () => {
     const user = await createUser();
     const team = await createTeam();
     setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(POST, {
       method: "POST",
-      body: { teamId: team.id, roleIntent: "MANAGER" },
+      body: { teamId: team.id, roleIntent: "COACH" },
     });
 
     expect(status).toBe(200);
-    expect((data as any).membership.roleInTeam).toBe("MANAGER");
+    expect((data as any).membership.roleInTeam).toBe("COACH");
 
     const updated = await db.user.findUnique({ where: { id: user.id } });
-    expect(updated!.role).toBe("MANAGER");
+    expect(updated!.role).toBe("COACH");
   });
 
   it("rejects nonexistent team → 400", async () => {

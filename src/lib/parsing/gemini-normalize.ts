@@ -179,14 +179,17 @@ function scoreCandidate(candidate: JsonRecord) {
   return typeWeight[type] * 100 + Math.min(total, 100000) / 10000 + confidence + hasMerchant + hasDate;
 }
 
-function collectLineItems(source: JsonRecord, candidates: JsonRecord[]) {
-  const allCandidates = [source, ...candidates];
+function collectLineItems(candidates: JsonRecord[]) {
+  // Deduplicate candidate references (source may already be in candidates)
+  const uniqueCandidates = candidates.filter(
+    (c, i) => candidates.indexOf(c) === i
+  );
 
-  const receiptInvoice = allCandidates.filter((c) => {
+  const receiptInvoice = uniqueCandidates.filter((c) => {
     const type = normalizeDocumentType(c.documentType);
     return type === "RECEIPT" || type === "INVOICE";
   });
-  const checkRequestForm = allCandidates.filter((c) => {
+  const checkRequestForm = uniqueCandidates.filter((c) => {
     return normalizeDocumentType(c.documentType) === "CHECK_REQUEST_FORM";
   });
 
@@ -198,27 +201,66 @@ function collectLineItems(source: JsonRecord, candidates: JsonRecord[]) {
   const relevantCandidates =
     receiptItems.length > 0 ? receiptInvoice : [...checkRequestForm, ...receiptInvoice];
 
-  const merged = relevantCandidates.flatMap((candidate) =>
-    LINE_ITEM_ARRAY_KEYS.flatMap((key) => toLineItems(candidate[key]))
-  );
+  // Dedup within each candidate (same receipt/order) but NOT across candidates.
+  // Identical items from different orders (different candidates) are legitimate
+  // repeat purchases and must be kept.
+  const result: NormalizedLineItem[] = [];
+  for (const candidate of relevantCandidates) {
+    const items = LINE_ITEM_ARRAY_KEYS.flatMap((key) =>
+      toLineItems(candidate[key])
+    );
+    const seen = new Set<string>();
+    for (const item of items) {
+      const desc = item.description.trim().toLowerCase();
+      const key = `${desc}|${item.lineTotal ?? ""}|${item.quantity ?? ""}|${item.unitPrice ?? ""}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+  }
+  return result;
+}
 
-  const seen = new Set<string>();
-  return merged.filter((item) => {
-    const normalizedDescription = item.description.trim().toLowerCase();
-    const key = `${normalizedDescription}|${item.lineTotal ?? ""}|${item.quantity ?? ""}|${item.unitPrice ?? ""}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function reconciliationFlags(
+  docType: NormalizedReceipt["documentType"],
+  lineItems: NormalizedLineItem[],
+  subtotal: number | null,
+  tax: number | null,
+  total: number | null,
+): string[] {
+  if (docType === "CHECK_REQUEST_FORM" || docType === "W9" || lineItems.length === 0) {
+    return [];
+  }
+
+  const flags: string[] = [];
+  const lineItemsSum =
+    Math.round(lineItems.reduce((sum, item) => sum + (item.lineTotal ?? 0), 0) * 100) / 100;
+
+  if (subtotal !== null) {
+    const diff = Math.abs(lineItemsSum - subtotal);
+    if (diff > Math.max(subtotal * 0.02, 1.0)) {
+      flags.push("LINE_ITEMS_SUBTOTAL_MISMATCH");
+    }
+  }
+
+  if (total !== null) {
+    const expectedTotal = lineItemsSum + (tax ?? 0);
+    const diff = Math.abs(expectedTotal - total);
+    if (diff > Math.max(total * 0.02, 1.0)) {
+      flags.push("LINE_ITEMS_TOTAL_MISMATCH");
+    }
+  }
+
+  return flags;
 }
 
 export function normalizeGeminiPayload(payload: unknown, model: string) {
   const candidates = collectCandidates(payload);
   const selected = candidates.sort((left, right) => scoreCandidate(right) - scoreCandidate(left))[0];
   const source = selected ?? (isRecord(payload) ? payload : {});
-  const lineItems = collectLineItems(source, candidates);
+  const lineItems = collectLineItems(candidates);
 
-  // Aggregate tax from receipt/invoice candidates when selected document lacks it
   const selectedTax = toNumberOrNull(source.tax);
   const aggregatedTax = candidates.reduce(
     (sum, c) => sum + (toNumberOrNull(c.tax) ?? 0),
@@ -231,16 +273,21 @@ export function normalizeGeminiPayload(payload: unknown, model: string) {
         ? aggregatedTax
         : null;
 
+  const subtotal = toNumberOrNull(source.subtotal);
+  const total = toNumberOrNull(source.total);
+  const docType = normalizeDocumentType(source.documentType);
+  const reconFlags = reconciliationFlags(docType, lineItems, subtotal, tax, total);
+
   return normalizedReceiptSchema.parse({
-    documentType: normalizeDocumentType(source.documentType),
+    documentType: docType,
     merchant: typeof source.merchant === "string" ? source.merchant : null,
     receiptDate: toIsoDateOrNull(source.receiptDate),
-    subtotal: toNumberOrNull(source.subtotal),
+    subtotal,
     tax,
-    total: toNumberOrNull(source.total),
+    total,
     currency: typeof source.currency === "string" && source.currency ? source.currency : "USD",
     confidence: toConfidenceOrNull(source.confidence) ?? 0.5,
-    flags: toFlags(source.flags),
+    flags: [...toFlags(source.flags), ...reconFlags],
     lineItems,
     raw: {
       source: "gemini",

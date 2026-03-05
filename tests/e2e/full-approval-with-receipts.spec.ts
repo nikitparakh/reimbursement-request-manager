@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 import { signIn } from "./helpers";
 
 test.describe("Full approval lifecycle with receipts E2E", () => {
-  test("DRAFT → SUBMITTED → MANAGER_APPROVED → ADMIN_APPROVED", async ({
+  test("DRAFT → SUBMITTED → COACH_APPROVED → ADMIN_APPROVED", async ({
     page,
   }) => {
-    // --- STUDENT: Create and submit ---
-    await signIn(page, "student@team.org", "Student1234");
+    // --- USER: Create and submit ---
+    await signIn(page, "user@team.org", "User1234");
     await expect(page.getByText("Dashboard")).toBeVisible();
 
     await page.getByText("New Request").click();
@@ -33,18 +33,18 @@ test.describe("Full approval lifecycle with receipts E2E", () => {
       });
     }
 
-    // --- MANAGER: Approve ---
-    await signIn(page, "manager@team.org", "Manager1234");
+    // --- COACH: Approve ---
+    await signIn(page, "coach@team.org", "Coach1234");
     await expect(page.getByText("Dashboard")).toBeVisible();
 
     await page.getByText("Review Inbox").click();
     await expect(page.getByText("Coach Inbox")).toBeVisible();
 
-    const managerApprove = page
+    const coachApprove = page
       .getByRole("button", { name: /approve/i })
       .first();
-    if (await managerApprove.isVisible().catch(() => false)) {
-      await managerApprove.click();
+    if (await coachApprove.isVisible().catch(() => false)) {
+      await coachApprove.click();
       await page.waitForTimeout(2000);
     }
 
@@ -64,8 +64,6 @@ test.describe("Full approval lifecycle with receipts E2E", () => {
 
     // Verify request is no longer in admin inbox
     await page.reload();
-    // The approved request should have moved out of the inbox
-    // or be marked with a different status
     await expect(page.getByText("Admin Inbox")).toBeVisible();
   });
 });

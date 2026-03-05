@@ -26,19 +26,19 @@ export async function POST(
     actorId: userId,
     nextStatus: "SUBMITTED",
     action: "SUBMIT",
-    comment: "Submitted by student",
+    comment: "Submitted for review",
   });
 
-  if (current.managerId) {
-    const [manager, actor] = await Promise.all([
-      db.user.findUnique({ where: { id: current.managerId } }),
+  if (current.coachId) {
+    const [coach, actor] = await Promise.all([
+      db.user.findUnique({ where: { id: current.coachId } }),
       db.user.findUnique({ where: { id: userId } }),
     ]);
-    if (manager?.email && actor?.email) {
+    if (coach?.email && actor?.email) {
       await sendNotification("REQUEST_SUBMITTED", {
         requestId,
         actorEmail: actor.email,
-        recipients: [manager.email],
+        recipients: [coach.email],
         message: `A reimbursement request was submitted: ${updated.title}`,
       });
     }

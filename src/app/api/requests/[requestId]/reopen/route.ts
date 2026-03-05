@@ -20,7 +20,7 @@ export async function POST(
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
-  if (current.status !== "MANAGER_REJECTED" && current.status !== "ADMIN_REJECTED") {
+  if (current.status !== "COACH_REJECTED" && current.status !== "ADMIN_REJECTED") {
     return NextResponse.json(
       { error: "Only rejected requests can be reopened" },
       { status: 400 }

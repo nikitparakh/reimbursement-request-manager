@@ -36,7 +36,7 @@ describe("sendNotification", () => {
   });
 
   it("does nothing when no recipients match", async () => {
-    await sendNotification("MANAGER_APPROVED", {
+    await sendNotification("COACH_APPROVED", {
       requestId: "nonexistent",
       actorEmail: "actor@test.com",
       recipients: ["nobody@test.com"],

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 type Notification = {
   id: string;
@@ -10,6 +11,12 @@ type Notification = {
   read: boolean;
   createdAt: string;
 };
+
+function requestHref(requestId: string, role: string): string {
+  return role === "ADMIN"
+    ? `/admin/requests/${requestId}`
+    : `/user/requests/${requestId}`;
+}
 
 function formatTime(iso: string, now: number) {
   const diff = now - new Date(iso).getTime();
@@ -27,7 +34,8 @@ async function fetchNotificationsData() {
   return res.json() as Promise<{ notifications: Notification[]; unreadCount: number }>;
 }
 
-export function NotificationBell() {
+export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -84,6 +92,14 @@ export function NotificationBell() {
     }
   }
 
+  function handleNotificationClick(n: Notification) {
+    if (!n.read) void markAsRead(n.id);
+    if (n.requestId) {
+      setOpen(false);
+      router.push(requestHref(n.requestId, userRole));
+    }
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -117,10 +133,10 @@ export function NotificationBell() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => !n.read && void markAsRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition ${
                     n.read ? "opacity-60" : ""
-                  }`}
+                  } ${n.requestId ? "cursor-pointer" : ""}`}
                 >
                   <div className="flex items-start gap-2">
                     {!n.read && (

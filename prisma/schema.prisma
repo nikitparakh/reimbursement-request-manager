@@ -16,13 +16,13 @@ datasource db {
 
 enum GlobalRole {
   STUDENT
-  MANAGER
+  COACH
   ADMIN
 }
 
 enum TeamMembershipRole {
   STUDENT
-  MANAGER
+  COACH
 }
 
 enum TeamRegistrationStatus {
@@ -34,8 +34,8 @@ enum TeamRegistrationStatus {
 enum RequestStatus {
   DRAFT
   SUBMITTED
-  MANAGER_APPROVED
-  MANAGER_REJECTED
+  COACH_APPROVED
+  COACH_REJECTED
   ADMIN_APPROVED
   ADMIN_REJECTED
   PAID
@@ -79,7 +79,7 @@ model User {
   sessions        Session[]
   memberships     TeamMembership[]
   createdRequests ReimbursementRequest[] @relation("RequestCreatedBy")
-  managedRequests ReimbursementRequest[] @relation("RequestManager")
+  coachedRequests ReimbursementRequest[] @relation("RequestCoach")
   teamRequests    TeamRegistrationRequest[] @relation("TeamRequestCreatedBy")
   reviewedTeamRequests TeamRegistrationRequest[] @relation("TeamRequestReviewedBy")
   approvals       ApprovalAction[]
@@ -144,19 +144,19 @@ model ReimbursementRequest {
   submittedAt    DateTime?
   teamId         String
   createdById    String
-  managerId      String?
+  coachId        String?           @map("managerId")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   team           Team              @relation(fields: [teamId], references: [id], onDelete: Restrict)
   createdBy      User              @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  manager        User?             @relation("RequestManager", fields: [managerId], references: [id], onDelete: SetNull)
+  coach          User?             @relation("RequestCoach", fields: [coachId], references: [id], onDelete: SetNull)
   receiptFiles   ReceiptFile[]
   approvals      ApprovalAction[]
   auditLogs      AuditLog[]
   notifications  Notification[]
 
   @@index([teamId, status, createdAt])
-  @@index([managerId, status])
+  @@index([coachId, status])
 }
 
 model ReceiptFile {

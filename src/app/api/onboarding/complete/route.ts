@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/rbac";
 
 const schema = z.object({
   teamId: z.string().min(1),
-  roleIntent: z.enum(["STUDENT", "MANAGER"]),
+  roleIntent: z.enum(["STUDENT", "COACH"]),
 });
 
 export async function POST(request: Request) {

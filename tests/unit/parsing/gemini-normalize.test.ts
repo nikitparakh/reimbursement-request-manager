@@ -126,4 +126,137 @@ describe("gemini payload normalization", () => {
     expect(normalized.lineItems).toHaveLength(1);
     expect(normalized.lineItems[0]?.description).toBe("Track Jackets");
   });
+
+  it("handles empty object payload", () => {
+    const normalized = normalizeGeminiPayload({}, "gemini-2.5-flash");
+    expect(normalized.documentType).toBe("OTHER");
+    expect(normalized.lineItems).toEqual([]);
+    expect(normalized.confidence).toBe(0.5);
+    expect(normalized.currency).toBe("USD");
+  });
+
+  it("handles empty array payload", () => {
+    const normalized = normalizeGeminiPayload([], "gemini-2.5-flash");
+    expect(normalized.documentType).toBe("OTHER");
+    expect(normalized.lineItems).toEqual([]);
+  });
+
+  it("handles missing optional fields gracefully", () => {
+    const payload = {
+      documentType: "RECEIPT",
+      lineItems: [{ description: "Item", lineTotal: 25 }],
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.documentType).toBe("RECEIPT");
+    expect(normalized.merchant).toBeNull();
+    expect(normalized.receiptDate).toBeNull();
+    expect(normalized.subtotal).toBeNull();
+    expect(normalized.tax).toBeNull();
+    expect(normalized.total).toBeNull();
+    expect(normalized.lineItems).toHaveLength(1);
+  });
+
+  it("deduplicates identical line items across candidates", () => {
+    const payload = [
+      {
+        documentType: "RECEIPT",
+        merchant: "Store A",
+        total: 50,
+        lineItems: [
+          { description: "Widget", quantity: 2, unitPrice: 25, lineTotal: 50 },
+        ],
+      },
+      {
+        documentType: "RECEIPT",
+        merchant: "Store A",
+        total: 50,
+        lineItems: [
+          { description: "Widget", quantity: 2, unitPrice: 25, lineTotal: 50 },
+        ],
+      },
+    ];
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.lineItems).toHaveLength(1);
+  });
+});
+
+describe("reconciliation flags", () => {
+  it("flags LINE_ITEMS_SUBTOTAL_MISMATCH when line items diverge from subtotal", () => {
+    const payload = {
+      documentType: "RECEIPT",
+      merchant: "Test Store",
+      subtotal: 200,
+      tax: 10,
+      total: 210,
+      lineItems: [{ description: "Widget", quantity: 1, lineTotal: 150 }],
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).toContain("LINE_ITEMS_SUBTOTAL_MISMATCH");
+  });
+
+  it("flags LINE_ITEMS_TOTAL_MISMATCH when line items + tax diverge from total", () => {
+    const payload = {
+      documentType: "RECEIPT",
+      merchant: "Test Store",
+      subtotal: 100,
+      tax: 8,
+      total: 150,
+      lineItems: [{ description: "Widget", quantity: 1, lineTotal: 100 }],
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).toContain("LINE_ITEMS_TOTAL_MISMATCH");
+  });
+
+  it("does not flag reconciliation for CHECK_REQUEST_FORM", () => {
+    const payload = {
+      documentType: "CHECK_REQUEST_FORM",
+      merchant: "Test Corp",
+      subtotal: 500,
+      total: 500,
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_SUBTOTAL_MISMATCH");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_TOTAL_MISMATCH");
+  });
+
+  it("does not flag reconciliation for W9", () => {
+    const payload = {
+      documentType: "W9",
+      merchant: "Contractor Inc",
+      total: 0,
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_SUBTOTAL_MISMATCH");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_TOTAL_MISMATCH");
+  });
+
+  it("does not flag when totals match within tolerance", () => {
+    const payload = {
+      documentType: "RECEIPT",
+      merchant: "Test Store",
+      subtotal: 99.99,
+      tax: 8.0,
+      total: 107.99,
+      lineItems: [
+        { description: "Widget A", quantity: 1, lineTotal: 49.99 },
+        { description: "Widget B", quantity: 1, lineTotal: 50.0 },
+      ],
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_SUBTOTAL_MISMATCH");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_TOTAL_MISMATCH");
+  });
+
+  it("does not flag when there are no line items", () => {
+    const payload = {
+      documentType: "RECEIPT",
+      merchant: "Test Store",
+      subtotal: 100,
+      total: 108,
+      lineItems: [],
+    };
+    const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_SUBTOTAL_MISMATCH");
+    expect(normalized.flags).not.toContain("LINE_ITEMS_TOTAL_MISMATCH");
+  });
 });

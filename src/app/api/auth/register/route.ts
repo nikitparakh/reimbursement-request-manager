@@ -13,6 +13,7 @@ const registerSchema = z.object({
     .regex(/[A-Z]/, "Password must include at least one uppercase letter")
     .regex(/[a-z]/, "Password must include at least one lowercase letter")
     .regex(/[0-9]/, "Password must include at least one number"),
+  role: z.enum(["STUDENT", "ADMIN"]).default("STUDENT"),
 });
 
 export async function POST(request: Request) {
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         email,
         passwordHash,
-        role: "STUDENT",
+        role: parsed.data.role,
         onboardingDone: false,
       },
       select: {

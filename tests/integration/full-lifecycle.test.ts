@@ -5,7 +5,7 @@ import { POST as register } from "@/app/api/auth/register/route";
 import { POST as onboard } from "@/app/api/onboarding/complete/route";
 import { POST as createRequestRoute } from "@/app/api/requests/route";
 import { POST as submitRoute } from "@/app/api/requests/[requestId]/submit/route";
-import { POST as managerDecision } from "@/app/api/requests/[requestId]/manager-decision/route";
+import { POST as coachDecision } from "@/app/api/requests/[requestId]/coach-decision/route";
 import { POST as adminDecision } from "@/app/api/requests/[requestId]/admin-decision/route";
 import { db } from "@/lib/db";
 import { cleanDatabase } from "../helpers/db-clean";
@@ -26,31 +26,31 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     clearMockSession();
   });
 
-  it("happy path: register → onboard → create → submit → manager approve → admin approve → paid", async () => {
-    // 1. Register student
+  it("happy path: register → onboard → create → submit → coach approve → admin approve → paid", async () => {
+    // 1. Register user
     const { data: regData } = await callRouteJSON(register, {
       method: "POST",
       body: {
-        name: "Alice Student",
+        name: "Alice User",
         email: "alice@test.com",
         password: "Password1",
       },
     });
-    const studentId = (regData as any).user.id;
+    const userId = (regData as any).user.id;
 
-    // Create team and manager
+    // Create team and coach
     const team = await createTeam({ name: "Test Team" });
-    const manager = await createUser({ role: "MANAGER", onboardingDone: true });
+    const coach = await createUser({ role: "COACH", onboardingDone: true });
     await createMembership({
-      userId: manager.id,
+      userId: coach.id,
       teamId: team.id,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
     });
     const admin = await createUser({ role: "ADMIN", onboardingDone: true });
 
-    // 2. Onboard student
+    // 2. Onboard user
     setMockUser({
-      id: studentId,
+      id: userId,
       email: "alice@test.com",
       role: "STUDENT",
     });
@@ -98,15 +98,15 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect(submitStatus).toBe(200);
     expect((submitData as any).status).toBe("SUBMITTED");
 
-    // 5. Manager approves
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
-    const { status: mgrStatus, data: mgrData } = await callRouteJSON(
-      managerDecision,
+    // 5. Coach approves
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    const { status: coachStatus, data: coachData } = await callRouteJSON(
+      coachDecision,
       { method: "POST", body: { decision: "APPROVE" } },
       { requestId }
     );
-    expect(mgrStatus).toBe(200);
-    expect((mgrData as any).status).toBe("MANAGER_APPROVED");
+    expect(coachStatus).toBe(200);
+    expect((coachData as any).status).toBe("COACH_APPROVED");
 
     // 6. Admin approves
     setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
@@ -154,34 +154,34 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect(Number(finalReq!.requestedTotal)).toBe(100);
   });
 
-  it("rejection path: submit → manager rejects", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    const manager = await createUser({ role: "MANAGER" });
+  it("rejection path: submit → coach rejects", async () => {
+    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "COACH" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     await createMembership({
-      userId: manager.id,
+      userId: coach.id,
       teamId: team.id,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
-      managerId: manager.id,
+      createdById: user.id,
+      coachId: coach.id,
     });
 
     // Submit
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
     await callRouteJSON(submitRoute, { method: "POST" }, { requestId: req.id });
 
-    // Manager rejects
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+    // Coach rejects
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
     const { status, data } = await callRouteJSON(
-      managerDecision,
+      coachDecision,
       {
         method: "POST",
         body: { decision: "REJECT", comment: "Insufficient documentation" },
@@ -189,7 +189,7 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
       { requestId: req.id }
     );
     expect(status).toBe(200);
-    expect((data as any).status).toBe("MANAGER_REJECTED");
+    expect((data as any).status).toBe("COACH_REJECTED");
 
     // Verify rejection ApprovalAction
     const approvals = await db.approvalAction.findMany({
@@ -201,35 +201,35 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect(approvals[1].comment).toBe("Insufficient documentation");
   });
 
-  it("admin rejection path: submit → manager approve → admin rejects", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    const manager = await createUser({ role: "MANAGER" });
+  it("admin rejection path: submit → coach approve → admin rejects", async () => {
+    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "COACH" });
     const admin = await createUser({ role: "ADMIN" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     await createMembership({
-      userId: manager.id,
+      userId: coach.id,
       teamId: team.id,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
-      managerId: manager.id,
+      createdById: user.id,
+      coachId: coach.id,
     });
 
     // Submit
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
     await callRouteJSON(submitRoute, { method: "POST" }, { requestId: req.id });
 
-    // Manager approves
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+    // Coach approves
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
     await callRouteJSON(
-      managerDecision,
+      coachDecision,
       { method: "POST", body: { decision: "APPROVE" } },
       { requestId: req.id }
     );

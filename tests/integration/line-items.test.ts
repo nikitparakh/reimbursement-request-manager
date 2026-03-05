@@ -21,23 +21,23 @@ import { callRouteJSON } from "../helpers/call-route";
 
 // Helper to set up a full request with receipt + extraction + line items
 async function setupRequestWithLineItems() {
-  const student = await createUser({ role: "STUDENT" });
-  const manager = await createUser({ role: "MANAGER" });
+  const user = await createUser({ role: "STUDENT" });
+  const coach = await createUser({ role: "COACH" });
   const team = await createTeam();
   await createMembership({
-    userId: student.id,
+    userId: user.id,
     teamId: team.id,
     roleInTeam: "STUDENT",
   });
   await createMembership({
-    userId: manager.id,
+    userId: coach.id,
     teamId: team.id,
-    roleInTeam: "MANAGER",
+    roleInTeam: "COACH",
   });
   const req = await createRequest({
     teamId: team.id,
-    createdById: student.id,
-    managerId: manager.id,
+    createdById: user.id,
+    coachId: coach.id,
   });
   const receipt = await createReceipt({ requestId: req.id });
   const extraction = await createExtraction({ receiptFileId: receipt.id });
@@ -52,7 +52,7 @@ async function setupRequestWithLineItems() {
     position: 1,
   });
 
-  return { student, manager, team, req, receipt, extraction, item1, item2 };
+  return { user, coach, team, req, receipt, extraction, item1, item2 };
 }
 
 describe("POST /api/requests/[requestId]/line-items (create)", () => {
@@ -62,8 +62,8 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
   });
 
   it("creator adds item → 201, requestedTotal recalculated", async () => {
-    const { student, req, extraction } = await setupRequestWithLineItems();
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const { user, req, extraction } = await setupRequestWithLineItems();
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -88,9 +88,9 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
     expect(Number(updated!.requestedTotal)).toBe(50.5);
   });
 
-  it("team manager adds item → 201", async () => {
-    const { manager, req, extraction } = await setupRequestWithLineItems();
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+  it("team coach adds item → 201", async () => {
+    const { coach, req, extraction } = await setupRequestWithLineItems();
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -98,7 +98,7 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
         method: "POST",
         body: {
           receiptExtractionId: extraction.id,
-          description: "Manager Item",
+          description: "Coach Item",
           lineTotal: 5,
         },
       },
@@ -107,7 +107,7 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
     expect(status).toBe(201);
   });
 
-  it("non-creator non-manager → 404", async () => {
+  it("non-creator non-coach → 404", async () => {
     const { req, extraction } = await setupRequestWithLineItems();
     const outsider = await createUser({ role: "STUDENT" });
     setMockUser({ id: outsider.id, email: outsider.email, role: "STUDENT" });
@@ -128,22 +128,22 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
   });
 
   it("non-draft → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "SUBMITTED",
     });
     const receipt = await createReceipt({ requestId: req.id });
     const extraction = await createExtraction({ receiptFileId: receipt.id });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -161,19 +161,19 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
   });
 
   it("extraction from different request → 404", async () => {
-    const { student, req } = await setupRequestWithLineItems();
+    const { user, req } = await setupRequestWithLineItems();
     // Create a different request with its own extraction
     const team2 = await createTeam();
     const req2 = await createRequest({
       teamId: team2.id,
-      createdById: student.id,
+      createdById: user.id,
     });
     const receipt2 = await createReceipt({ requestId: req2.id });
     const extraction2 = await createExtraction({
       receiptFileId: receipt2.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -198,8 +198,8 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
   });
 
   it("creator updates → 200, requestedTotal recalculated", async () => {
-    const { student, req, item1 } = await setupRequestWithLineItems();
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const { user, req, item1 } = await setupRequestWithLineItems();
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       PUT,
@@ -224,9 +224,9 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
     expect(Number(updated!.requestedTotal)).toBe(115.5);
   });
 
-  it("manager updates → 200", async () => {
-    const { manager, req, item1 } = await setupRequestWithLineItems();
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+  it("coach updates → 200", async () => {
+    const { coach, req, item1 } = await setupRequestWithLineItems();
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(
       PUT,
@@ -240,16 +240,16 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
   });
 
   it("non-draft → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "SUBMITTED",
     });
     const receipt = await createReceipt({ requestId: req.id });
@@ -259,7 +259,7 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
       lineTotal: 10,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       PUT,
@@ -273,12 +273,12 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
   });
 
   it("line item from different request → 404", async () => {
-    const { student, req } = await setupRequestWithLineItems();
+    const { user, req } = await setupRequestWithLineItems();
     // Create item on different request
     const team2 = await createTeam();
     const req2 = await createRequest({
       teamId: team2.id,
-      createdById: student.id,
+      createdById: user.id,
     });
     const receipt2 = await createReceipt({ requestId: req2.id });
     const ext2 = await createExtraction({ receiptFileId: receipt2.id });
@@ -287,7 +287,7 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
       lineTotal: 10,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       PUT,
@@ -308,8 +308,8 @@ describe("DELETE /api/requests/[requestId]/line-items", () => {
   });
 
   it("creator deletes → 200, requestedTotal recalculated", async () => {
-    const { student, req, item1 } = await setupRequestWithLineItems();
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const { user, req, item1 } = await setupRequestWithLineItems();
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       DELETE,
@@ -330,9 +330,9 @@ describe("DELETE /api/requests/[requestId]/line-items", () => {
     expect(Number(updated!.requestedTotal)).toBe(15.5);
   });
 
-  it("manager deletes → 200", async () => {
-    const { manager, req, item1 } = await setupRequestWithLineItems();
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+  it("coach deletes → 200", async () => {
+    const { coach, req, item1 } = await setupRequestWithLineItems();
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(
       DELETE,
@@ -346,16 +346,16 @@ describe("DELETE /api/requests/[requestId]/line-items", () => {
   });
 
   it("non-draft → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "SUBMITTED",
     });
     const receipt = await createReceipt({ requestId: req.id });
@@ -365,7 +365,7 @@ describe("DELETE /api/requests/[requestId]/line-items", () => {
       lineTotal: 10,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       DELETE,

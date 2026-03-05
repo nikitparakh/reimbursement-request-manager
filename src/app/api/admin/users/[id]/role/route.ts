@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 
 const schema = z.object({
-  role: z.enum(["STUDENT", "MANAGER", "ADMIN"]),
+  role: z.enum(["STUDENT", "COACH", "ADMIN"]),
 });
 
 export async function PATCH(

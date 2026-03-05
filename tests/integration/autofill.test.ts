@@ -22,16 +22,16 @@ describe("POST /api/requests/[requestId]/autofill", () => {
   });
 
   it("recalculates total from extractions → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     const receipt = await createReceipt({ requestId: req.id });
     const extraction = await createExtraction({ receiptFileId: receipt.id });
     await createLineItem({ receiptExtractionId: extraction.id, lineTotal: 30, position: 0 });
     await createLineItem({ receiptExtractionId: extraction.id, lineTotal: 20.5, position: 1 });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -48,13 +48,13 @@ describe("POST /api/requests/[requestId]/autofill", () => {
   });
 
   it("returns 409 when parsing still in progress", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     await createReceipt({ requestId: req.id, parseStatus: "PROCESSING" });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -70,10 +70,10 @@ describe("POST /api/requests/[requestId]/autofill", () => {
   });
 
   it("non-owner → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const other = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
 
     setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
 

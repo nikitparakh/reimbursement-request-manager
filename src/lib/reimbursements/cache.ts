@@ -1,7 +1,7 @@
 import { revalidateTag } from "next/cache";
 
-export function managerInboxTag(teamId: string) {
-  return `manager-inbox-${teamId}`;
+export function coachInboxTag(teamId: string) {
+  return `coach-inbox-${teamId}`;
 }
 
 export function adminInboxTag() {
@@ -9,6 +9,6 @@ export function adminInboxTag() {
 }
 
 export function invalidateApprovalCaches(teamId: string) {
-  revalidateTag(managerInboxTag(teamId), "max");
+  revalidateTag(coachInboxTag(teamId), "max");
   revalidateTag(adminInboxTag(), "max");
 }

@@ -72,7 +72,7 @@ export async function createMembership(input: {
 export async function createRequest(input: {
   teamId: string;
   createdById: string;
-  managerId?: string;
+  coachId?: string;
   status?: RequestStatus;
   requestedTotal?: number;
   title?: string;
@@ -85,7 +85,7 @@ export async function createRequest(input: {
       description: input.description,
       teamId: input.teamId,
       createdById: input.createdById,
-      managerId: input.managerId,
+      coachId: input.coachId,
       status: input.status ?? "DRAFT",
       requestedTotal: new Prisma.Decimal(input.requestedTotal ?? 0),
     },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useId, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { inferTax, type SerializedLineItem, type SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
@@ -8,6 +9,7 @@ import { inferTax, type SerializedLineItem, type SerializedReceipt } from "@/lib
 type EditableLineItemsProps = {
   requestId: string;
   receipts: SerializedReceipt[];
+  allowReceiptDeletion?: boolean;
 };
 
 type EditableRow = {
@@ -44,9 +46,11 @@ function formatCurrency(value: number, currency: string) {
   return `${currency} ${value.toFixed(2)}`;
 }
 
-export function EditableLineItems({ requestId, receipts }: EditableLineItemsProps) {
+export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }: EditableLineItemsProps) {
   const instanceId = useId();
   const nextTempId = useRef(0);
+  const router = useRouter();
+  const [deletingReceiptId, setDeletingReceiptId] = useState<string | null>(null);
 
   const [receiptRows, setReceiptRows] = useState<Map<string, EditableRow[]>>(() => {
     const map = new Map<string, EditableRow[]>();
@@ -218,7 +222,28 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
     }
   }
 
-  const receiptsWithExtractions = receipts.filter((r) => r.extraction);
+  async function deleteReceipt(receiptId: string) {
+    setDeletingReceiptId(receiptId);
+    try {
+      const res = await fetch(`/api/requests/${requestId}/receipts/${receiptId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setReceiptRows((prev) => {
+          const receipt = receipts.find((r) => r.id === receiptId);
+          if (!receipt?.extraction) return prev;
+          const next = new Map(prev);
+          next.delete(receipt.extraction.id);
+          return next;
+        });
+        router.refresh();
+      }
+    } finally {
+      setDeletingReceiptId(null);
+    }
+  }
+
+  const receiptsWithExtractions = receipts.filter((r) => r.extraction && r.id !== deletingReceiptId);
 
   const grandTotal = receiptsWithExtractions.reduce((sum, receipt) => {
     const rows = receiptRows.get(receipt.extraction!.id) ?? [];
@@ -245,6 +270,19 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
               <div className="flex items-center gap-3 text-xs text-slate-500">
                 {ext.merchant && <span>{ext.merchant}</span>}
                 <span className="uppercase">{ext.documentType}</span>
+                {allowReceiptDeletion && (
+                  <button
+                    type="button"
+                    onClick={() => void deleteReceipt(receipt.id)}
+                    className="ml-1 p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                    aria-label={`Remove ${receipt.fileName}`}
+                    title="Remove receipt"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -373,7 +411,7 @@ export function EditableLineItems({ requestId, receipts }: EditableLineItemsProp
                   </div>
                   {excludedTotal > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Manager Excluded <span className="text-xs text-red-500">(removed)</span></span>
+                      <span className="text-slate-500">Excluded <span className="text-xs text-red-500">(removed)</span></span>
                       <span className="font-medium text-slate-400 line-through">{formatCurrency(excludedTotal, currency)}</span>
                     </div>
                   )}

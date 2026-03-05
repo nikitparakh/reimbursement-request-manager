@@ -56,9 +56,9 @@ describe("POST /api/teams", () => {
     expect((data as any).name).toBe("New Team");
   });
 
-  it("student → 403", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+  it("user → 403", async () => {
+    const user = await createUser({ role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(postTeam, {
       method: "POST",
@@ -67,9 +67,9 @@ describe("POST /api/teams", () => {
     expect(status).toBe(403);
   });
 
-  it("manager → 403", async () => {
-    const manager = await createUser({ role: "MANAGER" });
-    setMockUser({ id: manager.id, email: manager.email, role: "MANAGER" });
+  it("coach → 403", async () => {
+    const coach = await createUser({ role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
 
     const { status } = await callRouteJSON(postTeam, {
       method: "POST",

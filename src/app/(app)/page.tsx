@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,11 @@ export default async function HomePage() {
 
   const role = session.user.role;
 
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { onboardingDone: true },
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -38,7 +44,7 @@ export default async function HomePage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(role === "STUDENT" || role === "MANAGER") ? (
+        {(role === "STUDENT" || role === "COACH") ? (
           <>
             <Link href="/team" className="block">
               <Card className="hover:border-emerald-300 transition">
@@ -49,7 +55,7 @@ export default async function HomePage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/student/requests/new" className="block">
+            <Link href="/user/requests/new" className="block">
               <Card className="hover:border-emerald-300 transition">
                 <CardContent>
                   <div className="text-sm font-medium text-slate-500">Quick Action</div>
@@ -61,13 +67,13 @@ export default async function HomePage() {
           </>
         ) : null}
 
-        {role === "MANAGER" ? (
-          <Link href="/manager/inbox" className="block">
+        {role === "COACH" ? (
+          <Link href="/coach/team-reimbursements" className="block">
             <Card className="hover:border-emerald-300 transition">
               <CardContent>
                 <div className="text-sm font-medium text-slate-500">Coach</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">Review Inbox</div>
-                <p className="mt-1 text-sm text-slate-500">Review submitted reimbursement requests</p>
+                <div className="mt-1 text-lg font-semibold text-slate-900">Team Reimbursements</div>
+                <p className="mt-1 text-sm text-slate-500">Review, approve, and track team requests</p>
               </CardContent>
             </Card>
           </Link>
@@ -93,27 +99,20 @@ export default async function HomePage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/student/requests/new" className="block">
-              <Card className="hover:border-emerald-300 transition">
-                <CardContent>
-                  <div className="text-sm font-medium text-slate-500">Quick Action</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">New Request</div>
-                  <p className="mt-1 text-sm text-slate-500">Create a new reimbursement request</p>
-                </CardContent>
-              </Card>
-            </Link>
           </>
         ) : null}
 
-        <Link href="/onboarding" className="block">
-          <Card className="hover:border-emerald-300 transition">
-            <CardContent>
-              <div className="text-sm font-medium text-slate-500">Setup</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">Onboarding</div>
-              <p className="mt-1 text-sm text-slate-500">Join a team or register a new one</p>
-            </CardContent>
-          </Card>
-        </Link>
+        {role !== "ADMIN" && !user?.onboardingDone ? (
+          <Link href="/onboarding" className="block">
+            <Card className="hover:border-emerald-300 transition">
+              <CardContent>
+                <div className="text-sm font-medium text-slate-500">Setup</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">Onboarding</div>
+                <p className="mt-1 text-sm text-slate-500">Join a team or register a new one</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ) : null}
       </div>
     </div>
   );

@@ -18,20 +18,20 @@ describe("POST /api/requests/[requestId]/submit", () => {
     clearMockSession();
   });
 
-  it("student submits draft → 200, status=SUBMITTED", async () => {
-    const student = await createUser({ role: "STUDENT" });
+  it("user submits draft → 200, status=SUBMITTED", async () => {
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     await createMembership({
-      userId: student.id,
+      userId: user.id,
       teamId: team.id,
       roleInTeam: "STUDENT",
     });
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -45,14 +45,14 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("creates ApprovalAction with action=SUBMIT", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
     const approval = await db.approvalAction.findFirst({
@@ -60,18 +60,18 @@ describe("POST /api/requests/[requestId]/submit", () => {
     });
     expect(approval).toBeTruthy();
     expect(approval!.action).toBe("SUBMIT");
-    expect(approval!.actorId).toBe(student.id);
+    expect(approval!.actorId).toBe(user.id);
   });
 
   it("creates AuditLog entry", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
     const log = await db.auditLog.findFirst({
@@ -82,12 +82,12 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("non-creator → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const other = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
     });
 
     setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
@@ -101,15 +101,15 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("already submitted → throws (assertTransition)", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
-      createdById: student.id,
+      createdById: user.id,
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     await expect(
       callRouteJSON(POST, { method: "POST" }, { requestId: req.id })
@@ -117,8 +117,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status } = await callRouteJSON(
       POST,

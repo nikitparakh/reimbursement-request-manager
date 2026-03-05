@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -9,12 +10,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 
 const PAGE_SIZE = 10;
-const INBOX_STATUSES = ["SUBMITTED", "MANAGER_APPROVED", "ADMIN_APPROVED"] as const;
+const INBOX_STATUSES = ["COACH_APPROVED", "ADMIN_APPROVED"] as const;
 
-function endpointForStatus(requestId: string, status: string) {
-  if (status === "SUBMITTED") return `/api/requests/${requestId}/manager-decision`;
+function adminEndpoint(requestId: string) {
   return `/api/requests/${requestId}/admin-decision`;
 }
 
@@ -72,8 +73,8 @@ export default async function AdminInboxPage({
         <>
           <div className="space-y-4">
             {items.map((request) => {
-              const isSubmitted = request.status === "SUBMITTED";
               const isAdminApproved = request.status === "ADMIN_APPROVED";
+              const isCoachApproved = request.status === "COACH_APPROVED";
               const receiptsForEditor = serializeReceipts(request.receiptFiles);
 
               return (
@@ -82,21 +83,22 @@ export default async function AdminInboxPage({
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-900">{request.title}</h3>
+                          <Link href={`/admin/requests/${request.id}`} className="text-base font-semibold text-slate-900 hover:text-emerald-600 transition">{request.title}</Link>
                           <Badge status={request.status} />
                         </div>
                         <p className="mt-1 text-sm text-slate-500">
                           {request.team.name} &middot; {request.createdBy.email}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex items-center gap-3">
                         <div className="text-xl font-bold text-slate-900">
                           ${Number(request.requestedTotal).toFixed(2)}
                         </div>
+                        <DownloadPdfLink requestId={request.id} />
                       </div>
                     </div>
                   </CardHeader>
-                  {isSubmitted && receiptsForEditor.length > 0 && (
+                  {isCoachApproved && receiptsForEditor.length > 0 && (
                     <CardContent>
                       <EditableLineItems requestId={request.id} receipts={receiptsForEditor} />
                     </CardContent>
@@ -104,8 +106,8 @@ export default async function AdminInboxPage({
                   <CardFooter>
                     <ApprovalDecision
                       requestId={request.id}
-                      endpoint={endpointForStatus(request.id, request.status)}
-                      allowMarkPaid={!isSubmitted}
+                      endpoint={adminEndpoint(request.id)}
+                      allowMarkPaid={isAdminApproved}
                       showApproveReject={!isAdminApproved}
                     />
                   </CardFooter>

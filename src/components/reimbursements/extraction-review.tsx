@@ -117,7 +117,7 @@ export function ExtractionReview({ receipts }: { receipts: ReceiptWithExtraction
                       </div>
                       {excludedSum > 0 && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">Manager Excluded <span className="text-xs text-red-500">(removed)</span></span>
+                          <span className="text-slate-500">Excluded <span className="text-xs text-red-500">(removed)</span></span>
                           <span className="font-medium text-slate-400 line-through">{currency} {excludedSum.toFixed(2)}</span>
                         </div>
                       )}

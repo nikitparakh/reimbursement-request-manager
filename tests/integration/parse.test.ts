@@ -11,8 +11,9 @@ import {
 } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
 
-vi.mock("@/lib/jobs/enqueue-parse", () => ({
-  enqueueReceiptParseJob: vi.fn(async () => {}),
+vi.mock("@/lib/jobs/process-receipt", () => ({
+  processReceipt: vi.fn(async () => {}),
+  recomputeRequestTotal: vi.fn(async () => {}),
 }));
 
 const { POST } = await import("@/app/api/requests/[requestId]/parse/route");
@@ -24,29 +25,29 @@ describe("POST /api/requests/[requestId]/parse", () => {
     vi.clearAllMocks();
   });
 
-  it("enqueues QUEUED receipts → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+  it("processes QUEUED receipts → 200", async () => {
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     await createReceipt({ requestId: req.id, parseStatus: "QUEUED" });
     await createReceipt({ requestId: req.id, parseStatus: "QUEUED" });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
     expect(status).toBe(200);
     expect((data as { queued: number }).queued).toBe(2);
   });
 
-  it("enqueues FAILED receipts (retry) → 200", async () => {
-    const student = await createUser({ role: "STUDENT" });
+  it("processes FAILED receipts (retry) → 200", async () => {
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     await createReceipt({ requestId: req.id, parseStatus: "FAILED" });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
     expect(status).toBe(200);
@@ -54,13 +55,13 @@ describe("POST /api/requests/[requestId]/parse", () => {
   });
 
   it("returns queued=0 when no parseable receipts", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    await createMembership({ userId: student.id, teamId: team.id, roleInTeam: "STUDENT" });
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    await createMembership({ userId: user.id, teamId: team.id, roleInTeam: "STUDENT" });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
     await createReceipt({ requestId: req.id, parseStatus: "DONE" });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
 
     const { status, data } = await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
     expect(status).toBe(200);
@@ -73,10 +74,10 @@ describe("POST /api/requests/[requestId]/parse", () => {
   });
 
   it("non-owner → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "STUDENT" });
     const other = await createUser({ role: "STUDENT" });
     const team = await createTeam();
-    const req = await createRequest({ teamId: team.id, createdById: student.id });
+    const req = await createRequest({ teamId: team.id, createdById: user.id });
 
     setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
 

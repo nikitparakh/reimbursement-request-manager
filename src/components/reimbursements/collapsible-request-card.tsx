@@ -12,6 +12,7 @@ type CollapsibleRequestCardProps = {
   createdAt: string;
   subtitle?: string;
   href?: string;
+  detailHref?: string;
   requestId?: string;
   isDraft?: boolean;
   isRejected?: boolean;
@@ -25,6 +26,7 @@ export function CollapsibleRequestCard({
   createdAt,
   subtitle,
   href,
+  detailHref,
   requestId,
   isDraft,
   isRejected,
@@ -93,6 +95,36 @@ export function CollapsibleRequestCard({
           </div>
           <div className="flex items-center gap-3 shrink-0 ml-4">
             <span className="text-lg font-bold text-slate-900">{requestedTotal}</span>
+            {!isDraft && requestId && (
+              <a
+                href={`/api/requests/${requestId}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                title="Download PDF"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+              </a>
+            )}
+            {detailHref && (
+              <a
+                href={detailHref}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  router.push(detailHref);
+                }}
+                className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+                title="Open request"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
+            )}
             {isRejected && requestId && (
               <button
                 type="button"

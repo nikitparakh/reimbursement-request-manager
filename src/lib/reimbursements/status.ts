@@ -2,9 +2,9 @@ import type { RequestStatus } from "@prisma/client";
 
 const transitions: Record<RequestStatus, RequestStatus[]> = {
   DRAFT: ["SUBMITTED"],
-  SUBMITTED: ["MANAGER_APPROVED", "MANAGER_REJECTED"],
-  MANAGER_APPROVED: ["ADMIN_APPROVED", "ADMIN_REJECTED"],
-  MANAGER_REJECTED: ["DRAFT"],
+  SUBMITTED: ["COACH_APPROVED", "COACH_REJECTED"],
+  COACH_APPROVED: ["ADMIN_APPROVED", "ADMIN_REJECTED"],
+  COACH_REJECTED: ["DRAFT"],
   ADMIN_APPROVED: ["PAID"],
   ADMIN_REJECTED: ["DRAFT"],
   PAID: [],

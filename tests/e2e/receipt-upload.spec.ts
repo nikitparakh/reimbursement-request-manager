@@ -16,8 +16,8 @@ test.afterAll(async () => {
 });
 
 test.describe("Receipt upload E2E", () => {
-  test("student creates draft and uploads a receipt", async ({ page }) => {
-    await signIn(page, "student@team.org", "Student1234");
+  test("user creates draft and uploads a receipt", async ({ page }) => {
+    await signIn(page, "user@team.org", "User1234");
     await expect(page.getByText("Dashboard")).toBeVisible();
 
     await page.getByText("New Request").click();

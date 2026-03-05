@@ -1,7 +1,7 @@
 export type NotificationEvent =
   | "REQUEST_SUBMITTED"
-  | "MANAGER_APPROVED"
-  | "MANAGER_REJECTED"
+  | "COACH_APPROVED"
+  | "COACH_REJECTED"
   | "ADMIN_APPROVED"
   | "ADMIN_REJECTED"
   | "MARKED_PAID";

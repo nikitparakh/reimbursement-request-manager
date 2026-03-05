@@ -12,17 +12,21 @@ async function authorizeForRequest(requestId: string) {
   });
   if (!request) return null;
 
-  const managerMembership = await db.teamMembership.findFirst({
+  if (user.role === "ADMIN") {
+    return { request, isCoach: false, isAdmin: true, userId: user.id };
+  }
+
+  const coachMembership = await db.teamMembership.findFirst({
     where: {
       userId: user.id,
       teamId: request.teamId,
-      roleInTeam: "MANAGER",
+      roleInTeam: "COACH",
       approved: true,
     },
   });
 
-  if (request.createdById === user.id || managerMembership) {
-    return { request, isManager: !!managerMembership, userId: user.id };
+  if (request.createdById === user.id || coachMembership) {
+    return { request, isCoach: !!coachMembership, isAdmin: false, userId: user.id };
   }
 
   return null;
@@ -30,11 +34,12 @@ async function authorizeForRequest(requestId: string) {
 
 function assertLineItemEditable(
   status: string,
-  isManager: boolean,
+  { isCoach, isAdmin }: { isCoach: boolean; isAdmin: boolean },
 ): string | null {
   if (status === "DRAFT") return null;
-  if (status === "SUBMITTED" && isManager) return null;
-  return "Can only edit line items on draft or submitted requests";
+  if (status === "SUBMITTED" && (isCoach || isAdmin)) return null;
+  if (status === "COACH_APPROVED" && isAdmin) return null;
+  return "Line items are not editable in the current request state";
 }
 
 async function recalculateRequestTotal(requestId: string) {
@@ -75,7 +80,7 @@ export async function PUT(
   if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  const editError = assertLineItemEditable(authResult.request.status, authResult);
   if (editError) {
     return NextResponse.json({ error: editError }, { status: 400 });
   }
@@ -134,7 +139,7 @@ export async function POST(
   if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  const editError = assertLineItemEditable(authResult.request.status, authResult);
   if (editError) {
     return NextResponse.json({ error: editError }, { status: 400 });
   }
@@ -144,7 +149,6 @@ export async function POST(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  // Verify the extraction belongs to this request
   const extraction = await db.receiptExtraction.findUnique({
     where: { id: body.data.receiptExtractionId },
     include: { receiptFile: true },
@@ -188,7 +192,7 @@ export async function DELETE(
   if (!authResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult.isManager);
+  const editError = assertLineItemEditable(authResult.request.status, authResult);
   if (editError) {
     return NextResponse.json({ error: editError }, { status: 400 });
   }
@@ -206,9 +210,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
-  const isSoftDelete = authResult.isManager && authResult.request.status === "SUBMITTED";
+  const isReviewerExclusion =
+    (authResult.isCoach || authResult.isAdmin) && authResult.request.status !== "DRAFT";
 
-  if (isSoftDelete) {
+  if (isReviewerExclusion) {
     await db.receiptLineItem.update({
       where: { id: body.data.lineItemId },
       data: { excludedAt: new Date(), excludedById: authResult.userId },
@@ -219,5 +224,5 @@ export async function DELETE(
 
   await recalculateRequestTotal(requestId);
 
-  return NextResponse.json({ deleted: true, soft: isSoftDelete });
+  return NextResponse.json({ deleted: true, soft: isReviewerExclusion });
 }

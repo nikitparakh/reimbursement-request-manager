@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import {
   createRequestDraft,
   getRequestWithDetails,
-  findTeamManager,
+  findTeamCoach,
 } from "@/lib/reimbursements/repository";
 import { cleanDatabase } from "../../helpers/db-clean";
 import { createUser, createTeam, createMembership } from "../../helpers/factory";
@@ -35,19 +35,19 @@ describe("reimbursements/repository", () => {
       expect(fromDb).not.toBeNull();
     });
 
-    it("assigns managerId when provided", async () => {
+    it("assigns coachId when provided", async () => {
       const user = await createUser();
-      const mgr = await createUser({ role: "MANAGER" });
+      const coach = await createUser({ role: "COACH" });
       const team = await createTeam();
 
       const req = await createRequestDraft({
-        title: "With Manager",
+        title: "With Coach",
         teamId: team.id,
         createdById: user.id,
-        managerId: mgr.id,
+        coachId: coach.id,
       });
 
-      expect(req.managerId).toBe(mgr.id);
+      expect(req.coachId).toBe(coach.id);
     });
   });
 
@@ -74,39 +74,39 @@ describe("reimbursements/repository", () => {
     });
   });
 
-  describe("findTeamManager", () => {
-    it("returns approved MANAGER membership", async () => {
-      const mgr = await createUser({ role: "MANAGER" });
+  describe("findTeamCoach", () => {
+    it("returns approved COACH membership", async () => {
+      const coach = await createUser({ role: "COACH" });
       const team = await createTeam();
       await createMembership({
-        userId: mgr.id,
+        userId: coach.id,
         teamId: team.id,
-        roleInTeam: "MANAGER",
+        roleInTeam: "COACH",
         approved: true,
       });
 
-      const found = await findTeamManager(team.id);
+      const found = await findTeamCoach(team.id);
       expect(found).not.toBeNull();
-      expect(found!.userId).toBe(mgr.id);
+      expect(found!.userId).toBe(coach.id);
     });
 
-    it("returns null when no manager exists", async () => {
+    it("returns null when no coach exists", async () => {
       const team = await createTeam();
-      const found = await findTeamManager(team.id);
+      const found = await findTeamCoach(team.id);
       expect(found).toBeNull();
     });
 
-    it("ignores unapproved managers", async () => {
-      const mgr = await createUser({ role: "MANAGER" });
+    it("ignores unapproved coaches", async () => {
+      const coach = await createUser({ role: "COACH" });
       const team = await createTeam();
       await createMembership({
-        userId: mgr.id,
+        userId: coach.id,
         teamId: team.id,
-        roleInTeam: "MANAGER",
+        roleInTeam: "COACH",
         approved: false,
       });
 
-      const found = await findTeamManager(team.id);
+      const found = await findTeamCoach(team.id);
       expect(found).toBeNull();
     });
   });

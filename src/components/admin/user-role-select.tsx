@@ -8,7 +8,7 @@ type UserRoleSelectProps = {
   currentRole: GlobalRole;
 };
 
-const roles: GlobalRole[] = ["STUDENT", "MANAGER", "ADMIN"];
+const roles: GlobalRole[] = ["STUDENT", "COACH", "ADMIN"];
 
 export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {
   const [role, setRole] = useState<GlobalRole>(currentRole);
