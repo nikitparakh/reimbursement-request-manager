@@ -14,6 +14,7 @@ type RequestActionsProps = {
   hasExtractions: boolean;
   hasUnparsedReceipts?: boolean;
   receiptsWithExtractions?: SerializedReceipt[];
+  redirectUrl?: string;
 };
 
 export function RequestActions({
@@ -22,6 +23,7 @@ export function RequestActions({
   hasExtractions,
   hasUnparsedReceipts = false,
   receiptsWithExtractions = [],
+  redirectUrl = "/user/requests",
 }: RequestActionsProps) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -115,7 +117,7 @@ export function RequestActions({
       setIsError(true);
       return;
     }
-    router.push("/user/requests");
+    router.push(redirectUrl);
   }
 
   return (
@@ -187,7 +189,7 @@ export function RequestActions({
                       setIsDeleting(false);
                       return;
                     }
-                    router.push("/user/requests");
+                    router.push(redirectUrl);
                   } catch {
                     setMessage("Failed to delete request.");
                     setIsError(true);

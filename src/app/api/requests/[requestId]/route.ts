@@ -47,9 +47,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  let userId = "";
+  let user;
   try {
-    userId = (await requireUser()).id;
+    user = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -57,17 +57,23 @@ export async function PATCH(
   const { requestId } = await params;
   const record = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
-    select: { createdById: true, status: true },
+    select: { createdById: true, status: true, teamId: true },
   });
 
   if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (record.createdById !== userId)
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (record.status !== "DRAFT")
     return NextResponse.json(
       { error: "Only draft requests can be edited" },
       { status: 400 }
     );
+
+  if (record.createdById !== user.id && user.role !== "ADMIN") {
+    const coachMembership = await db.teamMembership.findFirst({
+      where: { userId: user.id, teamId: record.teamId, roleInTeam: "COACH", approved: true },
+    });
+    if (!coachMembership)
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = patchSchema.safeParse(await request.json());
   if (!body.success) {
@@ -89,9 +95,9 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  let userId = "";
+  let user;
   try {
-    userId = (await requireUser()).id;
+    user = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -99,17 +105,23 @@ export async function DELETE(
 
   const record = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
-    select: { createdById: true, status: true },
+    select: { createdById: true, status: true, teamId: true },
   });
 
   if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (record.createdById !== userId)
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (record.status !== "DRAFT")
     return NextResponse.json(
       { error: "Only draft requests can be deleted" },
       { status: 400 }
     );
+
+  if (record.createdById !== user.id && user.role !== "ADMIN") {
+    const coachMembership = await db.teamMembership.findFirst({
+      where: { userId: user.id, teamId: record.teamId, roleInTeam: "COACH", approved: true },
+    });
+    if (!coachMembership)
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   await db.reimbursementRequest.delete({ where: { id: requestId } });
 

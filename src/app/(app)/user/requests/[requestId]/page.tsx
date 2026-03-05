@@ -89,6 +89,12 @@ export default async function UserRequestDetailPage({
     (isAdmin && ["SUBMITTED", "COACH_APPROVED", "ADMIN_APPROVED"].includes(status)) ||
     (isTeamCoach && status === "SUBMITTED");
 
+  const redirectUrl = !isOwner && isTeamCoach
+    ? "/coach/team-reimbursements"
+    : !isOwner && isAdmin
+      ? "/admin/team-requests"
+      : "/user/requests";
+
   const decision = canDecide ? decisionConfig(status, requestRecord.id, isAdmin) : null;
 
   return (
@@ -144,6 +150,7 @@ export default async function UserRequestDetailPage({
               hasExtractions={hasExtractions}
               hasUnparsedReceipts={hasUnparsedReceipts}
               receiptsWithExtractions={receiptsWithExtractions}
+              redirectUrl={redirectUrl}
             />
           </CardContent>
         </Card>
