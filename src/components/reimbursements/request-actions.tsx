@@ -15,6 +15,7 @@ type RequestActionsProps = {
   hasUnparsedReceipts?: boolean;
   receiptsWithExtractions?: SerializedReceipt[];
   redirectUrl?: string;
+  userRole?: string;
 };
 
 export function RequestActions({
@@ -24,6 +25,7 @@ export function RequestActions({
   hasUnparsedReceipts = false,
   receiptsWithExtractions = [],
   redirectUrl = "/user/requests",
+  userRole = "STUDENT",
 }: RequestActionsProps) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -154,7 +156,9 @@ export function RequestActions({
 
       {hasExtractions && !hasUnparsedReceipts && (
         <Button onClick={submit}>
-          Submit to Coach
+          {userRole === "ADMIN" || userRole === "COACH"
+            ? "Submit to Admin"
+            : "Submit to Coach"}
         </Button>
       )}
 

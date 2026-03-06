@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useCallback, useId, useRef, useEffect } from "react";
+import { Fragment, useState, useCallback, useId, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { inferTax, type SerializedLineItem, type SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
+import { LineItemComments, CommentIcon } from "@/components/reimbursements/line-item-comments";
+import { useLiveTotal } from "@/components/reimbursements/live-total-context";
+import { inferTax, type SerializedLineItem, type SerializedLineItemComment, type SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
 
 type EditableLineItemsProps = {
   requestId: string;
   receipts: SerializedReceipt[];
   allowReceiptDeletion?: boolean;
+  canComment?: boolean;
 };
 
 type EditableRow = {
@@ -22,6 +25,7 @@ type EditableRow = {
   category: string;
   isNew?: boolean;
   excluded?: boolean;
+  comments: SerializedLineItemComment[];
 };
 
 function toEditableRow(item: SerializedLineItem): EditableRow {
@@ -34,6 +38,7 @@ function toEditableRow(item: SerializedLineItem): EditableRow {
     lineTotal: item.lineTotal ?? "",
     category: item.category ?? "",
     excluded: !!item.excludedAt,
+    comments: item.comments,
   };
 }
 
@@ -46,11 +51,21 @@ function formatCurrency(value: number, currency: string) {
   return `${currency} ${value.toFixed(2)}`;
 }
 
-export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }: EditableLineItemsProps) {
+export function EditableLineItems({ requestId, receipts, allowReceiptDeletion, canComment = false }: EditableLineItemsProps) {
   const instanceId = useId();
   const nextTempId = useRef(0);
   const router = useRouter();
   const [deletingReceiptId, setDeletingReceiptId] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  function toggleComments(rowId: string) {
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  }
 
   const [receiptRows, setReceiptRows] = useState<Map<string, EditableRow[]>>(() => {
     const map = new Map<string, EditableRow[]>();
@@ -116,6 +131,11 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }:
       const idx = rows.findIndex((r) => r.id === rowId);
       if (idx === -1) return prev;
       const updated = { ...rows[idx], [field]: value };
+      if (field === "quantity" || field === "unitPrice") {
+        const qty = parseNum(updated.quantity);
+        const price = parseNum(updated.unitPrice);
+        updated.lineTotal = (qty * price).toFixed(2);
+      }
       rows[idx] = updated;
       next.set(extractionId, rows);
       if (!updated.isNew) {
@@ -180,6 +200,7 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }:
       lineTotal: "",
       category: "",
       isNew: true,
+      comments: [],
     };
     setReceiptRows((prev) => {
       const next = new Map(prev);
@@ -250,6 +271,11 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }:
     return sum + rows.filter((r) => !r.excluded).reduce((s, r) => s + parseNum(r.lineTotal), 0);
   }, 0);
 
+  const { setTotal } = useLiveTotal();
+  useEffect(() => {
+    setTotal(grandTotal);
+  }, [grandTotal, setTotal]);
+
   const receiptCards = receiptsWithExtractions.map((receipt) => {
       const ext = receipt.extraction!;
       const currency = ext.currency ?? "USD";
@@ -297,97 +323,160 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion }:
                     <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-28">Line Total</th>
                     <th className="text-left py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-32">Category</th>
                     <th className="py-2 px-2 bg-slate-50 w-10"></th>
+                    <th className="py-2 px-2 bg-slate-50 w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => row.excluded ? (
-                    <tr key={row.id} className="border-b border-slate-100 bg-red-50/40">
-                      <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.description}</td>
-                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.quantity || "-"}</td>
-                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.unitPrice || "-"}</td>
-                      <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.lineTotal || "-"}</td>
-                      <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.category || "-"}</td>
-                      <td className="py-1.5 px-2">
-                        <button
-                          onClick={() => void restoreRow(ext.id, row.id)}
-                          className="text-amber-500 hover:text-amber-700 transition p-1"
-                          aria-label="Restore line item"
-                          title="Undo exclusion"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={row.id} className="border-b border-slate-100">
-                      <td className="py-1.5 px-2">
-                        <input
-                          type="text"
-                          value={row.description}
-                          onChange={(e) => updateRow(ext.id, row.id, "description", e.target.value)}
-                          onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
-                          className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="Item description"
-                        />
-                      </td>
-                      <td className="py-1.5 px-2">
-                        <input
-                          type="number"
-                          value={row.quantity}
-                          onChange={(e) => updateRow(ext.id, row.id, "quantity", e.target.value)}
-                          onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
-                          className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                          min="0"
-                          step="1"
-                        />
-                      </td>
-                      <td className="py-1.5 px-2">
-                        <input
-                          type="number"
-                          value={row.unitPrice}
-                          onChange={(e) => updateRow(ext.id, row.id, "unitPrice", e.target.value)}
-                          onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
-                          className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                          min="0"
-                          step="0.01"
-                        />
-                      </td>
-                      <td className="py-1.5 px-2">
-                        <input
-                          type="number"
-                          value={row.lineTotal}
-                          onChange={(e) => updateRow(ext.id, row.id, "lineTotal", e.target.value)}
-                          onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
-                          className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                          min="0"
-                          step="0.01"
-                        />
-                      </td>
-                      <td className="py-1.5 px-2">
-                        <input
-                          type="text"
-                          value={row.category}
-                          onChange={(e) => updateRow(ext.id, row.id, "category", e.target.value)}
-                          onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
-                          className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="Category"
-                        />
-                      </td>
-                      <td className="py-1.5 px-2">
-                        <button
-                          onClick={() => void deleteRow(ext.id, row.id, row.isNew)}
-                          className="text-slate-400 hover:text-red-500 transition p-1"
-                          aria-label="Delete line item"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {rows.map((row) => {
+                    const commentCount = row.comments.length;
+                    const isExpanded = expandedComments.has(row.id);
+                    const colSpan = 7;
+
+                    if (row.excluded) {
+                      return (
+                        <Fragment key={row.id}>
+                          <tr className="border-b border-slate-100 bg-red-50/40">
+                            <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.description}</td>
+                            <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.quantity || "-"}</td>
+                            <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.unitPrice || "-"}</td>
+                            <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.lineTotal || "-"}</td>
+                            <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.category || "-"}</td>
+                            <td className="py-1.5 px-2">
+                              <button
+                                onClick={() => void restoreRow(ext.id, row.id)}
+                                className="text-amber-500 hover:text-amber-700 transition p-1"
+                                aria-label="Restore line item"
+                                title="Undo exclusion"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                </svg>
+                              </button>
+                            </td>
+                            <td className="py-1.5 px-2">
+                              {(commentCount > 0 || canComment) && !row.isNew && (
+                                <button
+                                  onClick={() => toggleComments(row.id)}
+                                  className={`p-1 transition ${commentCount > 0 ? "text-emerald-500 hover:text-emerald-700" : "text-slate-400 hover:text-slate-600"}`}
+                                  aria-label={`${commentCount} comment${commentCount !== 1 ? "s" : ""}`}
+                                  title="Line item comments"
+                                >
+                                  <CommentIcon count={commentCount} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {isExpanded && !row.isNew && (
+                            <tr>
+                              <td colSpan={colSpan} className="p-0">
+                                <LineItemComments
+                                  requestId={requestId}
+                                  lineItemId={row.id}
+                                  comments={row.comments}
+                                  canComment={canComment}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    }
+
+                    return (
+                      <Fragment key={row.id}>
+                        <tr className="border-b border-slate-100">
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => updateRow(ext.id, row.id, "description", e.target.value)}
+                              onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
+                              className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="Item description"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="number"
+                              value={row.quantity}
+                              onChange={(e) => updateRow(ext.id, row.id, "quantity", e.target.value)}
+                              onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
+                              className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              min="0"
+                              step="1"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="number"
+                              value={row.unitPrice}
+                              onChange={(e) => updateRow(ext.id, row.id, "unitPrice", e.target.value)}
+                              onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
+                              className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              min="0"
+                              step="0.01"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="number"
+                              value={row.lineTotal}
+                              onChange={(e) => updateRow(ext.id, row.id, "lineTotal", e.target.value)}
+                              onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
+                              className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-right text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              min="0"
+                              step="0.01"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="text"
+                              value={row.category}
+                              onChange={(e) => updateRow(ext.id, row.id, "category", e.target.value)}
+                              onBlur={() => row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined}
+                              className="w-full border border-slate-200 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="Category"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <button
+                              onClick={() => void deleteRow(ext.id, row.id, row.isNew)}
+                              className="text-slate-400 hover:text-red-500 transition p-1"
+                              aria-label="Delete line item"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="py-1.5 px-2">
+                            {(commentCount > 0 || canComment) && !row.isNew && (
+                              <button
+                                onClick={() => toggleComments(row.id)}
+                                className={`p-1 transition ${commentCount > 0 ? "text-emerald-500 hover:text-emerald-700" : "text-slate-400 hover:text-slate-600"}`}
+                                aria-label={`${commentCount} comment${commentCount !== 1 ? "s" : ""}`}
+                                title="Line item comments"
+                              >
+                                <CommentIcon count={commentCount} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && !row.isNew && (
+                          <tr>
+                            <td colSpan={colSpan} className="p-0">
+                              <LineItemComments
+                                requestId={requestId}
+                                lineItemId={row.id}
+                                comments={row.comments}
+                                canComment={canComment}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

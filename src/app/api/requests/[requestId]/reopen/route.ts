@@ -8,15 +8,35 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   let userId = "";
+  let userRole = "STUDENT";
   try {
-    userId = (await requireUser()).id;
+    const user = await requireUser();
+    userId = user.id;
+    userRole = user.role;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { requestId } = await params;
   const current = await db.reimbursementRequest.findUnique({ where: { id: requestId } });
-  if (!current || current.createdById !== userId) {
+  if (!current) {
+    return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  }
+
+  const isOwner = current.createdById === userId;
+  const isAdmin = userRole === "ADMIN";
+  const isTeamCoach =
+    userRole === "COACH" &&
+    !!(await db.teamMembership.findFirst({
+      where: {
+        userId,
+        teamId: current.teamId,
+        roleInTeam: "COACH",
+        approved: true,
+      },
+    }));
+
+  if (!isOwner && !isAdmin && !isTeamCoach) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 

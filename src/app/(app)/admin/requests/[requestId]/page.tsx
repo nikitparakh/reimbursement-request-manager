@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
+import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 
 const ADMIN_VISIBLE_STATUSES = [
   "COACH_APPROVED",
@@ -38,7 +39,17 @@ export default async function AdminRequestDetailPage({
       receiptFiles: {
         include: {
           extraction: {
-            include: { lineItems: { orderBy: { position: "asc" } } },
+            include: {
+              lineItems: {
+                orderBy: { position: "asc" },
+                include: {
+                  comments: {
+                    orderBy: { createdAt: "asc" },
+                    include: { author: { select: { email: true } } },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -61,6 +72,7 @@ export default async function AdminRequestDetailPage({
   const canDecide = status === "COACH_APPROVED" || status === "ADMIN_APPROVED";
 
   return (
+    <LiveTotalProvider initialTotal={Number(request.requestedTotal)}>
     <div className="space-y-6">
       <div>
         <Link
@@ -83,7 +95,7 @@ export default async function AdminRequestDetailPage({
           <CardContent>
             <div className="text-sm text-slate-500">Requested Total</div>
             <div className="text-2xl font-bold text-slate-900">
-              ${Number(request.requestedTotal).toFixed(2)}
+              <LiveRequestedTotal />
             </div>
           </CardContent>
         </Card>
@@ -111,9 +123,12 @@ export default async function AdminRequestDetailPage({
       </div>
 
       {canEditLineItems && receipts.length > 0 ? (
-        <EditableLineItems requestId={request.id} receipts={receipts} />
+        <EditableLineItems requestId={request.id} receipts={receipts} canComment />
       ) : (
-        <ExtractionReview receipts={request.receiptFiles} />
+        <ExtractionReview
+          receipts={receipts}
+          parseStatuses={Object.fromEntries(request.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+        />
       )}
 
       {canDecide ? (
@@ -139,5 +154,6 @@ export default async function AdminRequestDetailPage({
         }))}
       />
     </div>
+    </LiveTotalProvider>
   );
 }

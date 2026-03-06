@@ -86,6 +86,7 @@ model User {
   auditLogs       AuditLog[]
   notifications   Notification[]
   excludedLineItems ReceiptLineItem[] @relation("LineItemExcludedBy")
+  lineItemComments  LineItemComment[]
 }
 
 model Team {
@@ -208,8 +209,21 @@ model ReceiptLineItem {
   updatedAt           DateTime          @updatedAt
   receiptExtraction   ReceiptExtraction @relation(fields: [receiptExtractionId], references: [id], onDelete: Cascade)
   excludedBy          User?             @relation("LineItemExcludedBy", fields: [excludedById], references: [id], onDelete: SetNull)
+  comments            LineItemComment[]
 
   @@index([receiptExtractionId, position])
+}
+
+model LineItemComment {
+  id         String          @id @default(cuid())
+  lineItemId String
+  authorId   String
+  text       String
+  createdAt  DateTime        @default(now())
+  lineItem   ReceiptLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  author     User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([lineItemId, createdAt])
 }
 
 model ApprovalAction {

@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
+import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 
 function decisionConfig(status: string, requestId: string, isAdmin: boolean) {
   if (isAdmin && status === "ADMIN_APPROVED") {
@@ -54,7 +55,23 @@ export default async function UserRequestDetailPage({
     where: { id: requestId },
     include: {
       team: true,
-      receiptFiles: { include: { extraction: { include: { lineItems: { orderBy: { position: "asc" } } } } } },
+      receiptFiles: {
+        include: {
+          extraction: {
+            include: {
+              lineItems: {
+                orderBy: { position: "asc" },
+                include: {
+                  comments: {
+                    orderBy: { createdAt: "asc" },
+                    include: { author: { select: { email: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       approvals: { include: { actor: true }, orderBy: { createdAt: "asc" } },
     },
   });
@@ -89,15 +106,16 @@ export default async function UserRequestDetailPage({
     (isAdmin && ["SUBMITTED", "COACH_APPROVED", "ADMIN_APPROVED"].includes(status)) ||
     (isTeamCoach && status === "SUBMITTED");
 
-  const redirectUrl = !isOwner && isTeamCoach
+  const redirectUrl = session.user.role === "COACH"
     ? "/coach/team-reimbursements"
-    : !isOwner && isAdmin
+    : session.user.role === "ADMIN"
       ? "/admin/team-requests"
       : "/user/requests";
 
   const decision = canDecide ? decisionConfig(status, requestRecord.id, isAdmin) : null;
 
   return (
+    <LiveTotalProvider initialTotal={Number(requestRecord.requestedTotal)}>
     <div className="space-y-6">
       {status === "DRAFT" ? (
         <EditableRequestHeader
@@ -118,7 +136,7 @@ export default async function UserRequestDetailPage({
           <CardContent>
             <div className="text-sm text-slate-500">Requested Total</div>
             <div className="text-2xl font-bold text-slate-900">
-              ${Number(requestRecord.requestedTotal).toFixed(2)}
+              <LiveRequestedTotal />
             </div>
           </CardContent>
         </Card>
@@ -151,13 +169,14 @@ export default async function UserRequestDetailPage({
               hasUnparsedReceipts={hasUnparsedReceipts}
               receiptsWithExtractions={receiptsWithExtractions}
               redirectUrl={redirectUrl}
+              userRole={session.user.role}
             />
           </CardContent>
         </Card>
       ) : null}
 
       {status !== "DRAFT" && canEditLineItems ? (
-        <EditableLineItems requestId={requestRecord.id} receipts={receiptsWithExtractions} />
+        <EditableLineItems requestId={requestRecord.id} receipts={receiptsWithExtractions} canComment />
       ) : null}
 
       {status !== "DRAFT" && !canEditLineItems ? (
@@ -167,7 +186,10 @@ export default async function UserRequestDetailPage({
             (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
           )}
         >
-          <ExtractionReview receipts={requestRecord.receiptFiles} />
+          <ExtractionReview
+            receipts={receiptsWithExtractions}
+            parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+          />
         </ReceiptPollingWrapper>
       ) : null}
 
@@ -194,5 +216,6 @@ export default async function UserRequestDetailPage({
         }))}
       />
     </div>
+    </LiveTotalProvider>
   );
 }

@@ -63,20 +63,35 @@ export async function POST(
     comment: body.data.comment,
   });
   invalidateApprovalCaches(current.teamId);
-  const [creator, actor] = await Promise.all([
+  const [creator, actor, admins] = await Promise.all([
     db.user.findUnique({ where: { id: current.createdById } }),
     db.user.findUnique({ where: { id: actorId } }),
+    db.user.findMany({ where: { role: "ADMIN" }, select: { email: true } }),
   ]);
   if (creator?.email && actor?.email) {
-    await sendNotification(
-      body.data.decision === "APPROVE" ? "COACH_APPROVED" : "COACH_REJECTED",
-      {
-        requestId,
-        actorEmail: actor.email,
-        recipients: [creator.email],
-        message: `Coach ${body.data.decision.toLowerCase()}d reimbursement ${current.title}`,
+    const event = body.data.decision === "APPROVE" ? "COACH_APPROVED" as const : "COACH_REJECTED" as const;
+    const message = `Coach ${body.data.decision.toLowerCase()}d reimbursement: ${current.title}`;
+
+    await sendNotification(event, {
+      requestId,
+      actorEmail: actor.email,
+      recipients: [creator.email],
+      message,
+    });
+
+    if (body.data.decision === "APPROVE") {
+      const adminEmails = admins
+        .map((a) => a.email)
+        .filter((e): e is string => !!e && e !== actor.email);
+      if (adminEmails.length > 0) {
+        await sendNotification("COACH_APPROVED", {
+          requestId,
+          actorEmail: actor.email,
+          recipients: adminEmails,
+          message: `Reimbursement ready for admin review: ${current.title}`,
+        });
       }
-    );
+    }
   }
 
   return NextResponse.json(updated);

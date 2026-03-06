@@ -8,7 +8,11 @@ type UserRoleSelectProps = {
   currentRole: GlobalRole;
 };
 
-const roles: GlobalRole[] = ["STUDENT", "COACH", "ADMIN"];
+const roleOptions: { value: GlobalRole; label: string }[] = [
+  { value: "STUDENT", label: "Parent/Mentor" },
+  { value: "COACH", label: "Coach" },
+  { value: "ADMIN", label: "Admin" },
+];
 
 export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {
   const [role, setRole] = useState<GlobalRole>(currentRole);
@@ -38,9 +42,9 @@ export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {
       disabled={saving}
       className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700 disabled:opacity-50"
     >
-      {roles.map((r) => (
-        <option key={r} value={r}>
-          {r}
+      {roleOptions.map((r) => (
+        <option key={r.value} value={r.value}>
+          {r.label}
         </option>
       ))}
     </select>

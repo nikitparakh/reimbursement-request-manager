@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
+import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
 
 export async function POST(
@@ -9,8 +10,11 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   let userId = "";
+  let userRole = "STUDENT";
   try {
-    userId = (await requireUser()).id;
+    const user = await requireUser();
+    userId = user.id;
+    userRole = user.role;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -21,7 +25,10 @@ export async function POST(
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
-  const updated = await transitionRequestStatus({
+  const skipCoachApproval =
+    userRole === "ADMIN" || current.coachId === userId;
+
+  let updated = await transitionRequestStatus({
     requestId,
     actorId: userId,
     nextStatus: "SUBMITTED",
@@ -29,7 +36,34 @@ export async function POST(
     comment: "Submitted for review",
   });
 
-  if (current.coachId) {
+  if (skipCoachApproval) {
+    updated = await transitionRequestStatus({
+      requestId,
+      actorId: userId,
+      nextStatus: "COACH_APPROVED",
+      action: "APPROVE",
+      comment: "Auto-approved (submitted by coach/admin)",
+    });
+    invalidateApprovalCaches(current.teamId);
+
+    const [actor, admins] = await Promise.all([
+      db.user.findUnique({ where: { id: userId } }),
+      db.user.findMany({ where: { role: "ADMIN" }, select: { email: true } }),
+    ]);
+    if (actor?.email) {
+      const adminEmails = admins
+        .map((a) => a.email)
+        .filter((e): e is string => !!e && e !== actor.email);
+      if (adminEmails.length > 0) {
+        await sendNotification("COACH_APPROVED", {
+          requestId,
+          actorEmail: actor.email,
+          recipients: adminEmails,
+          message: `Reimbursement ready for admin review: ${updated.title}`,
+        });
+      }
+    }
+  } else if (current.coachId) {
     const [coach, actor] = await Promise.all([
       db.user.findUnique({ where: { id: current.coachId } }),
       db.user.findUnique({ where: { id: userId } }),

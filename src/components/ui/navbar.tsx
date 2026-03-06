@@ -43,8 +43,7 @@ export async function NavBar() {
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-          <Image src="/frogforce-shield.jpg" alt="Frog Force 503" width={40} height={40} className="h-10 w-auto" />
-          <span className="text-lg font-bold text-emerald-600">Frog Force 503</span>
+          <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-10 w-auto" />
         </Link>
 
         {session?.user ? (

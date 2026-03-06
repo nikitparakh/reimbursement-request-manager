@@ -40,7 +40,17 @@ export default async function AdminInboxPage({
         receiptFiles: {
           include: {
             extraction: {
-              include: { lineItems: { orderBy: { position: "asc" } } },
+              include: {
+                lineItems: {
+                  orderBy: { position: "asc" },
+                  include: {
+                    comments: {
+                      orderBy: { createdAt: "asc" },
+                      include: { author: { select: { email: true } } },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -100,7 +110,7 @@ export default async function AdminInboxPage({
                   </CardHeader>
                   {isCoachApproved && receiptsForEditor.length > 0 && (
                     <CardContent>
-                      <EditableLineItems requestId={request.id} receipts={receiptsForEditor} />
+                      <EditableLineItems requestId={request.id} receipts={receiptsForEditor} canComment />
                     </CardContent>
                   )}
                   <CardFooter>

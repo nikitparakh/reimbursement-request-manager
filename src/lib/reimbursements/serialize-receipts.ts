@@ -1,5 +1,13 @@
 import type { Prisma } from "@prisma/client";
 
+export type SerializedLineItemComment = {
+  id: string;
+  authorId: string;
+  authorEmail: string;
+  text: string;
+  createdAt: string;
+};
+
 export type SerializedLineItem = {
   id: string;
   receiptExtractionId: string;
@@ -9,6 +17,7 @@ export type SerializedLineItem = {
   lineTotal: string | null;
   category: string | null;
   excludedAt: string | null;
+  comments: SerializedLineItemComment[];
 };
 
 export type SerializedExtraction = {
@@ -31,7 +40,15 @@ export type SerializedReceipt = {
 type PrismaReceiptWithExtraction = Prisma.ReceiptFileGetPayload<{
   include: {
     extraction: {
-      include: { lineItems: true };
+      include: {
+        lineItems: {
+          include: {
+            comments: {
+              include: { author: { select: { email: true } } };
+            };
+          };
+        };
+      };
     };
   };
 }>;
@@ -64,6 +81,13 @@ export function serializeReceipts(
             lineTotal: li.lineTotal?.toString() ?? null,
             category: li.category,
             excludedAt: li.excludedAt?.toISOString() ?? null,
+            comments: li.comments.map((c) => ({
+              id: c.id,
+              authorId: c.authorId,
+              authorEmail: c.author.email,
+              text: c.text,
+              createdAt: c.createdAt.toISOString(),
+            })),
           })),
         }
       : null,
