@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -6,6 +6,8 @@ import path from "node:path";
 let tmpDir: string;
 
 beforeEach(async () => {
+  vi.resetModules();
+  delete process.env.BLOB_READ_WRITE_TOKEN;
   tmpDir = await mkdtemp(path.join(tmpdir(), "veltest-storage-"));
   process.env.LOCAL_STORAGE_DIR = tmpDir;
 });

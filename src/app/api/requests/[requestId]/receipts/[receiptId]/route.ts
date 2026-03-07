@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { unlink } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { recomputeRequestTotal } from "@/lib/jobs/process-receipt";
+import { deleteStoredObject } from "@/lib/storage";
 
 export async function DELETE(
   _request: Request,
@@ -46,13 +45,7 @@ export async function DELETE(
 
   await recomputeRequestTotal(requestId);
 
-  if (receipt.storageUrl.startsWith("file://")) {
-    try {
-      await unlink(fileURLToPath(receipt.storageUrl));
-    } catch {
-      // File may already be removed; don't fail the request
-    }
-  }
+  await deleteStoredObject(receipt.storageUrl);
 
   return NextResponse.json({ deleted: true });
 }

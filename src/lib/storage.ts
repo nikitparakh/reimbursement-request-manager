@@ -1,7 +1,3 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { env } from "@/lib/env";
 
 export type StoredObject = {
@@ -9,9 +5,19 @@ export type StoredObject = {
   url: string;
 };
 
-const uploadRoot = path.resolve(process.cwd(), env.LOCAL_STORAGE_DIR);
+const isVercelBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+
+// ---------------------------------------------------------------------------
+// Local filesystem helpers (only loaded when NOT using Vercel Blob)
+// ---------------------------------------------------------------------------
+
+function getUploadRoot() {
+  const path = require("node:path") as typeof import("node:path");
+  return path.resolve(process.cwd(), env.LOCAL_STORAGE_DIR);
+}
 
 function safeExtension(fileName: string) {
+  const path = require("node:path") as typeof import("node:path");
   const rawExt = path.extname(fileName).toLowerCase();
   const normalizedExt = rawExt.replace(/[^.a-z0-9]/g, "");
   if (!normalizedExt || normalizedExt === "." || normalizedExt.length > 10) {
@@ -21,6 +27,8 @@ function safeExtension(fileName: string) {
 }
 
 function toAbsoluteUploadPath(key: string) {
+  const path = require("node:path") as typeof import("node:path");
+  const uploadRoot = getUploadRoot();
   const filePath = path.resolve(uploadRoot, key);
   const relative = path.relative(uploadRoot, filePath);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
@@ -29,11 +37,30 @@ function toAbsoluteUploadPath(key: string) {
   return filePath;
 }
 
+// ---------------------------------------------------------------------------
+// Upload
+// ---------------------------------------------------------------------------
+
 export async function uploadReceiptFile(input: {
   fileName: string;
   mimeType: string;
   body: Uint8Array;
 }): Promise<StoredObject> {
+  if (isVercelBlob) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`receipts/${input.fileName}`, Buffer.from(input.body), {
+      access: "public",
+      contentType: input.mimeType,
+      addRandomSuffix: true,
+    });
+    return { key: blob.pathname, url: blob.url };
+  }
+
+  const path = await import("node:path");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const { randomUUID } = await import("node:crypto");
+  const { pathToFileURL } = await import("node:url");
+
   const key = path.join("receipts", `${randomUUID()}${safeExtension(input.fileName)}`);
   const absolutePath = toAbsoluteUploadPath(key);
   await mkdir(path.dirname(absolutePath), { recursive: true });
@@ -41,8 +68,27 @@ export async function uploadReceiptFile(input: {
   return { key, url: pathToFileURL(absolutePath).href };
 }
 
+// ---------------------------------------------------------------------------
+// Read
+// ---------------------------------------------------------------------------
+
 export async function readStoredObject(storageUrl: string): Promise<Uint8Array> {
+  // HTTP(S) URLs — works for both Vercel Blob and any remote URL
+  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
+    const response = await fetch(storageUrl);
+    if (!response.ok) {
+      throw new Error(`Unable to fetch stored receipt file: ${response.status}`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  // Local file:// URLs
   if (storageUrl.startsWith("file://")) {
+    const { readFile } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const path = await import("node:path");
+
+    const uploadRoot = getUploadRoot();
     const absolutePath = fileURLToPath(storageUrl);
     const relative = path.relative(uploadRoot, absolutePath);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
@@ -52,9 +98,32 @@ export async function readStoredObject(storageUrl: string): Promise<Uint8Array> 
     return new Uint8Array(contents);
   }
 
-  const response = await fetch(storageUrl);
-  if (!response.ok) {
-    throw new Error(`Unable to fetch stored receipt file: ${response.status}`);
+  throw new Error(`Unsupported storage URL scheme: ${storageUrl}`);
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+export async function deleteStoredObject(storageUrl: string): Promise<void> {
+  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
+    if (isVercelBlob) {
+      const { del } = await import("@vercel/blob");
+      await del(storageUrl);
+    }
+    // Non-blob HTTP URLs: nothing to clean up
+    return;
   }
-  return new Uint8Array(await response.arrayBuffer());
+
+  if (storageUrl.startsWith("file://")) {
+    const { unlink } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+
+    try {
+      await unlink(fileURLToPath(storageUrl));
+    } catch {
+      // File may already be removed; don't fail
+    }
+    return;
+  }
 }
