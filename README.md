@@ -2,10 +2,14 @@
 
 A multi-role reimbursement workflow app for school robotics teams. Parents/mentors submit receipt-backed reimbursement requests, coaches review and approve, and admins give final sign-off and mark payment.
 
+**Live demo:** [reimbursement-request-manager.vercel.app](https://reimbursement-request-manager.vercel.app)
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router, React 19, Turbopack)
-- **Database:** SQLite via Prisma ORM
+- **Database:** SQLite (local) / Turso (production) via Prisma ORM
+- **File Storage:** Local filesystem (local) / Vercel Blob (production)
+- **Hosting:** Vercel
 - **Auth:** NextAuth.js v4 (credentials provider, bcryptjs)
 - **AI Parsing:** Google Gemini API for receipt/invoice extraction
 - **PDF Generation:** pdfkit + pdf-lib
@@ -87,6 +91,9 @@ The setup script auto-generates `AUTH_SECRET`. To set other values, edit `.env`:
 | `GOOGLE_AI_API_KEY` | No | — | Gemini API key for AI receipt parsing |
 | `GOOGLE_AI_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
 | `LOCAL_STORAGE_DIR` | No | `data/uploads` | Directory for uploaded receipt files |
+| `TURSO_DATABASE_URL` | No | — | Turso database URL (enables cloud DB) |
+| `TURSO_AUTH_TOKEN` | No | — | Turso auth token |
+| `BLOB_READ_WRITE_TOKEN` | No | — | Vercel Blob token (enables cloud file storage) |
 
 ### Seed Accounts
 
@@ -135,10 +142,10 @@ src/
     ├── audit/                  # Audit logging
     ├── pdf/                    # PDF generation for reimbursement requests
     ├── jobs/                   # Background receipt processing
-    ├── db.ts                   # Prisma client singleton
+    ├── db.ts                   # Prisma client singleton (auto-selects SQLite or Turso)
     ├── env.ts                  # Zod-validated environment config
     ├── rbac.ts                 # Role-based access control helpers
-    └── storage.ts              # Local file storage abstraction
+    └── storage.ts              # File storage abstraction (local filesystem or Vercel Blob)
 ```
 
 ## Scripts
@@ -146,7 +153,7 @@ src/
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start dev server (Turbopack) |
-| `npm run build` | Production build |
+| `npm run build` | Production build (`prisma generate` + `next build`) |
 | `npm start` | Start production server |
 | `npm run lint` | ESLint (zero warnings enforced) |
 | `npm test` | Run all Vitest tests (unit + integration) |
@@ -196,6 +203,50 @@ npx playwright install
 - **Role-adaptive Navigation** — UI adapts based on user role
 - **Team Management** — Self-service team join with admin-approved team registration
 - **User Management** — Admin controls for role assignment and team membership
+
+## Deployment
+
+The app is designed to run locally with zero cloud dependencies, but can be deployed to Vercel with Turso and Vercel Blob for free.
+
+### Production Stack
+
+| Concern | Local Dev | Production |
+|---------|-----------|------------|
+| Database | SQLite file | Turso (libSQL) |
+| File storage | Local filesystem | Vercel Blob |
+| Hosting | `next dev` | Vercel |
+
+### Deploy to Vercel
+
+1. **Create a Turso database:**
+   ```bash
+   turso db create reimbursement-manager
+   turso db show reimbursement-manager --url
+   turso db tokens create reimbursement-manager
+   ```
+
+2. **Push the schema to Turso:**
+   ```bash
+   npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script | turso db shell reimbursement-manager
+   ```
+
+3. **Seed the database (optional):**
+   ```bash
+   TURSO_DATABASE_URL="libsql://..." TURSO_AUTH_TOKEN="..." DATABASE_URL="file:./dev.db" npx tsx prisma/seed.ts
+   ```
+
+4. **Connect your GitHub repo to Vercel** and add a Blob store (Vercel Dashboard > Storage > Create Blob Store).
+
+5. **Set environment variables** in Vercel project settings:
+   - `DATABASE_URL` = `file:./dev.db`
+   - `TURSO_DATABASE_URL` = your Turso URL
+   - `TURSO_AUTH_TOKEN` = your Turso token
+   - `AUTH_SECRET` = generate with `openssl rand -base64 32`
+   - `APP_URL` / `NEXTAUTH_URL` = your Vercel deployment URL
+   - `GOOGLE_AI_API_KEY` = your Gemini API key
+   - `BLOB_READ_WRITE_TOKEN` is set automatically when linking the Blob store
+
+6. **Deploy** — Vercel auto-deploys on push to `main`.
 
 ## License
 
