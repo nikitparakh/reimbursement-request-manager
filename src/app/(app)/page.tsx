@@ -12,8 +12,8 @@ export default async function HomePage() {
   if (!session?.user) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <Image src="/frogforce-shield.jpg" alt="Frog Force 503" width={96} height={96} className="h-24 w-auto mx-auto mb-4" />
-        <h1 className="text-4xl font-bold text-slate-900">Frog Force 503</h1>
+        <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-14 w-auto mx-auto mb-4" />
+        <h1 className="text-4xl font-bold text-slate-900">Reimbursement Request Manager</h1>
         <p className="mt-3 text-lg text-slate-500 max-w-md">
           Submit team reimbursements, route approvals to your coach, then admin.
         </p>

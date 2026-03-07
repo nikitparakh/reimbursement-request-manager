@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { MobileNavMenu } from "@/components/ui/mobile-nav-menu";
 
 type NavLink = { href: string; label: string };
 
@@ -41,14 +42,14 @@ export async function NavBar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
           <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-10 w-auto" />
         </Link>
 
         {session?.user ? (
           <>
-            <div className="flex items-center gap-6">
+            <div className="hidden sm:flex items-center gap-6">
               {getLinksForRole(session.user.role).map((link) => (
                 <Link
                   key={link.href}
@@ -59,11 +60,16 @@ export async function NavBar() {
                 </Link>
               ))}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-4">
               <NotificationBell userRole={session.user.role} />
-              <span className="text-sm text-slate-500">{session.user.email}</span>
+              <span className="hidden md:inline text-sm text-slate-500">{session.user.email}</span>
               <SignOutButton />
             </div>
+            <MobileNavMenu
+              links={getLinksForRole(session.user.role)}
+              userEmail={session.user.email!}
+              userRole={session.user.role}
+            />
           </>
         ) : (
           <div className="flex items-center gap-4">

@@ -35,14 +35,16 @@ const columns: Column<AdminReimbursementRow>[] = [
     key: "requester",
     label: "Requester",
     sortValue: (r) => r.requester.toLowerCase(),
-    cellClassName: "text-slate-600",
+    headerClassName: "hidden sm:table-cell",
+    cellClassName: "text-slate-600 hidden sm:table-cell",
     render: (r) => r.requester,
   },
   {
     key: "team",
     label: "Team",
     sortValue: (r) => r.team.toLowerCase(),
-    cellClassName: "text-slate-600",
+    headerClassName: "hidden sm:table-cell",
+    cellClassName: "text-slate-600 hidden sm:table-cell",
     render: (r) => r.team,
   },
   {
@@ -56,7 +58,8 @@ const columns: Column<AdminReimbursementRow>[] = [
     key: "date",
     label: "Date",
     sortValue: (r) => r.dateMs,
-    cellClassName: "text-slate-500",
+    headerClassName: "hidden md:table-cell",
+    cellClassName: "text-slate-500 hidden md:table-cell",
     render: (r) => r.date,
   },
   {
@@ -134,8 +137,8 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
+      <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
+        <div className="flex-1 sm:min-w-[200px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
           <Input
             type="text"
@@ -146,7 +149,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
           />
         </div>
 
-        <div className="min-w-[160px]">
+        <div className="sm:min-w-[160px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
           <select
             value={filters.status}
@@ -162,7 +165,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
           </select>
         </div>
 
-        <div className="min-w-[160px]">
+        <div className="sm:min-w-[160px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Team</label>
           <select
             value={filters.team}
@@ -178,7 +181,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
           </select>
         </div>
 
-        <div className="min-w-[140px]">
+        <div className="sm:min-w-[140px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">From</label>
           <Input
             type="date"
@@ -187,7 +190,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
           />
         </div>
 
-        <div className="min-w-[140px]">
+        <div className="sm:min-w-[140px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">To</label>
           <Input
             type="date"

@@ -62,7 +62,7 @@ export function CreateTeamForm() {
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Frog Force 503"
+          placeholder="e.g. Team 503"
           required
           error={!!error}
           className="w-48"

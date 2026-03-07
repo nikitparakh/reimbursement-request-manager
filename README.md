@@ -90,7 +90,7 @@ The setup script auto-generates `AUTH_SECRET`. To set other values, edit `.env`:
 
 ### Seed Accounts
 
-The seed script creates a team ("Frog Force 503") with three users you can sign in with immediately:
+The seed script creates a team ("Demo Team 503") with three users you can sign in with immediately:
 
 | Email | Password | Role |
 |-------|----------|------|

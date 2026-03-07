@@ -47,9 +47,9 @@ async function main() {
   ]);
 
   const team = await prisma.team.upsert({
-    where: { name: "Frog Force 503" },
-    update: { shortCode: "FF503", active: true },
-    create: { name: "Frog Force 503", shortCode: "FF503", active: true },
+    where: { name: "Demo Team 503" },
+    update: { shortCode: "DT503", active: true },
+    create: { name: "Demo Team 503", shortCode: "DT503", active: true },
   });
 
   await prisma.teamMembership.upsert({

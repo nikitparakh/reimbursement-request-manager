@@ -94,10 +94,10 @@ export function ExtractionReview({
                       <thead>
                         <tr className="border-b border-slate-200">
                           <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Description</th>
-                          <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Qty</th>
+                          <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 hidden sm:table-cell">Qty</th>
                           <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Unit Price</th>
                           <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Line Total</th>
-                          <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Category</th>
+                          <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 hidden sm:table-cell">Category</th>
                           <th className="py-2 px-3 bg-slate-50 w-8"></th>
                         </tr>
                       </thead>
@@ -113,7 +113,7 @@ export function ExtractionReview({
                                 : "border-b border-slate-100 hover:bg-slate-50"
                               }>
                                 <td className={`py-2 px-3 ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.description}</td>
-                                <td className={`py-2 px-3 text-right ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.quantity ?? "-"}</td>
+                                <td className={`py-2 px-3 text-right hidden sm:table-cell ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.quantity ?? "-"}</td>
                                 <td className={`py-2 px-3 text-right ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>
                                   {item.unitPrice
                                     ? `${currency} ${item.unitPrice}`
@@ -124,7 +124,7 @@ export function ExtractionReview({
                                     ? `${currency} ${item.lineTotal}`
                                     : "-"}
                                 </td>
-                                <td className={`py-2 px-3 ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.category ?? "-"}</td>
+                                <td className={`py-2 px-3 hidden sm:table-cell ${isExcluded ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.category ?? "-"}</td>
                                 <td className="py-2 px-3">
                                   {commentCount > 0 && (
                                     <button

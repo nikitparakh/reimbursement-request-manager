@@ -90,7 +90,7 @@ export default async function AdminInboxPage({
               return (
                 <Card key={request.id}>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
                           <Link href={`/admin/requests/${request.id}`} className="text-base font-semibold text-slate-900 hover:text-emerald-600 transition">{request.title}</Link>

@@ -318,10 +318,10 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion, c
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Description</th>
-                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-20">Qty</th>
-                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-28">Unit Price</th>
-                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-28">Line Total</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-32">Category</th>
+                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-20 hidden sm:table-cell">Qty</th>
+                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-20 sm:w-28">Unit Price</th>
+                    <th className="text-right py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-20 sm:w-28">Line Total</th>
+                    <th className="text-left py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50 w-32 hidden sm:table-cell">Category</th>
                     <th className="py-2 px-2 bg-slate-50 w-10"></th>
                     <th className="py-2 px-2 bg-slate-50 w-8"></th>
                   </tr>
@@ -337,10 +337,10 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion, c
                         <Fragment key={row.id}>
                           <tr className="border-b border-slate-100 bg-red-50/40">
                             <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.description}</td>
-                            <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.quantity || "-"}</td>
+                            <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through hidden sm:table-cell">{row.quantity || "-"}</td>
                             <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.unitPrice || "-"}</td>
                             <td className="py-1.5 px-2 text-sm text-right text-slate-400 line-through">{row.lineTotal || "-"}</td>
-                            <td className="py-1.5 px-2 text-sm text-slate-400 line-through">{row.category || "-"}</td>
+                            <td className="py-1.5 px-2 text-sm text-slate-400 line-through hidden sm:table-cell">{row.category || "-"}</td>
                             <td className="py-1.5 px-2">
                               <button
                                 onClick={() => void restoreRow(ext.id, row.id)}
@@ -395,7 +395,7 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion, c
                               placeholder="Item description"
                             />
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-1.5 px-2 hidden sm:table-cell">
                             <input
                               type="number"
                               value={row.quantity}
@@ -428,7 +428,7 @@ export function EditableLineItems({ requestId, receipts, allowReceiptDeletion, c
                               step="0.01"
                             />
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-1.5 px-2 hidden sm:table-cell">
                             <input
                               type="text"
                               value={row.category}

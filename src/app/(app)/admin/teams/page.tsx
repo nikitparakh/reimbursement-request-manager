@@ -108,16 +108,16 @@ export default async function AdminTeamsPage() {
                     <th className="pb-3 pr-4 font-medium text-slate-500">
                       Team
                     </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500">
+                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden sm:table-cell">
                       Short Code
                     </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500">
+                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
                       Coaches
                     </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500">
+                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
                       Parents/Mentors
                     </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500">
+                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
                       Requests
                     </th>
                     <th className="pb-3 font-medium text-slate-500">Status</th>
@@ -137,18 +137,18 @@ export default async function AdminTeamsPage() {
                           {team.name}
                         </Link>
                       </td>
-                      <td className="py-3 pr-4 text-slate-600">
+                      <td className="py-3 pr-4 text-slate-600 hidden sm:table-cell">
                         {team.shortCode || (
                           <span className="text-slate-400 italic">—</span>
                         )}
                       </td>
-                      <td className="py-3 pr-4 text-slate-700">
+                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
                         {team.coaches}
                       </td>
-                      <td className="py-3 pr-4 text-slate-700">
+                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
                         {team.parents}
                       </td>
-                      <td className="py-3 pr-4 text-slate-700">
+                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
                         {team.totalRequests}
                       </td>
                       <td className="py-3">

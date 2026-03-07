@@ -8,8 +8,8 @@ export default function SignInPage() {
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
         <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-12 w-auto mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-emerald-600">Frog Force 503</h1>
-        <p className="mt-2 text-sm text-slate-500">Sign in to the Frog Force 503 reimbursement system</p>
+        <h1 className="text-2xl font-bold text-emerald-600">Reimbursement Request Manager</h1>
+        <p className="mt-2 text-sm text-slate-500">Sign in to manage reimbursement requests</p>
       </div>
       <Card>
         <CardContent>

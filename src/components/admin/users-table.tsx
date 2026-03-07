@@ -40,7 +40,8 @@ const columns: Column<UserRow>[] = [
     key: "email",
     label: "Email",
     sortValue: (u) => u.email.toLowerCase(),
-    cellClassName: "text-slate-600",
+    headerClassName: "hidden sm:table-cell",
+    cellClassName: "text-slate-600 hidden sm:table-cell",
     render: (u) => u.email,
   },
   {
@@ -58,6 +59,8 @@ const columns: Column<UserRow>[] = [
         .sort()
         .join(", ")
         .toLowerCase() || "\uffff",
+    headerClassName: "hidden md:table-cell",
+    cellClassName: "hidden md:table-cell",
     render: (u) => (
       <div className="flex flex-wrap gap-1">
         {u.memberships.length === 0 ? (
@@ -96,8 +99,8 @@ export function UsersTable({ users, teams }: UsersTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[200px]">
+      <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-3">
+        <div className="flex-1 sm:min-w-[200px]">
           <Input
             type="search"
             placeholder="Search by name or email…"

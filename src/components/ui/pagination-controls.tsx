@@ -14,7 +14,7 @@ export function PaginationControls({
   if (!prevCursor && !nextCursor) return null;
 
   return (
-    <div className="flex items-center justify-between pt-4">
+    <div className="flex items-center justify-between gap-2 pt-4">
       {prevCursor ? (
         <Link
           href={`${basePath}?cursor=${prevCursor}&dir=prev`}
