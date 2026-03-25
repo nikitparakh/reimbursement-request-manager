@@ -63,8 +63,8 @@ async function main() {
 
     const team = await prisma.team.upsert({
       where: { name: "Demo Team 503" },
-      update: { shortCode: "DT503", active: true },
-      create: { name: "Demo Team 503", shortCode: "DT503", active: true },
+      update: { shortCode: "DT503", glAccount: "61-296-7920-099-978-0000", active: true },
+      create: { name: "Demo Team 503", shortCode: "DT503", glAccount: "61-296-7920-099-978-0000", active: true },
     });
 
     await prisma.teamMembership.upsert({
@@ -238,6 +238,7 @@ async function main() {
       data: {
         teamName: "Iron Panthers 4180",
         shortCode: "IP4180",
+        glAccount: "61-310-8100-045-612-0000",
         notes: "New team from West High School. We have 15 members and a coach sponsor.",
         requestedById: user.id,
       },

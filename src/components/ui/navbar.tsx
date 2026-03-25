@@ -14,7 +14,7 @@ const userLinks: NavLink[] = [
 ];
 
 const coachLinks: NavLink[] = [
-  { href: "/team", label: "My Team" },
+  { href: "/coach/team-overview", label: "Team Overview" },
   { href: "/user/requests/new", label: "New Request" },
   { href: "/coach/team-reimbursements", label: "Team Reimbursements" },
 ];

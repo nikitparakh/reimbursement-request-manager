@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/rbac";
 const createSchema = z.object({
   name: z.string().min(2),
   shortCode: z.string().max(12).optional(),
+  glAccount: z.string().max(30).optional(),
 });
 
 export async function GET() {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     data: {
       name: body.data.name,
       shortCode: body.data.shortCode,
+      glAccount: body.data.glAccount,
     },
   });
   return NextResponse.json(team, { status: 201 });

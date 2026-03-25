@@ -42,7 +42,7 @@ export async function POST(
   }
 
   const team = await db.team.create({
-    data: { name: req.teamName, shortCode: req.shortCode ?? undefined },
+    data: { name: req.teamName, shortCode: req.shortCode ?? undefined, glAccount: req.glAccount ?? undefined },
   });
 
   const updated = await db.teamRegistrationRequest.update({

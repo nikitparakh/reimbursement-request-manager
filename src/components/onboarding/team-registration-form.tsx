@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/alert";
 export function TeamRegistrationForm() {
   const [teamName, setTeamName] = useState("");
   const [shortCode, setShortCode] = useState("");
+  const [glAccount, setGlAccount] = useState("");
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -19,7 +20,7 @@ export function TeamRegistrationForm() {
     const response = await fetch("/api/teams/registration-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamName, shortCode: shortCode || undefined, notes }),
+      body: JSON.stringify({ teamName, shortCode: shortCode || undefined, glAccount: glAccount || undefined, notes }),
     });
 
     if (!response.ok) {
@@ -32,6 +33,7 @@ export function TeamRegistrationForm() {
     setMessage("Team request sent for admin approval.");
     setTeamName("");
     setShortCode("");
+    setGlAccount("");
     setNotes("");
   }
 
@@ -52,6 +54,15 @@ export function TeamRegistrationForm() {
           value={shortCode}
           onChange={(event) => setShortCode(event.target.value)}
           placeholder="e.g. RTA"
+        />
+      </FormField>
+
+      <FormField label="GL Account" htmlFor="glAccount" helpText="Optional GL account number">
+        <Input
+          id="glAccount"
+          value={glAccount}
+          onChange={(event) => setGlAccount(event.target.value)}
+          placeholder="e.g. 61-296-7920-099-978-0000"
         />
       </FormField>
 

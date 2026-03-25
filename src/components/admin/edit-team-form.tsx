@@ -9,17 +9,20 @@ type EditTeamFormProps = {
   teamId: string;
   currentName: string;
   currentShortCode: string | null;
+  currentGlAccount: string | null;
 };
 
 export function EditTeamForm({
   teamId,
   currentName,
   currentShortCode,
+  currentGlAccount,
 }: EditTeamFormProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(currentName);
   const [shortCode, setShortCode] = useState(currentShortCode ?? "");
+  const [glAccount, setGlAccount] = useState(currentGlAccount ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,6 +40,7 @@ export function EditTeamForm({
         body: JSON.stringify({
           name: name.trim(),
           shortCode: shortCode.trim() || null,
+          glAccount: glAccount.trim() || null,
         }),
       });
 
@@ -90,6 +94,18 @@ export function EditTeamForm({
           className="w-32"
         />
       </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-500 mb-1">
+          GL Account
+        </label>
+        <Input
+          value={glAccount}
+          onChange={(e) => setGlAccount(e.target.value)}
+          placeholder="e.g. 61-296-7920-099-978-0000"
+          maxLength={30}
+          className="w-56"
+        />
+      </div>
       <Button type="submit" variant="primary" size="sm" loading={saving}>
         Save
       </Button>
@@ -101,6 +117,7 @@ export function EditTeamForm({
           setEditing(false);
           setName(currentName);
           setShortCode(currentShortCode ?? "");
+          setGlAccount(currentGlAccount ?? "");
           setError("");
         }}
       >

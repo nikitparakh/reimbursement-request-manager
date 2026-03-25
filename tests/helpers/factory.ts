@@ -40,6 +40,7 @@ export async function createTeam(
   overrides: {
     name?: string;
     shortCode?: string;
+    glAccount?: string;
     active?: boolean;
   } = {}
 ) {
@@ -48,6 +49,7 @@ export async function createTeam(
     data: {
       name: overrides.name ?? `Team ${n}`,
       shortCode: overrides.shortCode ?? `T${n}`,
+      glAccount: overrides.glAccount,
       active: overrides.active ?? true,
     },
   });
@@ -156,6 +158,7 @@ export async function createTeamRegistrationRequest(input: {
   teamName: string;
   requestedById: string;
   shortCode?: string;
+  glAccount?: string;
   notes?: string;
 }) {
   return db.teamRegistrationRequest.create({
@@ -163,6 +166,7 @@ export async function createTeamRegistrationRequest(input: {
       teamName: input.teamName,
       requestedById: input.requestedById,
       shortCode: input.shortCode,
+      glAccount: input.glAccount,
       notes: input.notes,
     },
   });

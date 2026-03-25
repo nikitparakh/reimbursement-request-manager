@@ -91,13 +91,19 @@ export default async function AdminTeamDetailPage({
         title={team.name}
         badge={<Badge status={team.active ? "APPROVED" : "REJECTED"} />}
         description={
-          team.shortCode ? `Code: ${team.shortCode}` : "No short code"
+          [
+            team.shortCode ? `Code: ${team.shortCode}` : null,
+            team.glAccount ? `GL: ${team.glAccount}` : null,
+          ]
+            .filter(Boolean)
+            .join("  ·  ") || "No short code"
         }
         action={
           <EditTeamForm
             teamId={team.id}
             currentName={team.name}
             currentShortCode={team.shortCode}
+            currentGlAccount={team.glAccount}
           />
         }
       />

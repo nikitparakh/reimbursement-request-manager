@@ -10,6 +10,7 @@ export function CreateTeamForm() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [shortCode, setShortCode] = useState("");
+  const [glAccount, setGlAccount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,6 +28,7 @@ export function CreateTeamForm() {
         body: JSON.stringify({
           name: name.trim(),
           shortCode: shortCode.trim() || undefined,
+          glAccount: glAccount.trim() || undefined,
         }),
       });
 
@@ -38,6 +40,7 @@ export function CreateTeamForm() {
 
       setName("");
       setShortCode("");
+      setGlAccount("");
       setOpen(false);
       router.refresh();
     } finally {
@@ -78,6 +81,18 @@ export function CreateTeamForm() {
           placeholder="e.g. FF503"
           maxLength={12}
           className="w-32"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-500 mb-1">
+          GL Account
+        </label>
+        <Input
+          value={glAccount}
+          onChange={(e) => setGlAccount(e.target.value)}
+          placeholder="e.g. 61-296-7920-099-978-0000"
+          maxLength={30}
+          className="w-56"
         />
       </div>
       <Button type="submit" variant="primary" size="md" loading={saving}>

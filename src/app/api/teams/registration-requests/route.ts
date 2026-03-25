@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/rbac";
 const schema = z.object({
   teamName: z.string().min(2),
   shortCode: z.string().max(12).optional(),
+  glAccount: z.string().max(30).optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     data: {
       teamName: body.data.teamName,
       shortCode: body.data.shortCode,
+      glAccount: body.data.glAccount,
       notes: body.data.notes,
       requestedById: userId,
     },

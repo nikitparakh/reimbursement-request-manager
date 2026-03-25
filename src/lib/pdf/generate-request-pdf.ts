@@ -69,8 +69,11 @@ function writeHeader(doc: PDFKit.PDFDocument, req: FullRequest) {
     .text(req.title, M, M, { width: CONTENT_W });
 
   resetX(doc);
+  const headerParts = [req.team.name];
+  if (req.team.glAccount) headerParts.push(`GL: ${req.team.glAccount}`);
+  headerParts.push(statusLabel(req.status));
   doc.font("Helvetica").fontSize(10).fillColor("#64748b")
-    .text(`${req.team.name}  ·  ${statusLabel(req.status)}`, M, doc.y + 4, { width: CONTENT_W });
+    .text(headerParts.join("  ·  "), M, doc.y + 4, { width: CONTENT_W });
 
   doc.y += 14;
   hr(doc);

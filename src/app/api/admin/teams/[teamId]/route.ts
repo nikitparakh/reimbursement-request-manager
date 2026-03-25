@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/rbac";
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
   shortCode: z.string().max(12).nullable().optional(),
+  glAccount: z.string().max(30).nullable().optional(),
   active: z.boolean().optional(),
 });
 

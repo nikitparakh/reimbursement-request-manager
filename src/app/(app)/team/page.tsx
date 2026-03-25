@@ -19,6 +19,7 @@ export default async function TeamPage() {
           id: true,
           name: true,
           shortCode: true,
+          glAccount: true,
           memberships: {
             where: { approved: true },
             select: {
@@ -41,6 +42,7 @@ export default async function TeamPage() {
       id: string;
       name: string;
       shortCode: string | null;
+      glAccount: string | null;
       myRoles: string[];
       coaches: { id: string; name: string | null; email: string }[];
       parents: { id: string; name: string | null; email: string }[];
@@ -58,6 +60,7 @@ export default async function TeamPage() {
         id: membership.team.id,
         name: membership.team.name,
         shortCode: membership.team.shortCode,
+        glAccount: membership.team.glAccount,
         myRoles: [membership.roleInTeam],
         coaches: membership.team.memberships
           .filter((m) => m.roleInTeam === "COACH")
@@ -92,6 +95,9 @@ export default async function TeamPage() {
                   <div className="flex items-center gap-3">
                     <h2 className="text-lg font-semibold text-slate-900">{team.name}</h2>
                     {team.shortCode ? <Badge status={team.shortCode} /> : null}
+                    {team.glAccount ? (
+                      <span className="text-sm text-slate-500">GL: {team.glAccount}</span>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     {team.myRoles.map((role) => (

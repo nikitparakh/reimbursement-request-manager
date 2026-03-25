@@ -144,6 +144,9 @@ export default async function UserRequestDetailPage({
           <CardContent>
             <div className="text-sm text-slate-500">Team</div>
             <div className="text-lg font-semibold text-slate-900">{requestRecord.team.name}</div>
+            {requestRecord.team.glAccount && (
+              <div className="text-xs text-slate-500 mt-1">GL: {requestRecord.team.glAccount}</div>
+            )}
           </CardContent>
         </Card>
         <Card>

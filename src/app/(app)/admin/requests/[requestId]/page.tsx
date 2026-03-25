@@ -35,7 +35,7 @@ export default async function AdminRequestDetailPage({
     where: { id: requestId },
     include: {
       createdBy: { select: { name: true, email: true } },
-      team: { select: { id: true, name: true } },
+      team: { select: { id: true, name: true, glAccount: true } },
       receiptFiles: {
         include: {
           extraction: {
@@ -86,7 +86,15 @@ export default async function AdminRequestDetailPage({
       <PageHeader
         title={request.title}
         badge={<Badge status={status} />}
-        description={`${request.team.name} · ${request.createdBy.name || request.createdBy.email}`}
+        description={
+          [
+            request.team.name,
+            request.team.glAccount ? `GL: ${request.team.glAccount}` : null,
+            request.createdBy.name || request.createdBy.email,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        }
         action={<DownloadPdfLink requestId={request.id} />}
       />
 

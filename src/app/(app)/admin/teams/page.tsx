@@ -49,6 +49,7 @@ export default async function AdminTeamsPage() {
     id: team.id,
     name: team.name,
     shortCode: team.shortCode,
+    glAccount: team.glAccount,
     active: team.active,
     coaches: team.memberships.filter((m) => m.roleInTeam === "COACH").length,
     parents: team.memberships.filter((m) => m.roleInTeam === "STUDENT").length,
@@ -79,6 +80,16 @@ export default async function AdminTeamsPage() {
                 <p className="text-sm text-slate-500">
                   Requested by {request.requestedBy.email}
                 </p>
+                {(request.shortCode || request.glAccount) && (
+                  <p className="text-sm text-slate-500 mt-1">
+                    {[
+                      request.shortCode ? `Code: ${request.shortCode}` : null,
+                      request.glAccount ? `GL: ${request.glAccount}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join("  ·  ")}
+                  </p>
+                )}
               </CardHeader>
               {request.notes ? (
                 <CardContent>
@@ -111,6 +122,9 @@ export default async function AdminTeamsPage() {
                     <th className="pb-3 pr-4 font-medium text-slate-500 hidden sm:table-cell">
                       Short Code
                     </th>
+                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden sm:table-cell">
+                      GL Account
+                    </th>
                     <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
                       Coaches
                     </th>
@@ -139,6 +153,11 @@ export default async function AdminTeamsPage() {
                       </td>
                       <td className="py-3 pr-4 text-slate-600 hidden sm:table-cell">
                         {team.shortCode || (
+                          <span className="text-slate-400 italic">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4 text-slate-600 hidden sm:table-cell">
+                        {team.glAccount || (
                           <span className="text-slate-400 italic">—</span>
                         )}
                       </td>
