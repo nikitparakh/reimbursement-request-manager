@@ -8,6 +8,7 @@ import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 import { POLICY_PATH } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
@@ -123,35 +124,37 @@ export function SignUpForm() {
           control={form.control}
           name="policyAccepted"
           render={({ field }) => (
-            <FormItem className="rounded-md border border-border bg-muted/50 px-3 py-3">
-              <div className="flex items-start gap-3">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value === true}
-                    disabled={field.disabled}
-                    onBlur={field.onBlur}
-                    onCheckedChange={(v) => field.onChange(v === true)}
-                    ref={field.ref}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-snug">
-                  <FormLabel className="cursor-pointer font-normal text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    <span className="text-sm">
-                      I agree to the{" "}
-                      <Link
-                        href={POLICY_PATH}
-                        className="font-medium text-primary hover:text-primary/80"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        reimbursement policy
-                      </Link>
-                      .
-                    </span>
-                  </FormLabel>
-                  <FormMessage />
-                </div>
-              </div>
+            <FormItem>
+              <Card className="border-muted bg-muted/40 shadow-none">
+                <CardContent className="flex items-start gap-3 p-3 text-sm text-muted-foreground">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value === true}
+                      disabled={field.disabled}
+                      onBlur={field.onBlur}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-snug">
+                    <FormLabel className="cursor-pointer font-normal text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      <span className="text-sm">
+                        I agree to the{" "}
+                        <Link
+                          href={POLICY_PATH}
+                          className="font-medium text-primary hover:text-primary/80"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          reimbursement policy
+                        </Link>
+                        .
+                      </span>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </CardContent>
+              </Card>
             </FormItem>
           )}
         />

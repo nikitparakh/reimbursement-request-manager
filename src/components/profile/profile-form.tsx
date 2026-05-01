@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -142,7 +143,7 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -260,16 +261,18 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
           />
         </div>
 
-        <div className="flex gap-3 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-          <CalendarCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span>
-            Policy accepted{" "}
-            {initialProfile.policyAcceptedAt
-              ? `on ${initialProfile.policyAcceptedAt.toLocaleDateString()}`
-              : "during registration"}
-            {initialProfile.policyVersion ? ` · version ${initialProfile.policyVersion}` : ""}
-          </span>
-        </div>
+        <Card className="border-muted bg-muted/40 shadow-none">
+          <CardContent className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+            <CalendarCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span>
+              Policy accepted{" "}
+              {initialProfile.policyAcceptedAt
+                ? `on ${initialProfile.policyAcceptedAt.toLocaleDateString()}`
+                : "during registration"}
+              {initialProfile.policyVersion ? ` · version ${initialProfile.policyVersion}` : ""}
+            </span>
+          </CardContent>
+        </Card>
 
         <Button type="submit" loading={form.formState.isSubmitting}>
           Save profile

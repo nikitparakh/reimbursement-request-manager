@@ -143,8 +143,8 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
           )}
         />
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Creating..." : "Create Draft"}
+        <Button type="submit" loading={form.formState.isSubmitting}>
+          Create Draft
         </Button>
 
         {requestId ? (
