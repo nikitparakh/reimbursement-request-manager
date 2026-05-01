@@ -136,7 +136,7 @@ export function EditableRequestHeader({
                 <Input
                   {...field}
                   type="text"
-                  className="h-auto rounded-none border-0 border-b border-transparent bg-transparent px-1 py-0.5 text-2xl font-bold text-foreground shadow-none hover:border-border focus-visible:border-ring focus-visible:ring-0"
+                  className="text-xl font-semibold md:text-2xl"
                   placeholder="Request title"
                 />
               </FormControl>
@@ -155,7 +155,7 @@ export function EditableRequestHeader({
                   {...field}
                   value={field.value ?? ""}
                   rows={2}
-                  className="min-h-0 resize-none border-transparent bg-transparent px-1 py-1 text-sm text-muted-foreground shadow-none hover:border-border focus-visible:border-ring focus-visible:ring-0 md:text-sm"
+                  className="min-h-[4.5rem] resize-y text-sm md:text-sm"
                   placeholder="Add a description..."
                 />
               </FormControl>
