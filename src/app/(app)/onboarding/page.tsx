@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { TeamSelector } from "@/components/onboarding/team-selector";
 import { TeamRegistrationForm } from "@/components/onboarding/team-registration-form";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function OnboardingPage() {
   const session = await auth();
@@ -90,14 +90,14 @@ export default async function OnboardingPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <PageHeader
         title="Get Started"
         description="Choose your district, school, program, and team before you start working in the reimbursement flow."
       />
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">Join an Existing Team</h2>
+          <CardTitle>Join an existing team</CardTitle>
         </CardHeader>
         <CardContent>
           <TeamSelector districts={districtOptions} />
@@ -105,8 +105,10 @@ export default async function OnboardingPage() {
       </Card>
       <Card className="border-dashed">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">Team Not Listed?</h2>
-          <p className="text-sm text-slate-500">Propose a new team inside the right school and program for school admin review.</p>
+          <CardTitle>Team not listed?</CardTitle>
+          <CardDescription>
+            Propose a new team inside the right school and program for school admin review.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <TeamRegistrationForm districts={requestDistricts} programs={programs} />
