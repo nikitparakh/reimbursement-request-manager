@@ -9,7 +9,7 @@ import {
 } from "@/lib/admin-scope";
 import { TeamRequestDecision } from "@/components/onboarding/team-request-decision";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CreateTeamForm } from "@/components/admin/create-team-form";
@@ -117,6 +117,9 @@ export default async function AdminTeamsPage({
     totalRequests: team.requests.length,
   }));
 
+  const activeTeams = teamsWithStats.filter((t) => t.active);
+  const inactiveTeams = teamsWithStats.filter((t) => !t.active);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -142,45 +145,49 @@ export default async function AdminTeamsPage({
       />
 
       {registrationRequests.length > 0 ? (
-        <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            Pending Registrations
-            <StatusBadge status={`${registrationRequests.length} pending`} />
-          </h2>
-          {registrationRequests.map((request) => (
-            <Card key={request.id}>
-              <CardHeader>
-                <h3 className="text-base font-semibold text-slate-900">
-                  {request.teamName}
-                </h3>
-                <p className="text-sm text-slate-500">
-                  Requested by {request.requestedBy.email}
-                </p>
-                <p className="text-sm text-slate-500 mt-1">
-                  {request.district.name} · {request.school.name} · {request.program.name}
-                </p>
-                {(request.shortCode || request.glAccount) && (
-                  <p className="text-sm text-slate-500 mt-1">
-                    {[
-                      request.shortCode ? `Code: ${request.shortCode}` : null,
-                      request.glAccount ? `GL: ${request.glAccount}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join("  ·  ")}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Pending registrations</CardTitle>
+              <StatusBadge status={`${registrationRequests.length} pending`} />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {registrationRequests.map((request) => (
+              <Card key={request.id}>
+                <CardHeader>
+                  <h3 className="text-base font-semibold text-foreground">
+                    {request.teamName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Requested by {request.requestedBy.email}
                   </p>
-                )}
-              </CardHeader>
-              {request.notes ? (
-                <CardContent>
-                  <p className="text-sm text-slate-700">{request.notes}</p>
-                </CardContent>
-              ) : null}
-              <CardFooter>
-                <TeamRequestDecision requestId={request.id} />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {request.district.name} · {request.school.name} · {request.program.name}
+                  </p>
+                  {(request.shortCode || request.glAccount) && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {[
+                        request.shortCode ? `Code: ${request.shortCode}` : null,
+                        request.glAccount ? `GL: ${request.glAccount}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join("  ·  ")}
+                    </p>
+                  )}
+                </CardHeader>
+                {request.notes ? (
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-foreground">{request.notes}</p>
+                  </CardContent>
+                ) : null}
+                <CardFooter>
+                  <TeamRequestDecision requestId={request.id} />
+                </CardFooter>
+              </Card>
+            ))}
+          </CardContent>
+        </Card>
       ) : null}
 
       {teamsWithStats.length === 0 ? (
@@ -193,84 +200,116 @@ export default async function AdminTeamsPage({
           }
         />
       ) : (
-        <Card>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left">
-                    <th className="pb-3 pr-4 font-medium text-slate-500">
-                      Team
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden lg:table-cell">
-                      School / Program
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden sm:table-cell">
-                      Short Code
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden sm:table-cell">
-                      GL Account
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
-                      Coaches
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
-                      Parents/Mentors
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-slate-500 hidden md:table-cell">
-                      Requests
-                    </th>
-                    <th className="pb-3 font-medium text-slate-500">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamsWithStats.map((team) => (
-                    <tr
-                      key={team.id}
-                      className="border-b border-slate-100 last:border-0"
-                    >
-                      <td className="py-3 pr-4">
-                        <Link
-                          href={`/admin/teams/${team.id}`}
-                          className="font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
-                        >
-                          {team.name}
-                        </Link>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 hidden lg:table-cell">
-                        <div>{team.schoolName}</div>
-                        <div className="text-xs text-slate-400">{team.programName}</div>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 hidden sm:table-cell">
-                        {team.shortCode || (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 hidden sm:table-cell">
-                        {team.glAccount || (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
-                        {team.coaches}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
-                        {team.parents}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700 hidden md:table-cell">
-                        {team.totalRequests}
-                      </td>
-                      <td className="py-3">
-                        <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {activeTeams.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Active teams</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ManageTeamsTable teams={activeTeams} />
+              </CardContent>
+            </Card>
+          ) : null}
+          {inactiveTeams.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Inactive teams</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ManageTeamsTable teams={inactiveTeams} />
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
       )}
+    </div>
+  );
+}
+
+type TeamStatRow = {
+  id: string;
+  name: string;
+  shortCode: string | null;
+  glAccount: string | null;
+  schoolName: string;
+  districtName: string;
+  programName: string;
+  active: boolean;
+  coaches: number;
+  parents: number;
+  totalRequests: number;
+};
+
+function ManageTeamsTable({ teams }: { teams: TeamStatRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="pb-3 pr-4 font-medium text-muted-foreground">Team</th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground lg:table-cell">
+              School / Program
+            </th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
+              Short Code
+            </th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
+              GL Account
+            </th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+              Coaches
+            </th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+              Parents/Mentors
+            </th>
+            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+              Requests
+            </th>
+            <th className="pb-3 font-medium text-muted-foreground">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {teams.map((team) => (
+            <tr key={team.id} className="border-b border-border/60 last:border-0">
+              <td className="py-3 pr-4">
+                <Link
+                  href={`/admin/teams/${team.id}`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  {team.name}
+                </Link>
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground lg:table-cell">
+                <div>{team.schoolName}</div>
+                <div className="text-xs text-muted-foreground">{team.programName}</div>
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground sm:table-cell">
+                {team.shortCode || (
+                  <span className="italic text-muted-foreground">—</span>
+                )}
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground sm:table-cell">
+                {team.glAccount || (
+                  <span className="italic text-muted-foreground">—</span>
+                )}
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
+                {team.coaches}
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
+                {team.parents}
+              </td>
+              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
+                {team.totalRequests}
+              </td>
+              <td className="py-3">
+                <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

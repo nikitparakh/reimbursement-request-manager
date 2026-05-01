@@ -45,17 +45,17 @@ export default async function AdminTeamRequestsPage() {
           {requests.map((request) => (
             <Card key={request.id}>
               <CardHeader>
-                <h3 className="text-base font-semibold text-slate-900">{request.teamName}</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-base font-semibold text-foreground">{request.teamName}</h3>
+                <p className="text-sm text-muted-foreground">
                   Requested by {request.requestedBy.email}
                 </p>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {request.district.name} · {request.school.name} · {request.program.name}
                 </p>
               </CardHeader>
               {request.notes ? (
                 <CardContent>
-                  <p className="text-sm text-slate-700">{request.notes}</p>
+                  <p className="text-sm text-foreground">{request.notes}</p>
                 </CardContent>
               ) : null}
               <CardFooter>
