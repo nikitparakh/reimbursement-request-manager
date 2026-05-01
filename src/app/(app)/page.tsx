@@ -22,7 +22,7 @@ export default async function HomePage() {
         </p>
         <div className="mt-8 flex gap-4">
           <Link href="/sign-in">
-            <Button variant="primary">Sign In</Button>
+            <Button variant="default">Sign In</Button>
           </Link>
           <Link href="/sign-up">
             <Button variant="secondary">Create Account</Button>

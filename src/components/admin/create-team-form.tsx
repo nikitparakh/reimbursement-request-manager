@@ -74,7 +74,7 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
 
   if (!open) {
     return (
-      <Button variant="primary" size="md" onClick={() => setOpen(true)}>
+      <Button variant="default" onClick={() => setOpen(true)}>
         + Create Team
       </Button>
     );
@@ -175,8 +175,7 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
       </div>
       <Button
         type="submit"
-        variant="primary"
-        size="md"
+        variant="default"
         loading={saving}
         disabled={!schoolId || !programId}
       >
@@ -185,7 +184,6 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
       <Button
         type="button"
         variant="ghost"
-        size="md"
         onClick={() => {
           setOpen(false);
           setError("");

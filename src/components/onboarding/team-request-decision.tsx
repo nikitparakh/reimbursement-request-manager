@@ -52,10 +52,10 @@ export function TeamRequestDecision({ requestId }: { requestId: string }) {
         />
       </FormField>
       <div className="flex gap-2">
-        <Button variant="success" size="sm" onClick={() => handleDecision("APPROVE")} loading={saving} disabled={decided || saving}>
+        <Button variant="default" size="sm" onClick={() => handleDecision("APPROVE")} loading={saving} disabled={decided || saving}>
           Approve
         </Button>
-        <Button variant="danger" size="sm" onClick={() => handleDecision("REJECT")} loading={saving} disabled={decided || saving}>
+        <Button variant="destructive" size="sm" onClick={() => handleDecision("REJECT")} loading={saving} disabled={decided || saving}>
           Reject
         </Button>
       </div>

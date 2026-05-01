@@ -106,7 +106,7 @@ export function EditTeamForm({
           className="w-56"
         />
       </div>
-      <Button type="submit" variant="primary" size="sm" loading={saving}>
+      <Button type="submit" variant="default" size="sm" loading={saving}>
         Save
       </Button>
       <Button

@@ -57,16 +57,16 @@ export function ApprovalDecision({
       <div className="flex gap-2">
         {showApproveReject && (
           <>
-            <Button variant="success" size="sm" onClick={() => handleDecision("APPROVE")}>
+            <Button variant="default" size="sm" onClick={() => handleDecision("APPROVE")}>
               Approve
             </Button>
-            <Button variant="danger" size="sm" onClick={() => handleDecision("REJECT")}>
+            <Button variant="destructive" size="sm" onClick={() => handleDecision("REJECT")}>
               Reject
             </Button>
           </>
         )}
         {allowMarkPaid ? (
-          <Button variant="primary" size="sm" onClick={() => handleDecision("MARK_PAID")}>
+          <Button variant="default" size="sm" onClick={() => handleDecision("MARK_PAID")}>
             Mark Paid
           </Button>
         ) : null}

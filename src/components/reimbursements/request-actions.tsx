@@ -187,7 +187,7 @@ export function RequestActions({
             </p>
             <div className="flex gap-2">
               <Button
-                variant="danger"
+                variant="destructive"
                 size="sm"
                 loading={isDeleting}
                 onClick={async () => {
