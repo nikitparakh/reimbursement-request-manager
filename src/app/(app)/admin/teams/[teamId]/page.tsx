@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { canManageTeams, getCachedAccessContext } from "@/lib/access";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TeamActiveToggle } from "@/components/admin/team-active-toggle";
@@ -96,9 +98,10 @@ export default async function AdminTeamDetailPage({
       <div>
         <Link
           href="/admin/teams"
-          className="text-sm text-slate-500 hover:text-emerald-600 transition"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
         >
-          &larr; Back to teams
+          <ArrowLeft className="size-4 shrink-0" aria-hidden />
+          Back to teams
         </Link>
       </div>
 
@@ -130,10 +133,10 @@ export default async function AdminTeamDetailPage({
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-slate-900">
+              <CardTitle className="text-sm font-medium text-foreground">
                 Active Status
-              </h3>
-              <p className="text-sm text-slate-500">
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
                 {team.active
                   ? "Team is visible and members can submit requests."
                   : "Team is hidden. Members cannot submit new requests."}
@@ -153,9 +156,9 @@ export default async function AdminTeamDetailPage({
       {/* Request history */}
       <Card>
         <CardHeader>
-          <h3 className="text-sm font-semibold text-slate-900">
+          <CardTitle className="text-sm font-semibold">
             Requests ({team.requests.length})
-          </h3>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {requestRows.length === 0 ? (
@@ -172,15 +175,16 @@ export default async function AdminTeamDetailPage({
       {/* Members */}
       <Card>
         <CardHeader>
-          <h3 className="text-sm font-semibold text-slate-900">
+          <CardTitle className="text-sm font-semibold">
             Members ({team.memberships.length})
-          </h3>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {memberRows.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">
-              No members yet.
-            </p>
+            <EmptyState
+              title="No members"
+              description="No members have joined this team yet."
+            />
           ) : (
             <TeamMembersTable data={memberRows} />
           )}
@@ -194,8 +198,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
       </CardContent>
     </Card>
   );
