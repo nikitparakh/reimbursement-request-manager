@@ -113,22 +113,24 @@ export default async function CoachTeamOverviewPage() {
         return (
           <div key={team.id} className="space-y-6">
             {teams.length > 1 && (
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-slate-900">
-                  {team.name}
-                </h2>
-                <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
-                {team.shortCode && (
-                  <span className="text-sm text-slate-500">
-                    Code: {team.shortCode}
-                  </span>
-                )}
-                {team.glAccount && (
-                  <span className="text-sm text-slate-500">
-                    GL: {team.glAccount}
-                  </span>
-                )}
-              </div>
+              <Card>
+                <CardContent className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    {team.name}
+                  </h2>
+                  <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
+                  {team.shortCode && (
+                    <span className="text-sm text-muted-foreground">
+                      Code: {team.shortCode}
+                    </span>
+                  )}
+                  {team.glAccount && (
+                    <span className="text-sm text-muted-foreground">
+                      GL: {team.glAccount}
+                    </span>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {teams.length === 1 && (
@@ -168,7 +170,7 @@ export default async function CoachTeamOverviewPage() {
 
             <Card>
               <CardHeader>
-                <h3 className="text-sm font-semibold text-slate-900">
+                <h3 className="text-sm font-semibold text-foreground">
                   Requests ({team.requests.length})
                 </h3>
               </CardHeader>
@@ -186,15 +188,16 @@ export default async function CoachTeamOverviewPage() {
 
             <Card>
               <CardHeader>
-                <h3 className="text-sm font-semibold text-slate-900">
+                <h3 className="text-sm font-semibold text-foreground">
                   Members ({team.memberships.length})
                 </h3>
               </CardHeader>
               <CardContent>
                 {memberRows.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">
-                    No members yet.
-                  </p>
+                  <EmptyState
+                    title="No members yet"
+                    description="Approved members will appear here once added."
+                  />
                 ) : (
                   <CoachTeamMembersTable data={memberRows} />
                 )}
@@ -202,7 +205,7 @@ export default async function CoachTeamOverviewPage() {
             </Card>
 
             {teams.length > 1 && (
-              <hr className="border-slate-200" />
+              <hr className="border-border" />
             )}
           </div>
         );
@@ -215,8 +218,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
       </CardContent>
     </Card>
   );
