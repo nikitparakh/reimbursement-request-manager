@@ -2,6 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 type EditableRequestHeaderProps = {
   requestId: string;
   initialTitle: string;
@@ -29,7 +32,7 @@ export function EditableRequestHeader({
         // Silently ignore save errors — user can retry
       }
     },
-    [requestId]
+    [requestId],
   );
 
   const debouncedSave = useCallback(
@@ -37,7 +40,7 @@ export function EditableRequestHeader({
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => void save(fields), 600);
     },
-    [save]
+    [save],
   );
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export function EditableRequestHeader({
 
   return (
     <div className="space-y-3">
-      <input
+      <Input
         type="text"
         value={title}
         onChange={(e) => {
@@ -57,17 +60,17 @@ export function EditableRequestHeader({
             debouncedSave({ title: e.target.value });
           }
         }}
-        className="w-full text-2xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-emerald-500 focus:outline-none transition px-1 py-0.5"
+        className="h-auto rounded-none border-0 border-b border-transparent bg-transparent px-1 py-0.5 text-2xl font-bold text-foreground shadow-none hover:border-border focus-visible:border-ring focus-visible:ring-0"
         placeholder="Request title"
       />
-      <textarea
+      <Textarea
         value={description}
         onChange={(e) => {
           setDescription(e.target.value);
           debouncedSave({ description: e.target.value });
         }}
         rows={2}
-        className="w-full text-sm text-slate-600 bg-transparent border border-transparent rounded-md hover:border-slate-200 focus:border-emerald-500 focus:outline-none transition resize-none px-1 py-1"
+        className="min-h-0 resize-none border-transparent bg-transparent px-1 py-1 text-sm text-muted-foreground shadow-none hover:border-border focus-visible:border-ring focus-visible:ring-0 md:text-sm"
         placeholder="Add a description..."
       />
     </div>

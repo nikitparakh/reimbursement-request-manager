@@ -1,8 +1,19 @@
 "use client";
 
 import { useRef, useState } from "react";
+import {
+  AlertCircle,
+  Check,
+  File,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Alert } from "@/components/ui/alert";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 type UploadedReceipt = {
   id: string;
@@ -28,13 +39,11 @@ export function ReceiptUploader({
 }: ReceiptUploaderProps) {
   const [uploads, setUploads] = useState<UploadingFile[]>([]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const visibleUploads = uploads.filter(
-    (upload) => upload.status === "uploading" || !existingReceipts.some((receipt) => receipt.fileName === upload.fileName)
+    (upload) => upload.status === "uploading" || !existingReceipts.some((receipt) => receipt.fileName === upload.fileName),
   );
 
   async function deleteReceipt(receiptId: string) {
@@ -49,10 +58,10 @@ export function ReceiptUploader({
           next.delete(receiptId);
           return next;
         });
-        setMessage("Failed to delete receipt.");
-        setIsError(true);
+        toast.error("Failed to delete receipt.");
         return;
       }
+      toast.success("Receipt removed");
       router.refresh();
     } catch {
       setDeletedIds((prev) => {
@@ -60,8 +69,7 @@ export function ReceiptUploader({
         next.delete(receiptId);
         return next;
       });
-      setMessage("Failed to delete receipt.");
-      setIsError(true);
+      toast.error("Failed to delete receipt.");
     }
   }
 
@@ -87,21 +95,19 @@ export function ReceiptUploader({
         const text = await response.text();
         try {
           const payload = JSON.parse(text) as { error?: string };
-          setMessage(payload.error ?? "Upload failed.");
+          toast.error(payload.error ?? "Upload failed.");
         } catch {
-          setMessage("Upload failed.");
+          toast.error("Upload failed.");
         }
-        setIsError(true);
         return;
       }
 
       updateUpload(key, { status: "uploaded" });
-      setMessage("");
+      toast.success("Receipt uploaded");
       router.refresh();
     } catch {
       updateUpload(key, { status: "failed" });
-      setMessage("Upload failed. Please try again.");
-      setIsError(true);
+      toast.error("Upload failed. Please try again.");
     }
   }
 
@@ -118,37 +124,39 @@ export function ReceiptUploader({
   const uploadedFileNames = new Set(visibleUploads.map((u) => u.fileName));
   const hiddenDeleteIds = new Set(hideExistingReceiptDeleteIds);
   const serverOnly = existingReceipts.filter(
-    (r) => !uploadedFileNames.has(r.fileName) && !deletedIds.has(r.id)
+    (r) => !uploadedFileNames.has(r.fileName) && !deletedIds.has(r.id),
   );
 
   return (
     <div className="space-y-4">
-        {(serverOnly.length > 0 || visibleUploads.length > 0) ? (
+      {serverOnly.length > 0 || visibleUploads.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {serverOnly.map((receipt) => (
             <div
               key={receipt.id}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm max-w-xs"
+              className="inline-flex max-w-xs items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm"
             >
               <a
                 href={`/api/receipts/${receipt.id}/download`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 hover:opacity-80 transition min-w-0"
+                className="inline-flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80"
               >
-                <FileIcon />
-                <span className="truncate text-slate-700">{receipt.fileName}</span>
-                <CheckIcon />
+                <File className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="truncate text-foreground">{receipt.fileName}</span>
+                <Check className="size-4 shrink-0 text-primary" aria-hidden />
               </a>
               {!hiddenDeleteIds.has(receipt.id) ? (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   type="button"
-                  onClick={() => void deleteReceipt(receipt.id)}
-                  className="ml-1 shrink-0 text-slate-400 hover:text-red-500 transition"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
                   aria-label={`Delete ${receipt.fileName}`}
+                  onClick={() => void deleteReceipt(receipt.id)}
                 >
-                  <DeleteIcon />
-                </button>
+                  <X className="size-4" />
+                </Button>
               ) : null}
             </div>
           ))}
@@ -156,81 +164,52 @@ export function ReceiptUploader({
           {visibleUploads.map((upload) => (
             <div
               key={upload.key}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm max-w-xs"
+              className="inline-flex max-w-xs items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm"
             >
-              <FileIcon />
-              <span className="truncate text-slate-700">{upload.fileName}</span>
+              <File className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate text-foreground">{upload.fileName}</span>
               <UploadStatusIndicator status={upload.status} />
             </div>
           ))}
         </div>
       ) : null}
 
-      <div
+      <Card
+        className="cursor-pointer border-2 border-dashed border-border transition-colors hover:border-primary hover:bg-primary/5"
         onClick={() => fileInputRef.current?.click()}
-        className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-emerald-400 hover:bg-emerald-50/50 transition cursor-pointer"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        role="button"
+        tabIndex={0}
       >
-        <svg className="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        <p className="mt-1 text-sm font-medium text-slate-700">Add receipts</p>
-        <p className="text-xs text-slate-500">PDF or images accepted</p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".pdf,image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </div>
-
-      {message ? (
-        <Alert variant={isError ? "destructive" : "success"}>{message}</Alert>
-      ) : null}
+        <CardContent className="flex flex-col items-center gap-1 py-6 text-center">
+          <Upload className="mx-auto size-8 text-muted-foreground" aria-hidden />
+          <p className="text-sm font-medium text-foreground">Add receipts</p>
+          <p className="text-xs text-muted-foreground">PDF or images accepted</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg className="h-4 w-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-  );
-}
-
-function DeleteIcon() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-    </svg>
   );
 }
 
 function UploadStatusIndicator({ status }: { status: UploadingFile["status"] }) {
   if (status === "uploading") {
-    return (
-      <svg className="h-4 w-4 animate-spin text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
-    );
+    return <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />;
   }
   if (status === "failed") {
-    return (
-      <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-      </svg>
-    );
+    return <AlertCircle className="size-4 shrink-0 text-destructive" aria-hidden />;
   }
-  return <CheckIcon />;
+  return <Check className="size-4 shrink-0 text-primary" aria-hidden />;
 }

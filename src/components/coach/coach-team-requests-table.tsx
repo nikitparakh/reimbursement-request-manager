@@ -1,8 +1,11 @@
 "use client";
 
+import type { ColumnDef, HeaderContext } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
+
+import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { type Column, SortableTable } from "@/components/ui/sortable-table";
 
 export type RequestRow = {
   id: string;
@@ -14,49 +17,78 @@ export type RequestRow = {
   dateMs: number;
 };
 
-const columns: Column<RequestRow>[] = [
+function SortableHeader<TData, TValue>({
+  column,
+  title,
+}: HeaderContext<TData, TValue> & { title: string }) {
+  const sorted = column.getIsSorted();
+  return (
+    <button
+      type="button"
+      className="-ml-2 inline-flex items-center gap-1 rounded px-2 py-0.5 font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      onClick={column.getToggleSortingHandler()}
+    >
+      {title}
+      {sorted === "asc" ? (
+        <ArrowUp className="size-3 shrink-0" aria-hidden />
+      ) : sorted === "desc" ? (
+        <ArrowDown className="size-3 shrink-0" aria-hidden />
+      ) : (
+        <ArrowUpDown className="size-3 shrink-0 opacity-50" aria-hidden />
+      )}
+    </button>
+  );
+}
+
+const columns: ColumnDef<RequestRow>[] = [
   {
-    key: "title",
-    label: "Title",
-    sortValue: (r) => r.title.toLowerCase(),
-    render: (r) => (
+    id: "title",
+    accessorFn: (r) => r.title.toLowerCase(),
+    sortingFn: "alphanumeric",
+    header: (ctx) => <SortableHeader {...ctx} title="Title" />,
+    cell: ({ row }) => (
       <Link
-        href={`/user/requests/${r.id}`}
-        className="font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
+        href={`/user/requests/${row.original.id}`}
+        className="font-medium text-primary underline-offset-4 hover:underline"
+        onClick={(e) => e.stopPropagation()}
       >
-        {r.title}
+        {row.original.title}
       </Link>
     ),
   },
   {
-    key: "submittedBy",
-    label: "Submitted By",
-    sortValue: (r) => r.submittedBy.toLowerCase(),
-    cellClassName: "text-slate-600",
-    render: (r) => r.submittedBy,
+    id: "submittedBy",
+    accessorFn: (r) => r.submittedBy.toLowerCase(),
+    sortingFn: "alphanumeric",
+    header: (ctx) => <SortableHeader {...ctx} title="Submitted By" />,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{row.original.submittedBy}</span>
+    ),
   },
   {
-    key: "amount",
-    label: "Amount",
-    sortValue: (r) => r.amount,
-    cellClassName: "text-slate-700",
-    render: (r) => `$${r.amount.toFixed(2)}`,
+    accessorKey: "amount",
+    header: (ctx) => <SortableHeader {...ctx} title="Amount" />,
+    cell: ({ row }) => (
+      <span className="text-foreground">
+        ${row.original.amount.toFixed(2)}
+      </span>
+    ),
   },
   {
-    key: "status",
-    label: "Status",
-    sortValue: (r) => r.status,
-    render: (r) => <StatusBadge status={r.status} />,
+    accessorKey: "status",
+    header: (ctx) => <SortableHeader {...ctx} title="Status" />,
+    cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
-    key: "date",
-    label: "Date",
-    sortValue: (r) => r.dateMs,
-    cellClassName: "text-slate-500",
-    render: (r) => r.date,
+    id: "date",
+    accessorFn: (r) => r.dateMs,
+    header: (ctx) => <SortableHeader {...ctx} title="Date" />,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{row.original.date}</span>
+    ),
   },
 ];
 
 export function CoachTeamRequestsTable({ data }: { data: RequestRow[] }) {
-  return <SortableTable columns={columns} data={data} rowKey={(r) => r.id} />;
+  return <DataTable columns={columns} data={data} />;
 }

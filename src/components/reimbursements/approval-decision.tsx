@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldGroup } from "@/components/ui/field-group";
-import { Alert } from "@/components/ui/alert";
 
 type Decision = "APPROVE" | "REJECT" | "MARK_PAID";
 
@@ -21,12 +22,9 @@ export function ApprovalDecision({
   showApproveReject?: boolean;
 }) {
   const [comment, setComment] = useState("");
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
   const router = useRouter();
 
   async function handleDecision(decision: Decision) {
-    setMessage("");
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,12 +32,10 @@ export function ApprovalDecision({
     });
 
     if (!response.ok) {
-      setMessage("Decision failed.");
-      setIsError(true);
+      toast.error("Decision failed.");
       return;
     }
-    setMessage(`Decision recorded: ${decision.replace("_", " ")}`);
-    setIsError(false);
+    toast.success(`Decision recorded: ${decision.replace("_", " ")}`);
     router.refresh();
   }
 
@@ -57,23 +53,20 @@ export function ApprovalDecision({
       <div className="flex gap-2">
         {showApproveReject && (
           <>
-            <Button variant="default" size="sm" onClick={() => handleDecision("APPROVE")}>
+            <Button variant="default" size="sm" onClick={() => void handleDecision("APPROVE")}>
               Approve
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => handleDecision("REJECT")}>
+            <Button variant="destructive" size="sm" onClick={() => void handleDecision("REJECT")}>
               Reject
             </Button>
           </>
         )}
         {allowMarkPaid ? (
-          <Button variant="default" size="sm" onClick={() => handleDecision("MARK_PAID")}>
+          <Button variant="default" size="sm" onClick={() => void handleDecision("MARK_PAID")}>
             Mark Paid
           </Button>
         ) : null}
       </div>
-      {message ? (
-        <Alert variant={isError ? "destructive" : "success"}>{message}</Alert>
-      ) : null}
     </div>
   );
 }
