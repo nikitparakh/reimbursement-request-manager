@@ -1,4 +1,7 @@
 import { unauthorized } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import { BanknoteArrowUp, Clock, FileText } from "lucide-react";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getCachedAccessContext } from "@/lib/access";
@@ -9,6 +12,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CoachTeamRequestsTable } from "@/components/coach/coach-team-requests-table";
 import { CoachTeamMembersTable } from "@/components/coach/coach-team-members-table";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { getTeamOverviewDescription } from "@/lib/ui-copy";
 
 export default async function CoachTeamOverviewPage() {
@@ -99,7 +104,7 @@ export default async function CoachTeamOverviewPage() {
           submittedBy: r.createdBy.name || r.createdBy.email,
           amount: Number(r.requestedTotal),
           status: r.status,
-          date: r.createdAt.toLocaleDateString(),
+          date: formatDate(r.createdAt),
           dateMs: r.createdAt.getTime(),
         }));
 
@@ -154,17 +159,25 @@ export default async function CoachTeamOverviewPage() {
             )}
 
             <div className="grid grid-cols-3 gap-4">
-              <StatCard
+              <StatTile
                 label="Requests"
                 value={String(team.requests.length)}
+                subtitle="Submitted (non-draft)"
+                icon={FileText}
               />
-              <StatCard
+              <StatTile
                 label="Paid Out"
-                value={`$${paidAmount.toFixed(2)}`}
+                value={formatCurrency(paidAmount, "USD")}
+                subtitle="Marked paid totals"
+                icon={BanknoteArrowUp}
+                iconClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
               />
-              <StatCard
+              <StatTile
                 label="Pending Review"
                 value={String(pendingCount)}
+                subtitle="Awaiting approval"
+                icon={Clock}
+                iconClassName="bg-amber-100 text-amber-800 dark:bg-amber-950/55 dark:text-amber-400"
               />
             </div>
 
@@ -214,12 +227,35 @@ export default async function CoachTeamOverviewPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatTile({
+  label,
+  value,
+  subtitle,
+  icon: Icon,
+  iconClassName,
+}: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  icon: LucideIcon;
+  iconClassName?: string;
+}) {
   return (
     <Card>
-      <CardContent className="py-4">
+      <CardContent className="relative pt-11 pb-4">
+        <div
+          className={cn(
+            "absolute top-4 right-4 flex size-9 shrink-0 items-center justify-center rounded-md",
+            iconClassName ?? "bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon className="size-[1.125rem]" aria-hidden />
+        </div>
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+        <p className="mt-1 pr-11 text-2xl font-bold text-foreground tabular-nums">{value}</p>
+        {subtitle ? (
+          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, BanknoteArrowUp, Clock, FileText } from "lucide-react";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -13,6 +14,8 @@ import { TeamActiveToggle } from "@/components/admin/team-active-toggle";
 import { EditTeamForm } from "@/components/admin/edit-team-form";
 import { TeamRequestsTable } from "@/components/admin/team-requests-table";
 import { TeamMembersTable } from "@/components/admin/team-members-table";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export default async function AdminTeamDetailPage({
   params,
@@ -81,7 +84,7 @@ export default async function AdminTeamDetailPage({
     submittedBy: r.createdBy.name || r.createdBy.email,
     amount: Number(r.requestedTotal),
     status: r.status,
-    date: r.createdAt.toLocaleDateString(),
+    date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
   }));
 
@@ -148,9 +151,26 @@ export default async function AdminTeamDetailPage({
       </Card>
 
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Requests" value={String(team.requests.length)} />
-        <StatCard label="Paid Out" value={`$${paidAmount.toFixed(2)}`} />
-        <StatCard label="Pending Review" value={String(pendingCount)} />
+        <StatTile
+          label="Requests"
+          value={String(team.requests.length)}
+          subtitle="Submitted (visible to admin)"
+          icon={FileText}
+        />
+        <StatTile
+          label="Paid Out"
+          value={formatCurrency(paidAmount, "USD")}
+          subtitle="Marked paid totals"
+          icon={BanknoteArrowUp}
+          iconClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+        />
+        <StatTile
+          label="Pending Review"
+          value={String(pendingCount)}
+          subtitle="Awaiting approval"
+          icon={Clock}
+          iconClassName="bg-amber-100 text-amber-800 dark:bg-amber-950/55 dark:text-amber-400"
+        />
       </div>
 
       {/* Request history */}
@@ -194,12 +214,35 @@ export default async function AdminTeamDetailPage({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatTile({
+  label,
+  value,
+  subtitle,
+  icon: Icon,
+  iconClassName,
+}: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  icon: LucideIcon;
+  iconClassName?: string;
+}) {
   return (
     <Card>
-      <CardContent className="py-4">
+      <CardContent className="relative pt-11 pb-4">
+        <div
+          className={cn(
+            "absolute top-4 right-4 flex size-9 shrink-0 items-center justify-center rounded-md",
+            iconClassName ?? "bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon className="size-[1.125rem]" aria-hidden />
+        </div>
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+        <p className="mt-1 pr-11 text-2xl font-bold text-foreground tabular-nums">{value}</p>
+        {subtitle ? (
+          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        ) : null}
       </CardContent>
     </Card>
   );
