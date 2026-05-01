@@ -37,7 +37,7 @@ export function SignInForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {error ? <Alert variant="destructive">{error}</Alert> : null}
 
       <FieldGroup label="Email" htmlFor="email">
         <Input

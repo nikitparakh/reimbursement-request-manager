@@ -76,7 +76,7 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {message ? <Alert variant={isError ? "error" : "success"}>{message}</Alert> : null}
+      {message ? <Alert variant={isError ? "destructive" : "success"}>{message}</Alert> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <FieldGroup label="Address line 1" htmlFor="mailingAddressLine1">

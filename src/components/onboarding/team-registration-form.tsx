@@ -165,7 +165,7 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
 
       <Button variant="secondary" onClick={submit}>Submit Request</Button>
 
-      {message ? <Alert variant={isSuccess ? "success" : "error"}>{message}</Alert> : null}
+      {message ? <Alert variant={isSuccess ? "success" : "destructive"}>{message}</Alert> : null}
     </div>
   );
 }

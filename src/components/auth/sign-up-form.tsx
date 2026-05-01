@@ -60,7 +60,7 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {message ? <Alert variant="error">{message}</Alert> : null}
+      {message ? <Alert variant="destructive">{message}</Alert> : null}
 
       <FieldGroup label="Name" htmlFor="name">
         <Input

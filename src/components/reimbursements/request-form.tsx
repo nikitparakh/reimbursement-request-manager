@@ -79,7 +79,7 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
       </Button>
 
       {message ? (
-        <Alert variant={isError ? "error" : "success"}>
+        <Alert variant={isError ? "destructive" : "success"}>
           {message}
           {requestId ? (
             <Link

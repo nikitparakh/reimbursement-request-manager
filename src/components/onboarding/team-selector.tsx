@@ -159,7 +159,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
 
       <Button onClick={submit} disabled={!teamId}>Save</Button>
 
-      {message ? <Alert variant={isSuccess ? "success" : "error"}>{message}</Alert> : null}
+      {message ? <Alert variant={isSuccess ? "success" : "destructive"}>{message}</Alert> : null}
     </div>
   );
 }

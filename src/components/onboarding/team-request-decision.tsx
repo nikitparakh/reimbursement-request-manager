@@ -60,7 +60,7 @@ export function TeamRequestDecision({ requestId }: { requestId: string }) {
         </Button>
       </div>
       {message ? (
-        <Alert variant={isError ? "error" : "success"}>{message}</Alert>
+        <Alert variant={isError ? "destructive" : "success"}>{message}</Alert>
       ) : null}
     </div>
   );

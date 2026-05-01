@@ -205,7 +205,7 @@ export function TeamReimbursementsTable({
 
   return (
     <div className="space-y-4">
-      {reopenError ? <Alert variant="error">{reopenError}</Alert> : null}
+      {reopenError ? <Alert variant="destructive">{reopenError}</Alert> : null}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
