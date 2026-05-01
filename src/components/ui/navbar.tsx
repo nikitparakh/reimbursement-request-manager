@@ -6,6 +6,7 @@ import { getNavigationLinks } from "@/lib/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { MobileNavMenu } from "@/components/ui/mobile-nav-menu";
+import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -57,19 +58,13 @@ export async function NavBar() {
             <MobileNavMenu links={links} userEmail={session.user.email!} />
           </>
         ) : (
-          <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/sign-up"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium transition"
-            >
-              Create Account
-            </Link>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/sign-in">Sign In</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/sign-up">Sign Up</Link>
+            </Button>
           </div>
         )}
       </div>
