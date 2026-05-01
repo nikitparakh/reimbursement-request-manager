@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { type Column, SortableTable } from "@/components/ui/sortable-table";
 
@@ -70,7 +70,7 @@ const columns: Column<AdminReimbursementRow>[] = [
     key: "status",
     label: "Status",
     sortValue: (r) => r.status,
-    render: (r) => <Badge status={r.status} />,
+    render: (r) => <StatusBadge status={r.status} />,
   },
 ];
 

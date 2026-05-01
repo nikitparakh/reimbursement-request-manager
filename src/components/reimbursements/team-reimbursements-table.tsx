@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { type Column, SortableTable } from "@/components/ui/sortable-table";
@@ -77,7 +77,7 @@ function buildColumns(
       sortValue: (r) => r.status,
       render: (r) => (
         <div className="flex items-center gap-2 whitespace-nowrap">
-          <Badge status={r.status} />
+          <StatusBadge status={r.status} />
           {hasAnyRejected && (
             <button
               type="button"

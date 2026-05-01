@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { RemoveMemberButton } from "@/components/admin/remove-member-button";
 import { type Column, SortableTable } from "@/components/ui/sortable-table";
 
@@ -32,7 +32,7 @@ const columns: Column<MemberRow>[] = [
     key: "role",
     label: "Role",
     sortValue: (m) => m.roleInTeam,
-    render: (m) => <Badge status={m.roleInTeam} />,
+    render: (m) => <StatusBadge status={m.roleInTeam} />,
   },
   {
     key: "actions",

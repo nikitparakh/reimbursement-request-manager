@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type CollapsibleRequestCardProps = {
   title: string;
@@ -86,7 +86,7 @@ export function CollapsibleRequestCard({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold text-slate-900 truncate">{title}</h3>
-              <Badge status={status} />
+              <StatusBadge status={status} />
             </div>
             {subtitle ? (
               <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>

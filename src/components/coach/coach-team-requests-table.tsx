@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { type Column, SortableTable } from "@/components/ui/sortable-table";
 
 export type RequestRow = {
@@ -46,7 +46,7 @@ const columns: Column<RequestRow>[] = [
     key: "status",
     label: "Status",
     sortValue: (r) => r.status,
-    render: (r) => <Badge status={r.status} />,
+    render: (r) => <StatusBadge status={r.status} />,
   },
   {
     key: "date",

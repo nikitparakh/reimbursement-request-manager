@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type TimelineEntry = {
   id: string;
@@ -28,7 +28,7 @@ export function StatusTimeline({ items }: { items: TimelineEntry[] }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Badge status={item.action} />
+                    <StatusBadge status={item.action} />
                     <span className="text-sm text-slate-500">by {item.actor}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-400">

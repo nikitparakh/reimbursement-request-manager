@@ -8,7 +8,7 @@ import {
   type ReimbursementRow,
 } from "@/components/reimbursements/team-reimbursements-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getTeamReimbursementsDescription } from "@/lib/ui-copy";
 
@@ -63,7 +63,7 @@ export default async function TeamReimbursementsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Team Reimbursements"
-        badge={pendingCount > 0 ? <Badge status={`${pendingCount} pending review`} /> : undefined}
+        badge={pendingCount > 0 ? <StatusBadge status={`${pendingCount} pending review`} /> : undefined}
         description={getTeamReimbursementsDescription(access)}
       />
 

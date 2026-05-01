@@ -5,7 +5,7 @@ import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedTeamRegistrationWhere } from "@/lib/admin-scope";
 import { TeamRequestDecision } from "@/components/onboarding/team-request-decision";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminTeamRequestsDescription } from "@/lib/ui-copy";
@@ -31,7 +31,7 @@ export default async function AdminTeamRequestsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Team Registrations"
-        badge={requests.length > 0 ? <Badge status={`${requests.length} pending`} /> : undefined}
+        badge={requests.length > 0 ? <StatusBadge status={`${requests.length} pending`} /> : undefined}
         description={getAdminTeamRequestsDescription(access.isSuperAdmin)}
       />
 

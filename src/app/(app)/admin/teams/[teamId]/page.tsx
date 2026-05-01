@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { canManageTeams, getCachedAccessContext } from "@/lib/access";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TeamActiveToggle } from "@/components/admin/team-active-toggle";
 import { EditTeamForm } from "@/components/admin/edit-team-form";
@@ -104,7 +104,7 @@ export default async function AdminTeamDetailPage({
 
       <PageHeader
         title={team.name}
-        badge={<Badge status={team.active ? "APPROVED" : "REJECTED"} />}
+        badge={<StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />}
         description={
           [
             `${team.school.district.name} / ${team.school.name}`,

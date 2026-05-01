@@ -12,7 +12,7 @@ import { ExtractionReview } from "@/components/reimbursements/extraction-review"
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { RequestTimeline } from "@/components/reimbursements/request-timeline";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
@@ -119,7 +119,7 @@ export default async function AdminRequestDetailPage({
 
       <PageHeader
         title={request.title}
-        badge={<Badge status={status} />}
+        badge={<StatusBadge status={status} />}
         description={
           [
             request.team.name,

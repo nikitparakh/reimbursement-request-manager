@@ -4,7 +4,7 @@ import { canManageUsers, getCachedAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { UsersTable } from "@/components/admin/users-table";
 import type { ScopeOption } from "@/components/admin/user-scope-manager";
 
@@ -184,7 +184,7 @@ export default async function AdminUsersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Manage Users"
-        badge={<Badge status={`${users.length} users`} />}
+        badge={<StatusBadge status={`${users.length} users`} />}
         description={
           access.isSuperAdmin
             ? "Manage global roles, scoped admin access, and team memberships."

@@ -5,7 +5,7 @@ import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CoachTeamRequestsTable } from "@/components/coach/coach-team-requests-table";
 import { CoachTeamMembersTable } from "@/components/coach/coach-team-members-table";
@@ -117,7 +117,7 @@ export default async function CoachTeamOverviewPage() {
                 <h2 className="text-xl font-bold text-slate-900">
                   {team.name}
                 </h2>
-                <Badge status={team.active ? "APPROVED" : "REJECTED"} />
+                <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
                 {team.shortCode && (
                   <span className="text-sm text-slate-500">
                     Code: {team.shortCode}
@@ -135,7 +135,7 @@ export default async function CoachTeamOverviewPage() {
               <PageHeader
                 title={team.name}
                 badge={
-                  <Badge status={team.active ? "APPROVED" : "REJECTED"} />
+                  <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
                 }
                 description={
                   [

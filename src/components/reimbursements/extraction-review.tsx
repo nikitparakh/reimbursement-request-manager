@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { CommentIcon } from "@/components/reimbursements/line-item-comments";
 import { inferTax, type SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
 
@@ -67,7 +67,7 @@ export function ExtractionReview({
           <Card key={receipt.id}>
             <CardHeader className="flex flex-row items-center justify-between">
               <span className="text-sm font-medium text-slate-900">{receipt.fileName}</span>
-              {status && <Badge status={status} />}
+              {status && <StatusBadge status={status} />}
             </CardHeader>
             {ext ? (
               <CardContent className="space-y-4">

@@ -10,7 +10,7 @@ import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { RequestTimeline } from "@/components/reimbursements/request-timeline";
 import { EditableRequestHeader } from "@/components/reimbursements/editable-request-header";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
@@ -131,7 +131,7 @@ export default async function UserRequestDetailPage({
         <PageHeader
           title={requestRecord.title}
           description={requestRecord.description ?? undefined}
-          badge={<Badge status={status} />}
+          badge={<StatusBadge status={status} />}
           action={<DownloadPdfLink requestId={requestRecord.id} />}
         />
       )}

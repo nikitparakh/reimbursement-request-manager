@@ -10,7 +10,7 @@ import {
 import { TeamRequestDecision } from "@/components/onboarding/team-request-decision";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CreateTeamForm } from "@/components/admin/create-team-form";
 
@@ -121,7 +121,7 @@ export default async function AdminTeamsPage({
     <div className="space-y-6">
       <PageHeader
         title="Manage Teams"
-        badge={<Badge status={`${teams.length} teams`} />}
+        badge={<StatusBadge status={`${teams.length} teams`} />}
         description={
           access.isSuperAdmin
             ? "Create, view, and manage teams across districts, schools, and programs."
@@ -145,7 +145,7 @@ export default async function AdminTeamsPage({
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             Pending Registrations
-            <Badge status={`${registrationRequests.length} pending`} />
+            <StatusBadge status={`${registrationRequests.length} pending`} />
           </h2>
           {registrationRequests.map((request) => (
             <Card key={request.id}>
@@ -261,7 +261,7 @@ export default async function AdminTeamsPage({
                         {team.totalRequests}
                       </td>
                       <td className="py-3">
-                        <Badge status={team.active ? "APPROVED" : "REJECTED"} />
+                        <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
                       </td>
                     </tr>
                   ))}

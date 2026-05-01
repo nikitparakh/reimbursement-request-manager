@@ -9,7 +9,7 @@ import { EditableLineItems } from "@/components/reimbursements/editable-line-ite
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
@@ -85,7 +85,7 @@ export default async function AdminInboxPage({
     <div className="space-y-6">
       <PageHeader
         title="Admin Inbox"
-        badge={totalCount > 0 ? <Badge status={`${totalCount} pending`} /> : undefined}
+        badge={totalCount > 0 ? <StatusBadge status={`${totalCount} pending`} /> : undefined}
         description="Review submitted requests, approve, reject, or mark paid."
       />
 
@@ -109,7 +109,7 @@ export default async function AdminInboxPage({
                       <div>
                         <div className="flex items-center gap-2">
                           <Link href={`/admin/requests/${request.id}`} className="text-base font-semibold text-slate-900 hover:text-emerald-600 transition">{request.title}</Link>
-                          <Badge status={request.status} />
+                          <StatusBadge status={request.status} />
                         </div>
                         <p className="mt-1 text-sm text-slate-500">
                           {request.team.name} &middot; {request.createdBy.email}

@@ -8,7 +8,7 @@ import {
   type AdminReimbursementRow,
 } from "@/components/admin/admin-reimbursements-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminReimbursementsDescription } from "@/lib/ui-copy";
 
@@ -80,7 +80,7 @@ export default async function AdminReimbursementsPage() {
     <div className="space-y-6">
       <PageHeader
         title="All Reimbursements"
-        badge={<Badge status={`${totalCount} total`} />}
+        badge={<StatusBadge status={`${totalCount} total`} />}
         description={getAdminReimbursementsDescription(access.isSuperAdmin)}
       />
 

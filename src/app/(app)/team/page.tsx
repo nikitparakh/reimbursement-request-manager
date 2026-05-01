@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function TeamPage() {
   const session = await auth();
@@ -110,14 +110,14 @@ export default async function TeamPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h2 className="text-lg font-semibold text-slate-900">{team.name}</h2>
-                    {team.shortCode ? <Badge status={team.shortCode} /> : null}
+                    {team.shortCode ? <StatusBadge status={team.shortCode} /> : null}
                     {team.glAccount ? (
                       <span className="text-sm text-slate-500">GL: {team.glAccount}</span>
                     ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     {team.myRoles.map((role) => (
-                      <Badge key={role} status={role} />
+                      <StatusBadge key={role} status={role} />
                     ))}
                   </div>
                 </div>
