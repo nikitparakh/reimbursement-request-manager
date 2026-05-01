@@ -1,16 +1,12 @@
 "use client";
 
-import type { ColumnDef, HeaderContext } from "@tanstack/react-table";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Loader2,
-} from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { SortableColumnHeader } from "@/components/admin/sortable-column-header";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,29 +44,6 @@ function isRejected(status: string) {
   return status === "COACH_REJECTED" || status === "ADMIN_REJECTED";
 }
 
-function SortableHeader<TData, TValue>({
-  column,
-  title,
-}: HeaderContext<TData, TValue> & { title: string }) {
-  const sorted = column.getIsSorted();
-  return (
-    <button
-      type="button"
-      className="-ml-2 inline-flex items-center gap-1 rounded px-2 py-0.5 font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-      onClick={column.getToggleSortingHandler()}
-    >
-      {title}
-      {sorted === "asc" ? (
-        <ArrowUp className="size-3 shrink-0" aria-hidden />
-      ) : sorted === "desc" ? (
-        <ArrowDown className="size-3 shrink-0" aria-hidden />
-      ) : (
-        <ArrowUpDown className="size-3 shrink-0 opacity-50" aria-hidden />
-      )}
-    </button>
-  );
-}
-
 function buildColumns(
   onReopen: (id: string) => void,
   reopeningId: string | null,
@@ -83,7 +56,7 @@ function buildColumns(
       id: "title",
       accessorFn: (r) => r.title.toLowerCase(),
       sortingFn: "alphanumeric",
-      header: (ctx) => <SortableHeader {...ctx} title="Receipt Name" />,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Receipt Name" />,
       cell: ({ row }) => (
         <button
           type="button"
@@ -101,7 +74,7 @@ function buildColumns(
       id: "requester",
       accessorFn: (r) => r.requester.toLowerCase(),
       sortingFn: "alphanumeric",
-      header: (ctx) => <SortableHeader {...ctx} title="Requester" />,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Requester" />,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{row.original.requester}</span>
       ),
@@ -111,7 +84,7 @@ function buildColumns(
   cols.push(
     {
       accessorKey: "amount",
-      header: (ctx) => <SortableHeader {...ctx} title="Amount" />,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Amount" />,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">
           ${row.original.amount.toFixed(2)}
@@ -121,14 +94,14 @@ function buildColumns(
     {
       id: "date",
       accessorFn: (r) => r.dateMs,
-      header: (ctx) => <SortableHeader {...ctx} title="Date" />,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Date" />,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{row.original.date}</span>
       ),
     },
     {
       accessorKey: "status",
-      header: (ctx) => <SortableHeader {...ctx} title="Status" />,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
         <div className="flex items-center gap-2 whitespace-nowrap">
           <StatusBadge status={row.original.status} />
