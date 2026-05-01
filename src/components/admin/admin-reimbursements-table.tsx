@@ -16,6 +16,7 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import { SortableColumnHeader } from "@/components/admin/sortable-column-header";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type AdminReimbursementRow = {
   id: string;
@@ -375,9 +376,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No requests match your filters.
-        </p>
+        <EmptyState variant="compact" title="No requests match" description="Try adjusting filters." />
       ) : (
         <>
           <p className="text-xs text-muted-foreground">

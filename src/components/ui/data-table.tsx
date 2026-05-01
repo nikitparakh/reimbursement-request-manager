@@ -18,6 +18,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { EmptyState } from "@/components/ui/empty-state"
+
 type DataTableProps<TData, TValue> = {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
@@ -73,11 +75,10 @@ export function DataTable<TData, TValue>({
           ))
         ) : (
           <TableRow>
-            <TableCell
-              colSpan={columns.length}
-              className="h-24 text-center text-muted-foreground"
-            >
-              {emptyMessage ?? "No results."}
+            <TableCell colSpan={columns.length} className="p-0">
+              {emptyMessage ?? (
+                <EmptyState variant="compact" title="No results" />
+              )}
             </TableCell>
           </TableRow>
         )}

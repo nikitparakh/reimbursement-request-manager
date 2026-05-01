@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type ReimbursementRow = {
   id: string;
@@ -331,9 +332,7 @@ export function TeamReimbursementsTable({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground text-sm">
-          No requests match your filters.
-        </p>
+        <EmptyState variant="compact" title="No requests match" description="Try adjusting filters." />
       ) : (
         <>
           <p className="text-muted-foreground text-xs">
