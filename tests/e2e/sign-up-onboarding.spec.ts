@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { openPageAndExpectHeading, signUp } from "./helpers";
+import { openPageAndExpectHeading, signUp, selectShadcn } from "./helpers";
 
 test.describe("Sign-up and onboarding E2E", () => {
   const uniqueEmail = `e2e-${Date.now()}@test.com`;
@@ -22,7 +22,7 @@ test.describe("Sign-up and onboarding E2E", () => {
     await expect(page.getByText("Join an Existing Team")).toBeVisible({
       timeout: 10_000,
     });
-    await page.locator("#roleIntent").selectOption("PARENT_MENTOR");
+    await selectShadcn(page, "Role", /parent\/mentor/i);
     await page.getByRole("button", { name: /^save$/i }).click();
     await expect(
       page.getByText("Onboarding complete. Your team workspace is ready.")

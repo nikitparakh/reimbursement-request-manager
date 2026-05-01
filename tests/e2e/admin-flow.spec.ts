@@ -13,8 +13,10 @@ test.describe("Admin flow", () => {
 
     await openPageAndExpectHeading(page, "/admin/teams", "Manage Teams");
     await page.getByRole("button", { name: /create team/i }).click();
-    await page.getByLabel("School").selectOption({ index: 0 });
-    await page.getByLabel("Program").selectOption({ index: 0 });
+    await page.getByRole("combobox", { name: "School" }).click();
+    await page.getByRole("option").first().click();
+    await page.getByRole("combobox", { name: "Program" }).click();
+    await page.getByRole("option").first().click();
     await page.getByLabel("Team Name").fill(teamName);
     await page.getByRole("button", { name: /^create$/i }).click();
     await expect(page.getByRole("link", { name: teamName })).toBeVisible({

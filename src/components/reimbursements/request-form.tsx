@@ -5,7 +5,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
@@ -65,12 +71,21 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
       </FieldGroup>
 
       <FieldGroup label="Team" htmlFor="team">
-        <Select id="team" value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-          {teams.map((team) => (
-            <option value={team.id} key={team.id}>
-              {team.name}
-            </option>
-          ))}
+        <Select
+          value={teamId}
+          onValueChange={setTeamId}
+          disabled={teams.length === 0}
+        >
+          <SelectTrigger id="team" className="w-full">
+            <SelectValue placeholder="Choose a team" />
+          </SelectTrigger>
+          <SelectContent>
+            {teams.map((team) => (
+              <SelectItem key={team.id} value={team.id}>
+                {team.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 

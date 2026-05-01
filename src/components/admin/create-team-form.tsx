@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type CreateTeamFormProps = {
   schools: Array<{
@@ -90,17 +96,20 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
           School
         </label>
         <Select
-          id="create-team-school"
-          value={schoolId}
-          onChange={(e) => setSchoolId(e.target.value)}
-          className="w-56"
+          value={schoolId || undefined}
+          onValueChange={setSchoolId}
           disabled={schools.length === 0}
         >
-          {schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.districtName} · {school.name}
-            </option>
-          ))}
+          <SelectTrigger id="create-team-school" className="w-56">
+            <SelectValue placeholder="School" />
+          </SelectTrigger>
+          <SelectContent>
+            {schools.map((school) => (
+              <SelectItem key={school.id} value={school.id}>
+                {school.districtName} · {school.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <div>
@@ -111,17 +120,20 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
           Program
         </label>
         <Select
-          id="create-team-program"
-          value={programId}
-          onChange={(e) => setProgramId(e.target.value)}
-          className="w-44"
+          value={programId || undefined}
+          onValueChange={setProgramId}
           disabled={programs.length === 0}
         >
-          {programs.map((program) => (
-            <option key={program.id} value={program.id}>
-              {program.code} · {program.name}
-            </option>
-          ))}
+          <SelectTrigger id="create-team-program" className="w-44">
+            <SelectValue placeholder="Program" />
+          </SelectTrigger>
+          <SelectContent>
+            {programs.map((program) => (
+              <SelectItem key={program.id} value={program.id}>
+                {program.code} · {program.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <div>

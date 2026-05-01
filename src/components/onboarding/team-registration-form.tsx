@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ProgramOption = {
   id: string;
@@ -81,47 +87,80 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
     <div className="space-y-4">
       <FieldGroup label="District" htmlFor="requestDistrictId">
         <Select
-          id="requestDistrictId"
-          value={districtId}
-          onChange={(event) => {
-            setDistrictId(event.target.value);
+          value={districtId || undefined}
+          onValueChange={(value) => {
+            setDistrictId(value);
             setSelectedSchoolId("");
           }}
+          disabled={districts.length === 0}
         >
-          {districts.map((district) => (
-            <option key={district.id} value={district.id}>
-              {district.name}
-            </option>
-          ))}
+          <SelectTrigger id="requestDistrictId" className="w-full">
+            <SelectValue placeholder="Choose district" />
+          </SelectTrigger>
+          <SelectContent>
+            {districts.map((district) => (
+              <SelectItem key={district.id} value={district.id}>
+                {district.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="School" htmlFor="requestSchoolId">
-        <Select id="requestSchoolId" value={schoolId} onChange={(event) => setSelectedSchoolId(event.target.value)}>
-          {schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.name}
-            </option>
-          ))}
+        <Select
+          value={schoolId || undefined}
+          onValueChange={setSelectedSchoolId}
+          disabled={schools.length === 0}
+        >
+          <SelectTrigger id="requestSchoolId" className="w-full">
+            <SelectValue placeholder="Choose school" />
+          </SelectTrigger>
+          <SelectContent>
+            {schools.map((school) => (
+              <SelectItem key={school.id} value={school.id}>
+                {school.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="Program" htmlFor="requestProgramId">
-        <Select id="requestProgramId" value={programId} onChange={(event) => setProgramId(event.target.value)}>
-          {programs.map((program) => (
-            <option key={program.id} value={program.id}>
-              {program.name}
-            </option>
-          ))}
+        <Select
+          value={programId || undefined}
+          onValueChange={setProgramId}
+          disabled={programs.length === 0}
+        >
+          <SelectTrigger id="requestProgramId" className="w-full">
+            <SelectValue placeholder="Choose program" />
+          </SelectTrigger>
+          <SelectContent>
+            {programs.map((program) => (
+              <SelectItem key={program.id} value={program.id}>
+                {program.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       {selectedProgram?.code === "FLL" ? (
         <FieldGroup label="FLL Division" htmlFor="fllDivision" hint="Optional for LEGO League team setup">
-          <Select id="fllDivision" value={fllDivision} onChange={(event) => setFllDivision(event.target.value as typeof fllDivision)}>
-            <option value="DISCOVER">Discover</option>
-            <option value="EXPLORE">Explore</option>
-            <option value="CHALLENGE">Challenge</option>
+          <Select
+            value={fllDivision}
+            onValueChange={(value) =>
+              setFllDivision(value as "DISCOVER" | "EXPLORE" | "CHALLENGE")
+            }
+          >
+            <SelectTrigger id="fllDivision" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DISCOVER">Discover</SelectItem>
+              <SelectItem value="EXPLORE">Explore</SelectItem>
+              <SelectItem value="CHALLENGE">Challenge</SelectItem>
+            </SelectContent>
           </Select>
         </FieldGroup>
       ) : null}

@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import type { ProgramCode } from "@prisma/client";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
@@ -84,76 +90,106 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
     <div className="space-y-4">
       <FieldGroup label="District" htmlFor="districtId">
         <Select
-          id="districtId"
-          value={districtId}
-          onChange={(event) => {
-            setDistrictId(event.target.value);
+          value={districtId || undefined}
+          onValueChange={(value) => {
+            setDistrictId(value);
             setSelectedSchoolId("");
             setSelectedProgramId("");
             setSelectedTeamId("");
           }}
+          disabled={districts.length === 0}
         >
-          {districts.map((district) => (
-            <option key={district.id} value={district.id}>
-              {district.name}
-            </option>
-          ))}
+          <SelectTrigger id="districtId" className="w-full">
+            <SelectValue placeholder="Choose district" />
+          </SelectTrigger>
+          <SelectContent>
+            {districts.map((district) => (
+              <SelectItem key={district.id} value={district.id}>
+                {district.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="School" htmlFor="schoolId">
         <Select
-          id="schoolId"
-          value={schoolId}
-          onChange={(event) => {
-            setSelectedSchoolId(event.target.value);
+          value={schoolId || undefined}
+          onValueChange={(value) => {
+            setSelectedSchoolId(value);
             setSelectedProgramId("");
             setSelectedTeamId("");
           }}
+          disabled={schools.length === 0}
         >
-          {schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.name}
-            </option>
-          ))}
+          <SelectTrigger id="schoolId" className="w-full">
+            <SelectValue placeholder="Choose school" />
+          </SelectTrigger>
+          <SelectContent>
+            {schools.map((school) => (
+              <SelectItem key={school.id} value={school.id}>
+                {school.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="Program" htmlFor="programId">
         <Select
-          id="programId"
-          value={programId}
-          onChange={(event) => {
-            setSelectedProgramId(event.target.value);
+          value={programId || undefined}
+          onValueChange={(value) => {
+            setSelectedProgramId(value);
             setSelectedTeamId("");
           }}
+          disabled={programs.length === 0}
         >
-          {programs.map((program) => (
-            <option key={program.id} value={program.id}>
-              {program.name}
-            </option>
-          ))}
+          <SelectTrigger id="programId" className="w-full">
+            <SelectValue placeholder="Choose program" />
+          </SelectTrigger>
+          <SelectContent>
+            {programs.map((program) => (
+              <SelectItem key={program.id} value={program.id}>
+                {program.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="Team" htmlFor="teamId">
-        <Select id="teamId" value={teamId} onChange={(event) => setSelectedTeamId(event.target.value)}>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
+        <Select
+          value={teamId || undefined}
+          onValueChange={setSelectedTeamId}
+          disabled={teams.length === 0}
+        >
+          <SelectTrigger id="teamId" className="w-full">
+            <SelectValue placeholder="Choose team" />
+          </SelectTrigger>
+          <SelectContent>
+            {teams.map((team) => (
+              <SelectItem key={team.id} value={team.id}>
+                {team.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </FieldGroup>
 
       <FieldGroup label="Role" htmlFor="roleIntent">
         <Select
-          id="roleIntent"
           value={roleIntent}
-          onChange={(event) => setRoleIntent(event.target.value as "PARENT_MENTOR" | "COACH")}
+          onValueChange={(value) =>
+            setRoleIntent(value as "PARENT_MENTOR" | "COACH")
+          }
         >
-          <option value="PARENT_MENTOR">Parent/Mentor</option>
-          <option value="COACH">Coach</option>
+          <SelectTrigger id="roleIntent" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="PARENT_MENTOR">Parent/Mentor</SelectItem>
+            <SelectItem value="COACH">Coach</SelectItem>
+          </SelectContent>
         </Select>
       </FieldGroup>
 
