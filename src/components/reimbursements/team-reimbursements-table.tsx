@@ -1,11 +1,28 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import type { ColumnDef, HeaderContext } from "@tanstack/react-table";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Loader2,
+} from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { toast } from "sonner";
+
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { type Column, SortableTable } from "@/components/ui/sortable-table";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export type ReimbursementRow = {
   id: string;
@@ -31,70 +48,112 @@ function isRejected(status: string) {
   return status === "COACH_REJECTED" || status === "ADMIN_REJECTED";
 }
 
+function SortableHeader<TData, TValue>({
+  column,
+  title,
+}: HeaderContext<TData, TValue> & { title: string }) {
+  const sorted = column.getIsSorted();
+  return (
+    <button
+      type="button"
+      className="-ml-2 inline-flex items-center gap-1 rounded px-2 py-0.5 font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      onClick={column.getToggleSortingHandler()}
+    >
+      {title}
+      {sorted === "asc" ? (
+        <ArrowUp className="size-3 shrink-0" aria-hidden />
+      ) : sorted === "desc" ? (
+        <ArrowDown className="size-3 shrink-0" aria-hidden />
+      ) : (
+        <ArrowUpDown className="size-3 shrink-0 opacity-50" aria-hidden />
+      )}
+    </button>
+  );
+}
+
 function buildColumns(
   onReopen: (id: string) => void,
   reopeningId: string | null,
   showRequester: boolean,
   hasAnyRejected: boolean,
-): Column<ReimbursementRow>[] {
-  const cols: Column<ReimbursementRow>[] = [
+  onOpenRequest: (id: string) => void,
+): ColumnDef<ReimbursementRow>[] {
+  const cols: ColumnDef<ReimbursementRow>[] = [
     {
-      key: "title",
-      label: "Receipt Name",
-      sortValue: (r) => r.title.toLowerCase(),
-      render: (r) => <span className="font-medium text-slate-900">{r.title}</span>,
+      id: "title",
+      accessorFn: (r) => r.title.toLowerCase(),
+      sortingFn: "alphanumeric",
+      header: (ctx) => <SortableHeader {...ctx} title="Receipt Name" />,
+      cell: ({ row }) => (
+        <button
+          type="button"
+          className="cursor-pointer truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => onOpenRequest(row.original.id)}
+        >
+          {row.original.title}
+        </button>
+      ),
     },
   ];
 
   if (showRequester) {
     cols.push({
-      key: "requester",
-      label: "Requester",
-      sortValue: (r) => r.requester.toLowerCase(),
-      cellClassName: "text-slate-600",
-      render: (r) => r.requester,
+      id: "requester",
+      accessorFn: (r) => r.requester.toLowerCase(),
+      sortingFn: "alphanumeric",
+      header: (ctx) => <SortableHeader {...ctx} title="Requester" />,
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">{row.original.requester}</span>
+      ),
     });
   }
 
   cols.push(
     {
-      key: "amount",
-      label: "Amount",
-      sortValue: (r) => r.amount,
-      cellClassName: "text-slate-700 font-medium",
-      render: (r) => `$${r.amount.toFixed(2)}`,
+      accessorKey: "amount",
+      header: (ctx) => <SortableHeader {...ctx} title="Amount" />,
+      cell: ({ row }) => (
+        <span className="font-medium text-foreground">
+          ${row.original.amount.toFixed(2)}
+        </span>
+      ),
     },
     {
-      key: "date",
-      label: "Date",
-      sortValue: (r) => r.dateMs,
-      cellClassName: "text-slate-500",
-      render: (r) => r.date,
+      id: "date",
+      accessorFn: (r) => r.dateMs,
+      header: (ctx) => <SortableHeader {...ctx} title="Date" />,
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">{row.original.date}</span>
+      ),
     },
     {
-      key: "status",
-      label: "Status",
-      sortValue: (r) => r.status,
-      render: (r) => (
+      accessorKey: "status",
+      header: (ctx) => <SortableHeader {...ctx} title="Status" />,
+      cell: ({ row }) => (
         <div className="flex items-center gap-2 whitespace-nowrap">
-          <StatusBadge status={r.status} />
-          {hasAnyRejected && (
-            <button
+          <StatusBadge status={row.original.status} />
+          {hasAnyRejected ? (
+            <Button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReopen(r.id);
+              variant="outline"
+              size="xs"
+              className={!isRejected(row.original.status) ? "invisible" : ""}
+              disabled={!isRejected(row.original.status) || reopeningId === row.original.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReopen(row.original.id);
               }}
-              disabled={!isRejected(r.status) || reopeningId === r.id}
-              className={`px-2.5 py-1 text-xs font-medium rounded border transition cursor-pointer ${
-                isRejected(r.status)
-                  ? "text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 disabled:opacity-50"
-                  : "invisible"
-              }`}
             >
-              {reopeningId === r.id ? "Reopening..." : "Reopen"}
-            </button>
-          )}
+              {reopeningId === row.original.id ? (
+                <>
+                  <Loader2 className="mr-1 size-3 animate-spin" aria-hidden />
+                  Reopening…
+                </>
+              ) : (
+                "Reopen"
+              )}
+            </Button>
+          ) : null}
         </div>
       ),
     },
@@ -129,21 +188,20 @@ export function TeamReimbursementsTable({
   const router = useRouter();
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [reopeningId, setReopeningId] = useState<string | null>(null);
-  const [reopenError, setReopenError] = useState("");
 
   const handleReopen = useCallback(async (id: string) => {
     setReopeningId(id);
-    setReopenError("");
     try {
       const res = await fetch(`/api/requests/${id}/reopen`, { method: "POST" });
       if (res.ok) {
+        toast.success("Request reopened.");
         router.refresh();
       } else {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setReopenError(body.error ?? "Failed to reopen request.");
+        toast.error(body.error ?? "Failed to reopen request.");
       }
     } catch {
-      setReopenError("Failed to reopen request.");
+      toast.error("Failed to reopen request.");
     } finally {
       setReopeningId(null);
     }
@@ -155,8 +213,15 @@ export function TeamReimbursementsTable({
   );
 
   const columns = useMemo(
-    () => buildColumns((id) => void handleReopen(id), reopeningId, showRequester, hasAnyRejected),
-    [handleReopen, reopeningId, showRequester, hasAnyRejected],
+    () =>
+      buildColumns(
+        (sid) => void handleReopen(sid),
+        reopeningId,
+        showRequester,
+        hasAnyRejected,
+        (rid) => router.push(`/user/requests/${rid}`),
+      ),
+    [handleReopen, reopeningId, showRequester, hasAnyRejected, router],
   );
 
   const uniqueRequesters = useMemo(
@@ -205,55 +270,64 @@ export function TeamReimbursementsTable({
 
   return (
     <div className="space-y-4">
-      {reopenError ? <Alert variant="destructive">{reopenError}</Alert> : null}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
+        <div className="flex-1 min-w-[200px] space-y-1">
+          <Label htmlFor="team-reimbursements-search" className="text-xs text-muted-foreground">
+            Search
+          </Label>
           <Input
+            id="team-reimbursements-search"
             type="text"
             placeholder={showRequester ? "Search by name or requester..." : "Search by name..."}
             value={filters.search}
             onChange={(e) => setFilter("search", e.target.value)}
-            className="!w-full"
+            className="w-full"
           />
         </div>
 
-        <div className="min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilter("status", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+        <div className="min-w-[160px] space-y-1">
+          <Label className="text-xs text-muted-foreground">Status</Label>
+          <Select value={filters.status || "all"} onValueChange={(value) => setFilter("status", value === "all" ? "" : value)}>
+            <SelectTrigger size="default" className="w-full min-w-[10rem]" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.replace(/_/g, " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {showRequester && (
-          <div className="min-w-[180px]">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Requester</label>
-            <select
-              value={filters.requester}
-              onChange={(e) => setFilter("requester", e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          <div className="min-w-[180px] space-y-1">
+            <Label className="text-xs text-muted-foreground">Requester</Label>
+            <Select
+              value={filters.requester || "all"}
+              onValueChange={(value) => setFilter("requester", value === "all" ? "" : value)}
             >
-              <option value="">All requesters</option>
-              {uniqueRequesters.map((email) => (
-                <option key={email} value={email}>
-                  {email}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger size="default" className="w-full min-w-[11rem]" aria-label="Filter by requester">
+                <SelectValue placeholder="All requesters" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All requesters</SelectItem>
+                {uniqueRequesters.map((email) => (
+                  <SelectItem key={email} value={email}>
+                    {email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
-        <div className="min-w-[140px]">
-          <label htmlFor="team-reimbursements-date-from" className="block text-xs font-medium text-slate-500 mb-1">From</label>
+        <div className="min-w-[140px] space-y-1">
+          <Label htmlFor="team-reimbursements-date-from" className="text-xs text-muted-foreground">
+            From
+          </Label>
           <Input
             id="team-reimbursements-date-from"
             aria-label="From date"
@@ -263,8 +337,10 @@ export function TeamReimbursementsTable({
           />
         </div>
 
-        <div className="min-w-[140px]">
-          <label htmlFor="team-reimbursements-date-to" className="block text-xs font-medium text-slate-500 mb-1">To</label>
+        <div className="min-w-[140px] space-y-1">
+          <Label htmlFor="team-reimbursements-date-to" className="text-xs text-muted-foreground">
+            To
+          </Label>
           <Input
             id="team-reimbursements-date-to"
             aria-label="To date"
@@ -275,32 +351,22 @@ export function TeamReimbursementsTable({
         </div>
 
         {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={() => setFilters(INITIAL_FILTERS)}
-            className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition cursor-pointer"
-          >
+          <Button type="button" variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setFilters(INITIAL_FILTERS)}>
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Results */}
       {filtered.length === 0 ? (
-        <p className="text-center py-8 text-sm text-slate-400">
+        <p className="py-8 text-center text-muted-foreground text-sm">
           No requests match your filters.
         </p>
       ) : (
         <>
-          <p className="text-xs text-slate-400">
+          <p className="text-muted-foreground text-xs">
             {filtered.length} request{filtered.length !== 1 ? "s" : ""}
           </p>
-          <SortableTable
-            columns={columns}
-            data={filtered}
-            rowKey={(r) => r.id}
-            onRowClick={(r) => router.push(`/user/requests/${r.id}`)}
-          />
+          <DataTable columns={columns} data={filtered} />
         </>
       )}
     </div>

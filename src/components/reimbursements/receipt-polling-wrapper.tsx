@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
@@ -33,7 +34,7 @@ export function ReceiptPollingWrapper({
         const statuses =
           payload.receiptFiles?.map((f) => f.parseStatus) ?? [];
         const stillProcessing = statuses.some(
-          (s) => s === "QUEUED" || s === "PROCESSING"
+          (s) => s === "QUEUED" || s === "PROCESSING",
         );
 
         if (!stillProcessing) {
@@ -54,32 +55,13 @@ export function ReceiptPollingWrapper({
   return (
     <div>
       {hasProcessing && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <svg
-            className="h-5 w-5 animate-spin text-amber-600"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+          <Loader2 className="size-5 animate-spin text-primary" aria-hidden />
           <div>
-            <p className="text-sm font-medium text-amber-800">
+            <p className="font-medium text-foreground text-sm">
               Processing receipts...
             </p>
-            <p className="text-xs text-amber-600">
+            <p className="text-muted-foreground text-xs">
               This usually takes 15–60 seconds. The page will update
               automatically.
             </p>

@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Client context for totals edited in `EditableLineItems` (shown via `LiveRequestedTotal`).
+ */
+
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 const LiveTotalContext = createContext<{
