@@ -33,7 +33,7 @@ const teamRegistrationFormSchema = z.object({
   shortCode: z.string().max(12).optional().or(z.literal("")),
   glAccount: z.string().max(30).optional().or(z.literal("")),
   notes: z.string().max(500).optional().or(z.literal("")),
-  fllDivision: z.enum(["DISCOVER", "EXPLORE", "CHALLENGE"]).default("CHALLENGE"),
+  fllDivision: z.enum(["DISCOVER", "EXPLORE", "CHALLENGE"]),
 });
 
 type TeamRegistrationFormValues = z.infer<typeof teamRegistrationFormSchema>;
