@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -14,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -137,7 +139,7 @@ export function UserScopeManager({
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
       <AlertDialog
         open={pendingRemoveId !== null}
         onOpenChange={(openNext) =>
@@ -159,6 +161,7 @@ export function UserScopeManager({
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
               disabled={saving || pendingRemoveId === null}
               onClick={() => void executeRemove(pendingRemoveId)}
             >
@@ -168,34 +171,34 @@ export function UserScopeManager({
         </AlertDialogContent>
       </AlertDialog>
 
-      {scopes.length > 0 ? (
-        <div className="space-y-1">
-          {scopes.map((scope) => (
-            <div key={scope.id} className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">{scope.label}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={saving}
-                onClick={() => setPendingRemoveId(scope.id)}
-              >
-                Remove
-              </Button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {scopes.length === 0 ? (
+        <span className="text-xs text-muted-foreground italic">No scoped access</span>
+      ) : (
+        scopes.map((scope) => (
+          <Badge key={scope.id} variant="secondary" className="max-w-[min(100%,20rem)] gap-1 px-2 py-0.5 font-normal">
+            <span className="min-w-0 truncate">{scope.label}</span>
+            <button
+              type="button"
+              disabled={saving}
+              className="-me-0.5 inline-flex shrink-0 rounded-sm p-0.5 opacity-70 transition-opacity hover:opacity-100 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              aria-label={`Remove ${scope.label}`}
+              onClick={() => setPendingRemoveId(scope.id)}
+            >
+              <X className="size-3" aria-hidden />
+            </button>
+          </Badge>
+        ))
+      )}
 
       {selectableOptions.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           <Select
             value={selectedOption ? selectedOption.key : selectedKey}
             onValueChange={(key) => setSelectedKey(key)}
             disabled={saving || !selectedOption}
           >
-            <SelectTrigger className="min-w-0 flex-1">
-              <SelectValue placeholder="Select scope" />
+            <SelectTrigger className="h-7 max-w-[12rem] min-w-0 text-xs shrink">
+              <SelectValue placeholder="Add scope…" />
             </SelectTrigger>
             <SelectContent>
               {selectableOptions.map((option) => (
@@ -205,10 +208,10 @@ export function UserScopeManager({
               ))}
             </SelectContent>
           </Select>
-          <Button type="button" size="sm" variant="outline" loading={saving} onClick={() => void addScope()}>
+          <Button type="button" size="xs" variant="outline" loading={saving} onClick={() => void addScope()}>
             Add
           </Button>
-        </div>
+        </>
       ) : null}
     </div>
   );

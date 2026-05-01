@@ -117,10 +117,12 @@ export function UsersTable({
           <SortableColumnHeader column={column} title="Scoped Access" />
         ),
         cell: ({ row }) => (
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+            <div className="flex min-w-[8rem] flex-1 flex-wrap items-center gap-1">
               {row.original.scopedRoles.length === 0 ? (
-                <span className="text-muted-foreground">None</span>
+                !canManageScopes ? (
+                  <span className="text-xs text-muted-foreground italic">No scoped access</span>
+                ) : null
               ) : (
                 row.original.scopedRoles.map((scope) => (
                   <StatusBadge key={scope.id} status={scope.label} />
@@ -151,9 +153,9 @@ export function UsersTable({
           </div>
         ),
         cell: ({ row }) => (
-          <div className="hidden gap-1 md:flex md:flex-wrap">
+          <div className="hidden flex-wrap gap-1 md:flex">
             {row.original.memberships.length === 0 ? (
-              <span className="text-muted-foreground">None</span>
+              <span className="text-xs text-muted-foreground italic">No teams</span>
             ) : (
               row.original.memberships.map((m) => (
                 <StatusBadge key={m.id} status={`${m.teamName} · ${m.roleInTeam}`} />
