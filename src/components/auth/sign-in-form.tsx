@@ -1,69 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
 import { signIn } from "next-auth/react";
+import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { toAppRouterHref } from "./router-redirect-path";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FieldGroup } from "@/components/ui/field-group";
-import { Alert } from "@/components/ui/alert";
+
+const signInFormSchema = z.object({
+  email: z.string().trim().email({ message: "Enter a valid email" }),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+type SignInFormValues = z.input<typeof signInFormSchema>;
 
 export function SignInForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const form = useForm<SignInFormValues>({
+    resolver: zodResolver(signInFormSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setIsSubmitting(true);
+  async function onSubmit(values: SignInFormValues) {
+    try {
+      const result = await signIn("credentials", {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+        callbackUrl: "/",
+      });
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl: "/",
-    });
+      if (!result || result.error) {
+        toast.error("Invalid email or password");
+        return;
+      }
 
-    setIsSubmitting(false);
-
-    if (!result || result.error) {
-      setError("Invalid email or password");
-      return;
+      toast.success("Signed in.");
+      router.replace(toAppRouterHref(result.url, "/"));
+    } catch {
+      toast.error("Could not sign in. Try again.");
     }
-
-    window.location.href = result.url ?? "/";
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error ? <Alert variant="destructive">{error}</Alert> : null}
-
-      <FieldGroup label="Email" htmlFor="email">
-        <Input
-          id="email"
-          type="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
 
-      <FieldGroup label="Password" htmlFor="password">
-        <Input
-          id="password"
-          type="password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" autoComplete="current-password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
 
-      <Button type="submit" loading={isSubmitting} className="w-full">
-        {isSubmitting ? "Signing in..." : "Sign in"}
-      </Button>
-    </form>
+        <Button type="submit" loading={form.formState.isSubmitting} className="w-full">
+          {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
+        </Button>
+      </form>
+    </Form>
   );
 }
