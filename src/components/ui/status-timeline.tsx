@@ -1,4 +1,8 @@
+import { CircleDot } from "lucide-react";
+
+import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { cn } from "@/lib/utils";
 
 type TimelineEntry = {
   id: string;
@@ -16,26 +20,26 @@ export function StatusTimeline({ items }: { items: TimelineEntry[] }) {
       <ul className="-mb-8">
         {items.map((item, idx) => (
           <li key={item.id}>
-            <div className="relative pb-8">
+            <div className={cn("relative pb-8", idx === items.length - 1 && "pb-0")}>
               {idx < items.length - 1 ? (
-                <span className="absolute left-3 top-6 -ml-px h-full w-0.5 bg-slate-200" />
+                <Separator
+                  orientation="vertical"
+                  decorative
+                  className="absolute left-[11px] top-7 ml-px h-[calc(100%-0.75rem)] w-px shrink-0 bg-border"
+                />
               ) : null}
-              <div className="relative flex items-start space-x-3">
-                <div className="relative">
-                  <div className="h-6 w-6 rounded-full bg-slate-100 border-2 border-white ring-2 ring-slate-200 flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-slate-400" />
-                  </div>
+              <div className="relative flex items-start gap-3">
+                <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted shadow-sm ring-2 ring-border">
+                  <CircleDot aria-hidden className="size-3.5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={item.action} />
-                    <span className="text-sm text-slate-500">by {item.actor}</span>
+                    <span className="text-sm text-muted-foreground">by {item.actor}</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {item.createdAt.toLocaleString()}
-                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{item.createdAt.toLocaleString()}</p>
                   {item.comment ? (
-                    <p className="mt-1 text-sm text-slate-600 bg-slate-50 rounded-md px-3 py-2">
+                    <p className="mt-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-foreground">
                       {item.comment}
                     </p>
                   ) : null}
