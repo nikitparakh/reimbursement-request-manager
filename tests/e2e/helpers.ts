@@ -75,3 +75,12 @@ export async function createDraft(
     timeout: 10_000,
   });
 }
+
+export async function selectShadcn(
+  page: Page,
+  triggerName: string | RegExp,
+  optionLabel: string | RegExp
+) {
+  await page.getByRole("combobox", { name: triggerName }).click();
+  await page.getByRole("option", { name: optionLabel }).click();
+}
