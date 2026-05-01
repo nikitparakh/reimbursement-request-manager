@@ -6,56 +6,67 @@ import { getNavigationLinks } from "@/lib/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { MobileNavMenu } from "@/components/ui/mobile-nav-menu";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
 
 export async function NavBar() {
   const session = await auth();
-  const access = session?.user
-    ? await getCachedAccessContext(session.user.id)
-    : null;
+  const access = session?.user ? await getCachedAccessContext(session.user.id) : null;
   const links = access ? getNavigationLinks(access) : [];
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-          <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-10 w-auto" />
+    <nav className="bg-background sticky top-0 z-50 border-b shadow-sm">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2 transition hover:opacity-80">
+          <Image
+            src="/novi-logo.png"
+            alt="Novi Community School District"
+            width={131}
+            height={40}
+            className="h-10 w-auto"
+          />
         </Link>
 
         {session?.user ? (
           <>
-            <div className="hidden sm:flex items-center gap-6">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  prefetch={link.prefetch}
-                  className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition"
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <div className="hidden min-w-0 flex-1 items-center justify-end gap-6 sm:flex">
+              <NavigationMenu viewport={false} className="max-w-max">
+                <NavigationMenuList className="flex-wrap justify-end gap-1">
+                  {links.map((link) => (
+                    <NavigationMenuItem key={link.href}>
+                      <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                        <Link href={link.href} prefetch={link.prefetch}>
+                          {link.label}
+                        </Link>
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                  ))}
+                </NavigationMenuList>
+              </NavigationMenu>
+              <div className="flex shrink-0 items-center gap-3">
+                <NotificationBell />
+                <span className="text-muted-foreground hidden text-sm md:inline">{session.user.email}</span>
+                <SignOutButton />
+              </div>
             </div>
-            <div className="hidden sm:flex items-center gap-4">
-              <NotificationBell />
-              <span className="hidden md:inline text-sm text-slate-500">{session.user.email}</span>
-              <SignOutButton />
-            </div>
-            <MobileNavMenu
-              links={links}
-              userEmail={session.user.email!}
-            />
+            <MobileNavMenu links={links} userEmail={session.user.email!} />
           </>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/sign-in"
-              className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition"
+              className="text-muted-foreground hover:text-primary text-sm font-medium transition"
             >
               Sign In
             </Link>
             <Link
               href="/sign-up"
-              className="text-sm font-medium bg-emerald-600 text-white px-4 py-2 rounded-md hover:bg-emerald-700 transition"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium transition"
             >
               Create Account
             </Link>

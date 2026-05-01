@@ -1,7 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 type Notification = {
   id: string;
@@ -35,7 +46,6 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,20 +73,8 @@ export function NotificationBell() {
     };
   }, [open]);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   async function markAsRead(id: string) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
 
     try {
@@ -99,58 +97,53 @@ export function NotificationBell() {
   }
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="relative p-1.5 text-slate-500 hover:text-emerald-600 transition"
-        aria-label="Notifications"
-      >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-slate-200 bg-white shadow-lg z-50">
-          <div className="border-b border-slate-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
-          </div>
-          <div className="max-h-80 overflow-y-auto">
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+          <Bell className="size-5" />
+          {unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px] font-semibold"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-80 flex-col gap-0 overflow-hidden p-0">
+        <div className="border-b px-4 py-3">
+          <h3 className="text-foreground text-sm font-semibold">Notifications</h3>
+        </div>
+        <ScrollArea className="h-80">
+          <div className="pr-3">
             {notifications.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-400">
-                No notifications yet
-              </p>
+              <p className="text-muted-foreground px-4 py-6 text-center text-sm">No notifications yet</p>
             ) : (
               notifications.map((n) => (
-                <button
+                <Button
                   key={n.id}
-                  type="button"
-                  onClick={() => handleNotificationClick(n)}
-                  className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition ${
+                  variant="ghost"
+                  className={cn(
+                    "h-auto min-h-0 w-full justify-start rounded-none border-b px-4 py-3 font-normal whitespace-normal",
+                    !n.requestHref ? "cursor-default" : "",
                     n.read ? "opacity-60" : ""
-                  } ${n.requestHref ? "cursor-pointer" : ""}`}
+                  )}
+                  onClick={() => handleNotificationClick(n)}
                 >
-                  <div className="flex items-start gap-2">
-                    {!n.read && (
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                    )}
+                  <div className="flex w-full min-w-0 items-start gap-2 text-left">
+                    {!n.read && <span className="bg-primary mt-1.5 h-2 w-2 shrink-0 rounded-full" />}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-700 line-clamp-2">{n.message}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">{formatTime(n.createdAt, now)}</p>
+                      <p className="text-foreground text-sm leading-snug line-clamp-2">{n.message}</p>
+                      <p className="text-muted-foreground mt-0.5 text-xs">{formatTime(n.createdAt, now)}</p>
                     </div>
                   </div>
-                </button>
+                </Button>
               ))
             )}
           </div>
-        </div>
-      )}
-    </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   );
 }

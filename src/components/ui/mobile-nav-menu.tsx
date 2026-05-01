@@ -2,63 +2,60 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 
 type MobileNavMenuProps = {
   links: { href: string; label: string; prefetch?: boolean }[];
   userEmail: string;
 };
 
-export function MobileNavMenu({
-  links,
-  userEmail,
-}: MobileNavMenuProps) {
+export function MobileNavMenu({ links, userEmail }: MobileNavMenuProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="sm:hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="p-2 text-slate-600 hover:text-emerald-600 transition"
-        aria-label={open ? "Close menu" : "Open menu"}
-      >
-        {open ? (
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-16 border-b border-slate-200 bg-white shadow-lg z-50">
-          <div className="flex flex-col px-4 py-3 space-y-1">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                prefetch={link.prefetch}
-                onClick={() => setOpen(false)}
-                className="block px-3 py-2 text-sm font-medium text-slate-600 hover:text-emerald-600 hover:bg-slate-50 rounded-md transition"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-          <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-slate-500 truncate mr-3">{userEmail}</span>
-            <div className="flex items-center gap-2 shrink-0">
-              <NotificationBell />
-              <SignOutButton />
-            </div>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Open menu">
+          <Menu className="size-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="flex w-72 flex-col gap-0 p-0">
+        <SheetHeader className="border-b px-4 py-3 text-left">
+          <SheetTitle>Menu</SheetTitle>
+        </SheetHeader>
+        <nav className="flex flex-col gap-0.5 px-2 pb-2 pt-2">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              prefetch={link.prefetch}
+              onClick={() => setOpen(false)}
+              className="hover:bg-accent rounded-md px-3 py-2 text-sm font-medium transition"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        <Separator />
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">{userEmail}</span>
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationBell />
+            <SignOutButton />
           </div>
         </div>
-      )}
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
