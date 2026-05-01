@@ -17,7 +17,8 @@ test.describe("Coach flow", () => {
     );
     const fieldTripRow = page.getByRole("row", { name: /Field Trip Supplies/i });
     await expect(fieldTripRow).toBeVisible();
-    await fieldTripRow.click();
+    await fieldTripRow.getByRole("button", { name: /Field Trip Supplies/i }).click();
+    await page.waitForURL(/\/user\/requests\/[^/]+$/, { timeout: 15_000 });
     await expect(
       page.getByRole("heading", { name: "Field Trip Supplies" })
     ).toBeVisible({

@@ -64,7 +64,7 @@ export async function createDraft(
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Description").fill(description);
   await page.getByRole("button", { name: /create draft/i }).click();
-  await expect(page.getByText("Draft created successfully.")).toBeVisible({
+  await expect(page.getByText("Draft created")).toBeVisible({
     timeout: 10_000,
   });
   await page

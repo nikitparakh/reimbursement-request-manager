@@ -93,7 +93,8 @@ test.describe("Full lifecycle E2E", () => {
       "/coach/team-reimbursements",
       "Team Reimbursements"
     );
-    await page.getByRole("row", { name: new RegExp(title, "i") }).click();
+    await page.getByRole("row", { name: new RegExp(title, "i") }).getByRole("button", { name: new RegExp(title, "i") }).click();
+    await page.waitForURL(/\/user\/requests\/[^/]+$/, { timeout: 15_000 });
     await expect(
       page.getByRole("heading", { name: title })
     ).toBeVisible({
