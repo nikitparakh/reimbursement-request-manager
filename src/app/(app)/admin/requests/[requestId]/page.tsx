@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusTimeline } from "@/components/ui/status-timeline";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -172,7 +173,12 @@ export default async function AdminRequestDetailPage({
           <CardTitle className="text-base">Receipts & line items</CardTitle>
         </CardHeader>
         <CardContent>
-          {canEditLineItems && receipts.length > 0 ? (
+          {request.receiptFiles.length === 0 ? (
+            <EmptyState
+              title="No receipts uploaded"
+              description="The submitter has not yet uploaded receipts for this request."
+            />
+          ) : canEditLineItems && receipts.length > 0 ? (
             <EditableLineItems requestId={request.id} receipts={receipts} canComment />
           ) : (
             <ExtractionReview
