@@ -7,6 +7,7 @@ import {
   TeamReimbursementsTable,
   type ReimbursementRow,
 } from "@/components/reimbursements/team-reimbursements-table";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -77,7 +78,16 @@ export default async function TeamReimbursementsPage() {
           }
         />
       ) : (
-        <TeamReimbursementsTable data={rows} />
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-foreground">
+              Requests ({rows.length})
+            </h2>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <TeamReimbursementsTable data={rows} />
+          </CardContent>
+        </Card>
       )}
     </div>
   );
