@@ -27,7 +27,7 @@ export function MobileNavMenu({ links, userEmail }: MobileNavMenuProps) {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Open menu">
-          <Menu className="size-5" />
+          <Menu className="size-5" aria-hidden />
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-72 flex-col gap-0 p-0">

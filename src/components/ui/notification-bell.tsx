@@ -100,7 +100,7 @@ export function NotificationBell() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell className="size-5" />
+          <Bell className="size-5" aria-hidden />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"

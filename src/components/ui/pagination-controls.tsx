@@ -32,7 +32,7 @@ export function PaginationControls({
                 href={`${basePath}?cursor=${prevCursor}&dir=prev`}
                 aria-label="Go to previous page"
               >
-                <ChevronLeftIcon data-icon="inline-start" />
+                <ChevronLeftIcon aria-hidden data-icon="inline-start" />
                 <span className="hidden sm:inline">Previous</span>
               </Link>
             </Button>
@@ -48,7 +48,7 @@ export function PaginationControls({
                 aria-label="Go to next page"
               >
                 <span className="hidden sm:inline">Next</span>
-                <ChevronRightIcon data-icon="inline-end" />
+                <ChevronRightIcon aria-hidden data-icon="inline-end" />
               </Link>
             </Button>
           ) : (

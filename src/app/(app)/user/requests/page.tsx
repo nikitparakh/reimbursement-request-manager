@@ -48,7 +48,7 @@ export default async function UserRequestsPage() {
         action={
           <Link href="/user/requests/new">
             <Button>
-              <Plus className="size-4" />
+              <Plus aria-hidden className="size-4" />
               New request
             </Button>
           </Link>

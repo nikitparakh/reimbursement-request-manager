@@ -30,11 +30,11 @@ export function SortableColumnHeader<TData>({
     >
       {title}
       {column.getIsSorted() === "asc" ? (
-        <ArrowUp className="ml-1 size-3.5" />
+        <ArrowUp className="ml-1 size-3.5" aria-hidden />
       ) : column.getIsSorted() === "desc" ? (
-        <ArrowDown className="ml-1 size-3.5" />
+        <ArrowDown className="ml-1 size-3.5" aria-hidden />
       ) : (
-        <ArrowUpDown className="ml-1 size-3.5 opacity-50" />
+        <ArrowUpDown className="ml-1 size-3.5 opacity-50" aria-hidden />
       )}
     </Button>
   );
