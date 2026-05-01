@@ -143,19 +143,13 @@ const STATUS_VARIANTS: Record<string, StatusConfig> = {
   },
 }
 
+/** Display overrides for labels whose Title-Case form would mislead readers. */
 const LABEL_OVERRIDES: Record<string, string> = {
-  SUPER_ADMIN: "SUPER ADMIN",
-  USER: "USER",
-  SCHOOL_ADMIN: "SCHOOL ADMIN",
-  PROGRAM_ADMIN: "PROGRAM ADMIN",
-  PARENT_MENTOR: "PARENT / MENTOR",
-  STUDENT: "PARENT/MENTOR",
-  COACH: "COACH",
-  COACH_APPROVED: "COACH APPROVED",
-  COACH_REJECTED: "COACH REJECTED",
+  PARENT_MENTOR: "Parent / Mentor",
+  STUDENT: "Parent / Mentor",
 }
 
-/** Enum-like statuses use title case from underscores; free-form strings are shown as-is. */
+/** Enum-like statuses use Title Case from underscores; free-form strings are shown as-is. */
 function formatLabel(status: string): string {
   if (LABEL_OVERRIDES[status]) return LABEL_OVERRIDES[status]
   if (!/^[A-Z0-9_]+$/.test(status)) return status

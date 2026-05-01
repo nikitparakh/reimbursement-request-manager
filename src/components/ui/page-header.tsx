@@ -26,7 +26,7 @@ export function PageHeader({ title, description, badge, action }: PageHeaderProp
           <div className="flex flex-wrap items-center gap-3">
             <h1
               className={cn(
-                "font-heading text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+                "font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
               )}
             >
               {title}
