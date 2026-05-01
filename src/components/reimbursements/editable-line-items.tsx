@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/format";
 import {
   inferTax,
   type SerializedLineItem,
@@ -68,10 +69,6 @@ function toEditableRow(item: SerializedLineItem): EditableRow {
 function parseNum(value: string): number {
   const n = parseFloat(value);
   return Number.isFinite(n) ? n : 0;
-}
-
-function formatCurrency(value: number, currency: string) {
-  return `${currency} ${value.toFixed(2)}`;
 }
 
 export function EditableLineItems({
@@ -343,53 +340,165 @@ export function EditableLineItems({
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="hidden w-20 text-right sm:table-cell">Qty</TableHead>
-                <TableHead className="w-20 text-right sm:w-28">Unit Price</TableHead>
-                <TableHead className="w-20 text-right sm:w-28">Line Total</TableHead>
-                <TableHead className="hidden w-32 sm:table-cell">Category</TableHead>
-                <TableHead className="w-10" aria-label="Delete row" />
-                <TableHead className="w-10" aria-label="Comments" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => {
-                const commentCount = row.comments.length;
-                const isExpanded = expandedComments.has(row.id);
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-20 text-right">Qty</TableHead>
+                  <TableHead className="w-20 text-right md:w-28">Unit Price</TableHead>
+                  <TableHead className="w-20 text-right md:w-28">Line Total</TableHead>
+                  <TableHead className="hidden w-32 md:table-cell">Category</TableHead>
+                  <TableHead className="w-10" aria-label="Delete row" />
+                  <TableHead className="w-10" aria-label="Comments" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => {
+                  const commentCount = row.comments.length;
+                  const isExpanded = expandedComments.has(row.id);
 
-                if (row.excluded) {
+                  if (row.excluded) {
+                    return (
+                      <Fragment key={row.id}>
+                        <TableRow className="bg-destructive/5 hover:bg-destructive/10">
+                          <TableCell className="whitespace-normal text-sm text-muted-foreground line-through">
+                            {row.description}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground line-through">
+                            {row.quantity || "-"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground line-through">
+                            {row.unitPrice || "-"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground line-through">
+                            {row.lineTotal || "-"}
+                          </TableCell>
+                          <TableCell className="hidden text-sm text-muted-foreground line-through md:table-cell">
+                            {row.category || "-"}
+                          </TableCell>
+                          <TableCell className="p-1 align-middle">
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              type="button"
+                              className="text-primary hover:text-primary/90"
+                              aria-label="Restore line item"
+                              title="Undo exclusion"
+                              onClick={() => void restoreRow(ext.id, row.id)}
+                            >
+                              <RotateCcw className="size-4" />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="p-1 align-middle">
+                            {(commentCount > 0 || canComment) && !row.isNew ? (
+                              <CommentIcon
+                                count={commentCount}
+                                className={
+                                  commentCount > 0
+                                    ? "text-primary"
+                                    : "text-muted-foreground hover:text-foreground"
+                                }
+                                aria-label={`${commentCount} comment${commentCount !== 1 ? "s" : ""}`}
+                                title="Line item comments"
+                                type="button"
+                                onClick={() => toggleComments(row.id)}
+                              />
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && !row.isNew && (
+                          <TableRow>
+                            <TableCell colSpan={colSpan} className="p-0">
+                              <LineItemComments
+                                requestId={requestId}
+                                lineItemId={row.id}
+                                comments={row.comments}
+                                canComment={canComment}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  }
+
                   return (
                     <Fragment key={row.id}>
-                      <TableRow className="bg-destructive/5 hover:bg-destructive/10">
-                        <TableCell className="whitespace-normal text-sm text-muted-foreground line-through">
-                          {row.description}
+                      <TableRow className="hover:bg-muted/50">
+                        <TableCell className="align-top">
+                          <Input
+                            type="text"
+                            value={row.description}
+                            className="h-8 whitespace-normal md:text-xs"
+                            onChange={(e) => updateRow(ext.id, row.id, "description", e.target.value)}
+                            onBlur={() =>
+                              row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                            }
+                            placeholder="Item description"
+                          />
                         </TableCell>
-                        <TableCell className="hidden text-right text-sm text-muted-foreground line-through sm:table-cell">
-                          {row.quantity || "-"}
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={row.quantity}
+                            className="h-8 md:text-xs"
+                            onChange={(e) => updateRow(ext.id, row.id, "quantity", e.target.value)}
+                            onBlur={() =>
+                              row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                            }
+                            min={0}
+                            step={1}
+                          />
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground line-through">
-                          {row.unitPrice || "-"}
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={row.unitPrice}
+                            className="h-8 md:text-xs"
+                            onChange={(e) => updateRow(ext.id, row.id, "unitPrice", e.target.value)}
+                            onBlur={() =>
+                              row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                            }
+                            min={0}
+                            step={0.01}
+                          />
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground line-through">
-                          {row.lineTotal || "-"}
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={row.lineTotal}
+                            className="h-8 md:text-xs"
+                            onChange={(e) => updateRow(ext.id, row.id, "lineTotal", e.target.value)}
+                            onBlur={() =>
+                              row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                            }
+                            min={0}
+                            step={0.01}
+                          />
                         </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground line-through sm:table-cell">
-                          {row.category || "-"}
+                        <TableCell className="hidden md:table-cell">
+                          <Input
+                            type="text"
+                            value={row.category}
+                            className="h-8 md:text-xs"
+                            onChange={(e) => updateRow(ext.id, row.id, "category", e.target.value)}
+                            onBlur={() =>
+                              row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                            }
+                            placeholder="Category"
+                          />
                         </TableCell>
                         <TableCell className="p-1 align-middle">
                           <Button
                             variant="ghost"
                             size="icon-xs"
                             type="button"
-                            className="text-primary hover:text-primary/90"
-                            aria-label="Restore line item"
-                            title="Undo exclusion"
-                            onClick={() => void restoreRow(ext.id, row.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label="Delete line item"
+                            onClick={() => void deleteRow(ext.id, row.id, row.isNew)}
                           >
-                            <RotateCcw className="size-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </TableCell>
                         <TableCell className="p-1 align-middle">
@@ -423,87 +532,51 @@ export function EditableLineItems({
                       )}
                     </Fragment>
                   );
-                }
+                })}
+              </TableBody>
+            </Table>
+          </div>
 
+          <div className="space-y-3 md:hidden">
+            {rows.map((row) => {
+              const commentCount = row.comments.length;
+              const isExpanded = expandedComments.has(row.id);
+
+              const commentBlock =
+                isExpanded && !row.isNew ? (
+                  <LineItemComments
+                    requestId={requestId}
+                    lineItemId={row.id}
+                    comments={row.comments}
+                    canComment={canComment}
+                  />
+                ) : null;
+
+              if (row.excluded) {
                 return (
-                  <Fragment key={row.id}>
-                    <TableRow className="hover:bg-muted/50">
-                      <TableCell className="align-top">
-                        <Input
-                          type="text"
-                          value={row.description}
-                          className="h-8 whitespace-normal md:text-xs"
-                          onChange={(e) => updateRow(ext.id, row.id, "description", e.target.value)}
-                          onBlur={() =>
-                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
-                          }
-                          placeholder="Item description"
-                        />
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Input
-                          type="number"
-                          value={row.quantity}
-                          className="h-8 md:text-xs"
-                          onChange={(e) => updateRow(ext.id, row.id, "quantity", e.target.value)}
-                          onBlur={() =>
-                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
-                          }
-                          min={0}
-                          step={1}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={row.unitPrice}
-                          className="h-8 md:text-xs"
-                          onChange={(e) => updateRow(ext.id, row.id, "unitPrice", e.target.value)}
-                          onBlur={() =>
-                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
-                          }
-                          min={0}
-                          step={0.01}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={row.lineTotal}
-                          className="h-8 md:text-xs"
-                          onChange={(e) => updateRow(ext.id, row.id, "lineTotal", e.target.value)}
-                          onBlur={() =>
-                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
-                          }
-                          min={0}
-                          step={0.01}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Input
-                          type="text"
-                          value={row.category}
-                          className="h-8 md:text-xs"
-                          onChange={(e) => updateRow(ext.id, row.id, "category", e.target.value)}
-                          onBlur={() =>
-                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
-                          }
-                          placeholder="Category"
-                        />
-                      </TableCell>
-                      <TableCell className="p-1 align-middle">
+                  <div key={row.id} className="space-y-2">
+                    <div className="rounded-lg border border-border bg-destructive/5 px-3 py-3 space-y-2">
+                      <p className="text-sm text-muted-foreground line-through">{row.description}</p>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground line-through">
+                        <span>Qty {row.quantity || "—"}</span>
+                        <span className="text-right">{row.unitPrice || "—"}</span>
+                        <span className="text-right">{row.lineTotal || "—"}</span>
+                      </div>
+                      {(row.category || "-") !== "-" ? (
+                        <p className="text-xs text-muted-foreground line-through">{row.category || "—"}</p>
+                      ) : null}
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon-xs"
                           type="button"
-                          className="text-muted-foreground hover:text-destructive"
-                          aria-label="Delete line item"
-                          onClick={() => void deleteRow(ext.id, row.id, row.isNew)}
+                          className="text-primary hover:text-primary/90"
+                          aria-label="Restore line item"
+                          title="Undo exclusion"
+                          onClick={() => void restoreRow(ext.id, row.id)}
                         >
-                          <Trash2 className="size-4" />
+                          <RotateCcw className="size-4" />
                         </Button>
-                      </TableCell>
-                      <TableCell className="p-1 align-middle">
                         {(commentCount > 0 || canComment) && !row.isNew ? (
                           <CommentIcon
                             count={commentCount}
@@ -518,25 +591,119 @@ export function EditableLineItems({
                             onClick={() => toggleComments(row.id)}
                           />
                         ) : null}
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && !row.isNew && (
-                      <TableRow>
-                        <TableCell colSpan={colSpan} className="p-0">
-                          <LineItemComments
-                            requestId={requestId}
-                            lineItemId={row.id}
-                            comments={row.comments}
-                            canComment={canComment}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
+                      </div>
+                    </div>
+                    {commentBlock}
+                  </div>
                 );
-              })}
-            </TableBody>
-          </Table>
+              }
+
+              return (
+                <div key={row.id} className="space-y-2">
+                  <div className="rounded-lg border border-border bg-card px-3 py-3 space-y-3">
+                    <Input
+                      type="text"
+                      value={row.description}
+                      className="h-9 w-full"
+                      onChange={(e) => updateRow(ext.id, row.id, "description", e.target.value)}
+                      onBlur={() =>
+                        row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                      }
+                      placeholder="Item description"
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Qty</label>
+                        <Input
+                          type="number"
+                          value={row.quantity}
+                          className="h-9 w-full md:text-xs"
+                          onChange={(e) => updateRow(ext.id, row.id, "quantity", e.target.value)}
+                          onBlur={() =>
+                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                          }
+                          min={0}
+                          step={1}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          Unit Price
+                        </label>
+                        <Input
+                          type="number"
+                          value={row.unitPrice}
+                          className="h-9 w-full md:text-xs"
+                          onChange={(e) => updateRow(ext.id, row.id, "unitPrice", e.target.value)}
+                          onBlur={() =>
+                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                          }
+                          min={0}
+                          step={0.01}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          Line Total
+                        </label>
+                        <Input
+                          type="number"
+                          value={row.lineTotal}
+                          className="h-9 w-full md:text-xs"
+                          onChange={(e) => updateRow(ext.id, row.id, "lineTotal", e.target.value)}
+                          onBlur={() =>
+                            row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                          }
+                          min={0}
+                          step={0.01}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Category</label>
+                      <Input
+                        type="text"
+                        value={row.category}
+                        className="h-9 w-full"
+                        onChange={(e) => updateRow(ext.id, row.id, "category", e.target.value)}
+                        onBlur={() =>
+                          row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
+                        }
+                        placeholder="Category"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Delete line item"
+                        onClick={() => void deleteRow(ext.id, row.id, row.isNew)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                      {(commentCount > 0 || canComment) && !row.isNew ? (
+                        <CommentIcon
+                          count={commentCount}
+                          className={
+                            commentCount > 0
+                              ? "text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }
+                          aria-label={`${commentCount} comment${commentCount !== 1 ? "s" : ""}`}
+                          title="Line item comments"
+                          type="button"
+                          onClick={() => toggleComments(row.id)}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                  {commentBlock}
+                </div>
+              );
+            })}
+          </div>
 
           <Button
             type="button"
@@ -553,7 +720,9 @@ export function EditableLineItems({
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium text-foreground">{formatCurrency(subtotal + excludedTotal, currency)}</span>
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(subtotal + excludedTotal, currency)}
+                  </span>
                 </div>
                 {excludedTotal > 0 && (
                   <div className="flex justify-between text-sm">
@@ -569,7 +738,7 @@ export function EditableLineItems({
                       Sales Tax{" "}
                       <span className="text-xs text-muted-foreground">(not reimbursable)</span>
                     </span>
-                    <span className="font-medium text-muted-foreground line-through">{formatCurrency(tax, currency)}</span>
+                    <span className="font-medium text-muted-foreground italic">{formatCurrency(tax, currency)}</span>
                   </div>
                 )}
               </>
@@ -586,16 +755,19 @@ export function EditableLineItems({
 
   if (receiptCards.length === 0) return null;
 
+  const defaultGrandCurrency =
+    receiptsWithExtractions.find((r) => r.extraction)?.extraction?.currency ?? "USD";
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-foreground">Line Items</h3>
       {receiptCards}
-      {receiptCards.length > 1 && (
+      {receiptCards.length > 1 ? (
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3">
           <span className="text-base font-semibold text-foreground">Grand Total</span>
-          <span className="text-lg font-bold text-foreground">${grandTotal.toFixed(2)}</span>
+          <span className="text-lg font-bold text-foreground">{formatCurrency(grandTotal, defaultGrandCurrency)}</span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

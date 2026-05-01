@@ -18,28 +18,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { formatCurrency, formatRelativeTime } from "@/lib/format";
 import { inferTax, type SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
 
 function parseNum(value: string | null): number {
   if (!value) return 0;
   const n = parseFloat(value);
   return Number.isFinite(n) ? n : 0;
-}
-
-function formatMoney(value: string | null, currency: string) {
-  if (!value) return "N/A";
-  return `${currency} ${value}`;
-}
-
-function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 export function ExtractionReview({
@@ -96,7 +81,7 @@ export function ExtractionReview({
                   </div>
                   <div>
                     <div className="text-muted-foreground">Total</div>
-                    <div className="font-medium text-foreground">{formatMoney(ext.total, currency)}</div>
+                    <div className="font-medium text-foreground">{formatCurrency(ext.total, currency)}</div>
                   </div>
                 </div>
 
@@ -131,10 +116,10 @@ export function ExtractionReview({
                                 {item.quantity ?? "-"}
                               </TableCell>
                               <TableCell className={`text-right ${cellExcluded}`}>
-                                {item.unitPrice ? `${currency} ${item.unitPrice}` : "-"}
+                                {item.unitPrice ? formatCurrency(item.unitPrice, currency) : "-"}
                               </TableCell>
                               <TableCell className={`text-right ${cellExcluded}`}>
-                                {item.lineTotal ? `${currency} ${item.lineTotal}` : "-"}
+                                {item.lineTotal ? formatCurrency(item.lineTotal, currency) : "-"}
                               </TableCell>
                               <TableCell className={`hidden sm:table-cell ${cellExcluded}`}>
                                 {item.category ?? "-"}
@@ -162,7 +147,7 @@ export function ExtractionReview({
                                           {item.comments.map((c) => (
                                             <div key={c.id} className="text-xs">
                                               <span className="font-medium text-foreground">{c.authorEmail}</span>
-                                              <span className="text-muted-foreground ml-1.5">{timeAgo(c.createdAt)}</span>
+                                              <span className="text-muted-foreground ml-1.5">{formatRelativeTime(c.createdAt)}</span>
                                               <p className="text-muted-foreground mt-0.5">{c.text}</p>
                                             </div>
                                           ))}
@@ -187,14 +172,14 @@ export function ExtractionReview({
                     <>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal</span>
-                        <span className="font-medium text-foreground">{currency} {(lineItemsSum + excludedSum).toFixed(2)}</span>
+                        <span className="font-medium text-foreground">{formatCurrency(lineItemsSum + excludedSum, currency)}</span>
                       </div>
                       {excludedSum > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
                             Excluded <span className="text-xs text-destructive">(removed)</span>
                           </span>
-                          <span className="font-medium text-muted-foreground line-through">{currency} {excludedSum.toFixed(2)}</span>
+                          <span className="font-medium text-muted-foreground line-through">{formatCurrency(excludedSum, currency)}</span>
                         </div>
                       )}
                       {tax > 0 && (
@@ -203,7 +188,7 @@ export function ExtractionReview({
                             Sales Tax{" "}
                             <span className="text-xs text-muted-foreground">(not reimbursable)</span>
                           </span>
-                          <span className="font-medium text-muted-foreground line-through">{currency} {tax.toFixed(2)}</span>
+                          <span className="font-medium text-muted-foreground italic">{formatCurrency(tax, currency)}</span>
                         </div>
                       )}
                     </>
@@ -211,7 +196,7 @@ export function ExtractionReview({
                   {receiptTotal > 0 && (
                     <div className="flex justify-between text-sm font-semibold">
                       <span className="text-foreground">Reimbursable Total</span>
-                      <span className="text-foreground">{currency} {receiptTotal.toFixed(2)}</span>
+                      <span className="text-foreground">{formatCurrency(receiptTotal, currency)}</span>
                     </div>
                   )}
                 </div>
