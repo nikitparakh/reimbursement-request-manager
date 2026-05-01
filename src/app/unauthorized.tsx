@@ -1,23 +1,38 @@
 import Link from "next/link";
+import { Lock } from "lucide-react";
+
 import { auth } from "@/auth";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getUnauthorizedPageContent } from "@/lib/ui-copy";
+import { cn } from "@/lib/utils";
 
 export default async function UnauthorizedPage() {
   const session = await auth();
   const content = getUnauthorizedPageContent(Boolean(session?.user));
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-center">
-      <h1 className="text-2xl font-bold text-slate-800">{content.title}</h1>
-      <p className="text-slate-500">
-        {content.description}
-      </p>
-      <Link
-        href={content.actionHref}
-        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
-      >
-        {content.actionLabel}
-      </Link>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className={cn("w-full max-w-md border-border shadow-sm")}>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-muted">
+            <Lock className="size-6 text-muted-foreground" aria-hidden />
+          </div>
+          <CardTitle className="text-xl">{content.title}</CardTitle>
+          <CardDescription>{content.description}</CardDescription>
+        </CardHeader>
+        <CardFooter className="justify-center">
+          <Button asChild>
+            <Link href={content.actionHref}>{content.actionLabel}</Link>
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
