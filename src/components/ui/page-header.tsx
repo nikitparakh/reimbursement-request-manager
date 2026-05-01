@@ -5,8 +5,8 @@ import {
   CardAction,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {
   title: string;
@@ -24,9 +24,13 @@ export function PageHeader({ title, description, badge, action }: PageHeaderProp
       <CardHeader className="flex flex-col gap-3 rounded-none p-0 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <CardTitle className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            <h1
+              className={cn(
+                "font-heading text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+              )}
+            >
               {title}
-            </CardTitle>
+            </h1>
             {badge}
           </div>
           {description ? (

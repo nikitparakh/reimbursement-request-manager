@@ -149,7 +149,7 @@ export function TeamRegistrationForm({
                 disabled={districts.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="requestDistrictId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose district" />
                   </SelectTrigger>
                 </FormControl>
@@ -178,7 +178,7 @@ export function TeamRegistrationForm({
                 disabled={schools.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="requestSchoolId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose school" />
                   </SelectTrigger>
                 </FormControl>
@@ -207,7 +207,7 @@ export function TeamRegistrationForm({
                 disabled={programs.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="requestProgramId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose program" />
                   </SelectTrigger>
                 </FormControl>
@@ -233,7 +233,7 @@ export function TeamRegistrationForm({
                 <FormLabel>FLL Division</FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>
-                    <SelectTrigger id="fllDivision" className="w-full">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Division" />
                     </SelectTrigger>
                   </FormControl>
@@ -257,7 +257,7 @@ export function TeamRegistrationForm({
             <FormItem>
               <FormLabel>Team Name</FormLabel>
               <FormControl>
-                <Input {...field} id="teamName" placeholder="e.g. Robotics Team Alpha" />
+                <Input {...field} placeholder="e.g. Robotics Team Alpha" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -271,7 +271,7 @@ export function TeamRegistrationForm({
             <FormItem>
               <FormLabel>Short Code</FormLabel>
               <FormControl>
-                <Input {...field} id="shortCode" placeholder="e.g. RTA" />
+                <Input {...field} placeholder="e.g. RTA" />
               </FormControl>
               <p className="text-muted-foreground text-xs">Optional team abbreviation</p>
               <FormMessage />

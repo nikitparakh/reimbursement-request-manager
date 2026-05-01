@@ -155,7 +155,7 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
                     disabled={schools.length === 0}
                   >
                     <FormControl>
-                      <SelectTrigger id="create-team-school">
+                      <SelectTrigger>
                         <SelectValue placeholder="School" />
                       </SelectTrigger>
                     </FormControl>
@@ -183,7 +183,7 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
                     disabled={programs.length === 0}
                   >
                     <FormControl>
-                      <SelectTrigger id="create-team-program">
+                      <SelectTrigger>
                         <SelectValue placeholder="Program" />
                       </SelectTrigger>
                     </FormControl>
@@ -207,7 +207,6 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
                   <FormLabel>Team name</FormLabel>
                   <FormControl>
                     <Input
-                      id="create-team-name"
                       placeholder="e.g. Team 503"
                       autoComplete="off"
                       {...field}
@@ -225,7 +224,6 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
                   <FormLabel>Short code</FormLabel>
                   <FormControl>
                     <Input
-                      id="create-team-short-code"
                       placeholder="e.g. FF503"
                       maxLength={12}
                       autoComplete="off"
@@ -244,7 +242,6 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
                   <FormLabel>GL account</FormLabel>
                   <FormControl>
                     <Input
-                      id="create-team-gl-account"
                       placeholder="e.g. 61-296-7920-099-978-0000"
                       maxLength={30}
                       autoComplete="off"

@@ -174,7 +174,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
                 disabled={districts.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="districtId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose district" />
                   </SelectTrigger>
                 </FormControl>
@@ -211,7 +211,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
                 disabled={schools.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="schoolId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose school" />
                   </SelectTrigger>
                 </FormControl>
@@ -245,7 +245,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
                 disabled={programs.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="programId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose program" />
                   </SelectTrigger>
                 </FormControl>
@@ -274,7 +274,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
                 disabled={teams.length === 0}
               >
                 <FormControl>
-                  <SelectTrigger id="teamId" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose team" />
                   </SelectTrigger>
                 </FormControl>
@@ -299,7 +299,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
               <FormLabel>Role</FormLabel>
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
-                  <SelectTrigger id="roleIntent" className="w-full">
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                 </FormControl>

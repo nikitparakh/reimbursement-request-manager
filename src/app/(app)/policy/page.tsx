@@ -5,7 +5,7 @@ export default function PolicyPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-10">
       <PageHeader
-        title="Reimbursement policy"
+        title="Reimbursement Policy"
         description="This policy explains the basic expectations for submitting and reviewing robotics reimbursement requests."
       />
 
