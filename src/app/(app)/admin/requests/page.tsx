@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Card, CardContent } from "@/components/ui/card";
 import { getAdminReimbursementsDescription } from "@/lib/ui-copy";
 
 const ADMIN_VISIBLE_STATUSES = [
@@ -94,7 +95,11 @@ export default async function AdminReimbursementsPage() {
           }
         />
       ) : (
-        <AdminReimbursementsTable data={rows} />
+        <Card>
+          <CardContent className="pt-6">
+            <AdminReimbursementsTable data={rows} />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

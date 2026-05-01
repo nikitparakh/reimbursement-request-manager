@@ -1,21 +1,23 @@
 import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
+import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
+import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
+import { ExtractionReview } from "@/components/reimbursements/extraction-review";
+import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
+import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
   canManageReimbursements,
   getCachedAccessContext,
 } from "@/lib/access";
-import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
-import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
-import { ExtractionReview } from "@/components/reimbursements/extraction-review";
-import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
-import { RequestTimeline } from "@/components/reimbursements/request-timeline";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
-import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 
 const ADMIN_VISIBLE_STATUSES = [
   "COACH_APPROVED",
@@ -107,13 +109,14 @@ export default async function AdminRequestDetailPage({
 
   return (
     <LiveTotalProvider initialTotal={Number(request.requestedTotal)}>
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div>
         <Link
           href={backTarget.href}
-          className="text-sm text-slate-500 hover:text-emerald-600 transition"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
         >
-          &larr; {backTarget.label}
+          <ArrowLeft className="size-4 shrink-0" aria-hidden />
+          {backTarget.label}
         </Link>
       </div>
 
@@ -134,20 +137,20 @@ export default async function AdminRequestDetailPage({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Requested Total</div>
-            <div className="text-2xl font-bold text-slate-900">
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">Requested Total</div>
+            <div className="text-2xl font-bold text-foreground">
               <LiveRequestedTotal />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Team</div>
-            <div className="text-lg font-semibold text-slate-900">
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">Team</div>
+            <div className="text-lg font-semibold text-foreground">
               <Link
                 href={`/admin/teams/${request.team.id}`}
-                className="text-emerald-600 hover:text-emerald-700 hover:underline"
+                className="text-primary underline-offset-4 hover:underline"
               >
                 {request.team.name}
               </Link>
@@ -155,26 +158,36 @@ export default async function AdminRequestDetailPage({
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Created</div>
-            <div className="text-lg font-semibold text-slate-900">
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">Created</div>
+            <div className="text-lg font-semibold text-foreground">
               {request.createdAt.toLocaleDateString()}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {canEditLineItems && receipts.length > 0 ? (
-        <EditableLineItems requestId={request.id} receipts={receipts} canComment />
-      ) : (
-        <ExtractionReview
-          receipts={receipts}
-          parseStatuses={Object.fromEntries(request.receiptFiles.map((f) => [f.id, f.parseStatus]))}
-        />
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Receipts & line items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {canEditLineItems && receipts.length > 0 ? (
+            <EditableLineItems requestId={request.id} receipts={receipts} canComment />
+          ) : (
+            <ExtractionReview
+              receipts={receipts}
+              parseStatuses={Object.fromEntries(request.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {canDecide ? (
         <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Admin actions</CardTitle>
+          </CardHeader>
           <CardFooter>
             <ApprovalDecision
               requestId={request.id}
@@ -186,16 +199,25 @@ export default async function AdminRequestDetailPage({
         </Card>
       ) : null}
 
-      <RequestTimeline
-        items={request.approvals.map((approval) => ({
-          id: approval.id,
-          action: approval.action,
-          actor: approval.actor.email,
-          comment: approval.comment,
-          createdAt: approval.createdAt,
-        }))}
-      />
-    </div>
+      {request.approvals.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Approval history</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusTimeline
+              items={request.approvals.map((approval) => ({
+                id: approval.id,
+                action: approval.action,
+                actor: approval.actor.email,
+                comment: approval.comment,
+                createdAt: approval.createdAt,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+      </div>
     </LiveTotalProvider>
   );
 }
