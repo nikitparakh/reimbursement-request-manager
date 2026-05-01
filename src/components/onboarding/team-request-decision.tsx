@@ -1,67 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldGroup } from "@/components/ui/field-group";
-import { Alert } from "@/components/ui/alert";
+
+const teamRequestDecisionSchema = z.object({
+  comment: z.string().max(500).optional(),
+});
+
+type TeamRequestDecisionValues = z.infer<typeof teamRequestDecisionSchema>;
 
 export function TeamRequestDecision({ requestId }: { requestId: string }) {
   const router = useRouter();
-  const [comment, setComment] = useState("");
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
   const [decided, setDecided] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  async function handleDecision(decision: "APPROVE" | "REJECT") {
-    setMessage("");
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/admin/team-requests/${requestId}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, comment }),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setMessage(body.error ?? "Decision failed.");
-        setIsError(true);
-        return;
-      }
-      setMessage(`Registration ${decision === "APPROVE" ? "approved" : "rejected"}.`);
-      setIsError(false);
-      setDecided(true);
-      router.refresh();
-    } finally {
-      setSaving(false);
+  const form = useForm<TeamRequestDecisionValues>({
+    resolver: zodResolver(teamRequestDecisionSchema),
+    defaultValues: { comment: "" },
+  });
+
+  async function executeDecision(decision: "APPROVE" | "REJECT", values: TeamRequestDecisionValues) {
+    const response = await fetch(`/api/admin/team-requests/${requestId}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        decision,
+        comment: values.comment?.trim() || undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      toast.error(body.error ?? "Decision failed.");
+      return;
     }
+
+    toast.success(`Registration ${decision === "APPROVE" ? "approved" : "rejected"}.`);
+    setDecided(true);
+    router.refresh();
   }
 
   return (
-    <div className="space-y-3">
-      <FieldGroup label="Comment" htmlFor={`comment-${requestId}`}>
-        <Textarea
-          id={`comment-${requestId}`}
-          value={comment}
-          placeholder="Add a comment..."
-          onChange={(event) => setComment(event.target.value)}
-          rows={2}
-          disabled={decided}
+    <Form {...form}>
+      <form className="space-y-3">
+        <FormField
+          control={form.control}
+          name="comment"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Comment</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  id={`comment-${requestId}`}
+                  placeholder="Add a comment..."
+                  rows={2}
+                  disabled={decided}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
-      <div className="flex gap-2">
-        <Button variant="default" size="sm" onClick={() => handleDecision("APPROVE")} loading={saving} disabled={decided || saving}>
-          Approve
-        </Button>
-        <Button variant="destructive" size="sm" onClick={() => handleDecision("REJECT")} loading={saving} disabled={decided || saving}>
-          Reject
-        </Button>
-      </div>
-      {message ? (
-        <Alert variant={isError ? "destructive" : "success"}>{message}</Alert>
-      ) : null}
-    </div>
+        <div className="flex gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            type="button"
+            loading={form.formState.isSubmitting}
+            disabled={decided}
+            onClick={form.handleSubmit(async (values) => executeDecision("APPROVE", values))}
+          >
+            Approve
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            type="button"
+            loading={form.formState.isSubmitting}
+            disabled={decided}
+            onClick={form.handleSubmit(async (values) => executeDecision("REJECT", values))}
+          >
+            Reject
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }
