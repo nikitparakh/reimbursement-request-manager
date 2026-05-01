@@ -6,7 +6,7 @@ import { signIn } from "next-auth/react";
 import { POLICY_PATH } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 export function SignUpForm() {
@@ -62,7 +62,7 @@ export function SignUpForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {message ? <Alert variant="error">{message}</Alert> : null}
 
-      <FormField label="Name" htmlFor="name">
+      <FieldGroup label="Name" htmlFor="name">
         <Input
           id="name"
           required
@@ -70,9 +70,9 @@ export function SignUpForm() {
           onChange={(event) => setName(event.target.value)}
           placeholder="Your full name"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Email" htmlFor="email">
+      <FieldGroup label="Email" htmlFor="email">
         <Input
           id="email"
           type="email"
@@ -81,12 +81,12 @@ export function SignUpForm() {
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField
+      <FieldGroup
         label="Password"
         htmlFor="password"
-        helpText="Must include at least one uppercase letter, one lowercase letter, and one number."
+        hint="Must include at least one uppercase letter, one lowercase letter, and one number."
       >
         <Input
           id="password"
@@ -96,7 +96,7 @@ export function SignUpForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-      </FormField>
+      </FieldGroup>
 
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
         <label className="flex items-start gap-3 text-sm text-slate-700">

@@ -5,7 +5,7 @@ import type { ProgramCode } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
 
@@ -79,7 +79,7 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
 
   return (
     <div className="space-y-4">
-      <FormField label="District" htmlFor="requestDistrictId">
+      <FieldGroup label="District" htmlFor="requestDistrictId">
         <Select
           id="requestDistrictId"
           value={districtId}
@@ -94,9 +94,9 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="School" htmlFor="requestSchoolId">
+      <FieldGroup label="School" htmlFor="requestSchoolId">
         <Select id="requestSchoolId" value={schoolId} onChange={(event) => setSelectedSchoolId(event.target.value)}>
           {schools.map((school) => (
             <option key={school.id} value={school.id}>
@@ -104,9 +104,9 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Program" htmlFor="requestProgramId">
+      <FieldGroup label="Program" htmlFor="requestProgramId">
         <Select id="requestProgramId" value={programId} onChange={(event) => setProgramId(event.target.value)}>
           {programs.map((program) => (
             <option key={program.id} value={program.id}>
@@ -114,46 +114,46 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
       {selectedProgram?.code === "FLL" ? (
-        <FormField label="FLL Division" htmlFor="fllDivision" helpText="Optional for LEGO League team setup">
+        <FieldGroup label="FLL Division" htmlFor="fllDivision" hint="Optional for LEGO League team setup">
           <Select id="fllDivision" value={fllDivision} onChange={(event) => setFllDivision(event.target.value as typeof fllDivision)}>
             <option value="DISCOVER">Discover</option>
             <option value="EXPLORE">Explore</option>
             <option value="CHALLENGE">Challenge</option>
           </Select>
-        </FormField>
+        </FieldGroup>
       ) : null}
 
-      <FormField label="Team Name" htmlFor="teamName">
+      <FieldGroup label="Team Name" htmlFor="teamName">
         <Input
           id="teamName"
           value={teamName}
           onChange={(event) => setTeamName(event.target.value)}
           placeholder="e.g. Robotics Team Alpha"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Short Code" htmlFor="shortCode" helpText="Optional team abbreviation">
+      <FieldGroup label="Short Code" htmlFor="shortCode" hint="Optional team abbreviation">
         <Input
           id="shortCode"
           value={shortCode}
           onChange={(event) => setShortCode(event.target.value)}
           placeholder="e.g. RTA"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="GL Account" htmlFor="glAccount" helpText="Optional GL account number">
+      <FieldGroup label="GL Account" htmlFor="glAccount" hint="Optional GL account number">
         <Input
           id="glAccount"
           value={glAccount}
           onChange={(event) => setGlAccount(event.target.value)}
           placeholder="e.g. 61-296-7920-099-978-0000"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Notes" htmlFor="notes">
+      <FieldGroup label="Notes" htmlFor="notes">
         <Textarea
           id="notes"
           value={notes}
@@ -161,7 +161,7 @@ export function TeamRegistrationForm({ districts, programs }: { districts: Distr
           placeholder="Any additional details about the team..."
           rows={3}
         />
-      </FormField>
+      </FieldGroup>
 
       <Button variant="secondary" onClick={submit}>Submit Request</Button>
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 type Decision = "APPROVE" | "REJECT" | "MARK_PAID";
@@ -45,7 +45,7 @@ export function ApprovalDecision({
 
   return (
     <div className="space-y-3">
-      <FormField label="Comment" htmlFor={`comment-${requestId}`} helpText="Required for rejection">
+      <FieldGroup label="Comment" htmlFor={`comment-${requestId}`} hint="Required for rejection">
         <Textarea
           id={`comment-${requestId}`}
           value={comment}
@@ -53,7 +53,7 @@ export function ApprovalDecision({
           onChange={(event) => setComment(event.target.value)}
           rows={2}
         />
-      </FormField>
+      </FieldGroup>
       <div className="flex gap-2">
         {showApproveReject && (
           <>

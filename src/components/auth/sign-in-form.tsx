@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 export function SignInForm() {
@@ -39,7 +39,7 @@ export function SignInForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {error ? <Alert variant="error">{error}</Alert> : null}
 
-      <FormField label="Email" htmlFor="email">
+      <FieldGroup label="Email" htmlFor="email">
         <Input
           id="email"
           type="email"
@@ -48,9 +48,9 @@ export function SignInForm() {
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Password" htmlFor="password">
+      <FieldGroup label="Password" htmlFor="password">
         <Input
           id="password"
           type="password"
@@ -59,7 +59,7 @@ export function SignInForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-      </FormField>
+      </FieldGroup>
 
       <Button type="submit" loading={isSubmitting} className="w-full">
         {isSubmitting ? "Signing in..." : "Sign in"}

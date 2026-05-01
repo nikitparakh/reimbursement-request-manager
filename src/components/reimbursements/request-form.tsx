@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 type TeamOption = { id: string; name: string };
@@ -45,16 +45,16 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
 
   return (
     <div className="space-y-4">
-      <FormField label="Title" htmlFor="title">
+      <FieldGroup label="Title" htmlFor="title">
         <Input
           id="title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="e.g. Competition Travel Expenses"
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Description" htmlFor="description">
+      <FieldGroup label="Description" htmlFor="description">
         <Textarea
           id="description"
           value={description}
@@ -62,9 +62,9 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
           placeholder="Describe what this reimbursement is for..."
           rows={3}
         />
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Team" htmlFor="team">
+      <FieldGroup label="Team" htmlFor="team">
         <Select id="team" value={teamId} onChange={(event) => setTeamId(event.target.value)}>
           {teams.map((team) => (
             <option value={team.id} key={team.id}>
@@ -72,7 +72,7 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
       <Button onClick={createDraft} disabled={isCreating}>
         {isCreating ? "Creating..." : "Create Draft"}

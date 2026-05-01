@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 export function TeamRequestDecision({ requestId }: { requestId: string }) {
@@ -41,7 +41,7 @@ export function TeamRequestDecision({ requestId }: { requestId: string }) {
 
   return (
     <div className="space-y-3">
-      <FormField label="Comment" htmlFor={`comment-${requestId}`}>
+      <FieldGroup label="Comment" htmlFor={`comment-${requestId}`}>
         <Textarea
           id={`comment-${requestId}`}
           value={comment}
@@ -50,7 +50,7 @@ export function TeamRequestDecision({ requestId }: { requestId: string }) {
           rows={2}
           disabled={decided}
         />
-      </FormField>
+      </FieldGroup>
       <div className="flex gap-2">
         <Button variant="default" size="sm" onClick={() => handleDecision("APPROVE")} loading={saving} disabled={decided || saving}>
           Approve

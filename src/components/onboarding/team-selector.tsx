@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { ProgramCode } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Alert } from "@/components/ui/alert";
 
 type TeamOption = {
@@ -82,7 +82,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
 
   return (
     <div className="space-y-4">
-      <FormField label="District" htmlFor="districtId">
+      <FieldGroup label="District" htmlFor="districtId">
         <Select
           id="districtId"
           value={districtId}
@@ -99,9 +99,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="School" htmlFor="schoolId">
+      <FieldGroup label="School" htmlFor="schoolId">
         <Select
           id="schoolId"
           value={schoolId}
@@ -117,9 +117,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Program" htmlFor="programId">
+      <FieldGroup label="Program" htmlFor="programId">
         <Select
           id="programId"
           value={programId}
@@ -134,9 +134,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Team" htmlFor="teamId">
+      <FieldGroup label="Team" htmlFor="teamId">
         <Select id="teamId" value={teamId} onChange={(event) => setSelectedTeamId(event.target.value)}>
           {teams.map((team) => (
             <option key={team.id} value={team.id}>
@@ -144,9 +144,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
             </option>
           ))}
         </Select>
-      </FormField>
+      </FieldGroup>
 
-      <FormField label="Role" htmlFor="roleIntent">
+      <FieldGroup label="Role" htmlFor="roleIntent">
         <Select
           id="roleIntent"
           value={roleIntent}
@@ -155,7 +155,7 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
           <option value="PARENT_MENTOR">Parent/Mentor</option>
           <option value="COACH">Coach</option>
         </Select>
-      </FormField>
+      </FieldGroup>
 
       <Button onClick={submit} disabled={!teamId}>Save</Button>
 

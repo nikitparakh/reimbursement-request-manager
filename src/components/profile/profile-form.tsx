@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/ui/form-field";
+import { FieldGroup } from "@/components/ui/field-group";
 import { Input } from "@/components/ui/input";
 
 type ProfileFormProps = {
@@ -79,49 +79,49 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
       {message ? <Alert variant={isError ? "error" : "success"}>{message}</Alert> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <FormField label="Address line 1" htmlFor="mailingAddressLine1">
+        <FieldGroup label="Address line 1" htmlFor="mailingAddressLine1">
           <Input
             id="mailingAddressLine1"
             value={form.mailingAddressLine1}
             onChange={(event) => setField("mailingAddressLine1", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
 
-        <FormField label="Address line 2" htmlFor="mailingAddressLine2">
+        <FieldGroup label="Address line 2" htmlFor="mailingAddressLine2">
           <Input
             id="mailingAddressLine2"
             value={form.mailingAddressLine2}
             onChange={(event) => setField("mailingAddressLine2", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
 
-        <FormField label="City" htmlFor="mailingCity">
+        <FieldGroup label="City" htmlFor="mailingCity">
           <Input
             id="mailingCity"
             value={form.mailingCity}
             onChange={(event) => setField("mailingCity", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
 
-        <FormField label="State / Province" htmlFor="mailingState">
+        <FieldGroup label="State / Province" htmlFor="mailingState">
           <Input
             id="mailingState"
             value={form.mailingState}
             onChange={(event) => setField("mailingState", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
 
-        <FormField label="Postal code" htmlFor="mailingPostalCode">
+        <FieldGroup label="Postal code" htmlFor="mailingPostalCode">
           <Input
             id="mailingPostalCode"
             value={form.mailingPostalCode}
             onChange={(event) => setField("mailingPostalCode", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <FormField label="Zelle type" htmlFor="zelleType">
+        <FieldGroup label="Zelle type" htmlFor="zelleType">
           <select
             id="zelleType"
             value={form.zelleType}
@@ -132,19 +132,19 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
             <option value="email">Email</option>
             <option value="phone">Phone</option>
           </select>
-        </FormField>
+        </FieldGroup>
 
-        <FormField
+        <FieldGroup
           label="Zelle destination"
           htmlFor="zelleValue"
-          helpText="Provide the email address or phone number that should receive reimbursement."
+          hint="Provide the email address or phone number that should receive reimbursement."
         >
           <Input
             id="zelleValue"
             value={form.zelleValue}
             onChange={(event) => setField("zelleValue", event.target.value)}
           />
-        </FormField>
+        </FieldGroup>
       </div>
 
       <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
