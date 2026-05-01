@@ -16,7 +16,7 @@ import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
 
 const PAGE_SIZE = 10;
-const INBOX_STATUSES = ["COACH_APPROVED", "ADMIN_APPROVED"] as const;
+const INBOX_STATUSES = ["SUBMITTED", "COACH_APPROVED"] as const;
 
 function adminEndpoint(requestId: string) {
   return `/api/requests/${requestId}/admin-decision`;
@@ -99,7 +99,6 @@ export default async function AdminInboxPage({
         <>
           <div className="space-y-4">
             {items.map((request) => {
-              const isAdminApproved = request.status === "ADMIN_APPROVED";
               const isCoachApproved = request.status === "COACH_APPROVED";
               const receiptsForEditor = serializeReceipts(request.receiptFiles);
 
@@ -138,8 +137,7 @@ export default async function AdminInboxPage({
                     <ApprovalDecision
                       requestId={request.id}
                       endpoint={adminEndpoint(request.id)}
-                      allowMarkPaid={isAdminApproved}
-                      showApproveReject={!isAdminApproved}
+                      allowMarkPaid={isCoachApproved}
                     />
                   </CardFooter>
                 </Card>
