@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  BookOpen,
   ClipboardList,
   Compass,
   FilePlus,
@@ -27,6 +28,12 @@ function TileIcon({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+function dashboardGridClass(tileCount: number) {
+  if (tileCount <= 1) return "grid grid-cols-1 gap-4";
+  if (tileCount === 2) return "grid grid-cols-1 gap-4 sm:grid-cols-2";
+  return "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
 }
 
 export default async function HomePage() {
@@ -156,6 +163,14 @@ export default async function HomePage() {
 
   const cardHover = "transition-colors hover:border-primary/40";
 
+  const dashboardTileCount =
+    (access.isSuperAdmin ? 1 : 0) +
+    adminPrograms.length +
+    (access.isCoach ? 1 : 0) +
+    (access.canManageTeamRequests ? 1 : 0) +
+    (access.isParentMentor ? 3 : 0) +
+    (!user?.onboardingDone && !access.isSuperAdmin ? 1 : 0);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -163,7 +178,7 @@ export default async function HomePage() {
         description={`Welcome back, ${session.user.name ?? session.user.email}`}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={cn(dashboardGridClass(dashboardTileCount))}>
         {access.isSuperAdmin ? (
           <Link href="/admin/teams" prefetch={false} className="block">
             <Card className={cn("border-border", cardHover)}>
@@ -288,6 +303,26 @@ export default async function HomePage() {
                       <div className="mt-1 text-lg font-semibold text-foreground">New Request</div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Create a new reimbursement request for your team.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/policy" className="block">
+              <Card className={cn("border-border", cardHover)}>
+                <CardContent className="pt-6">
+                  <div className="flex gap-4">
+                    <TileIcon>
+                      <BookOpen className="size-5 text-muted-foreground" aria-hidden />
+                    </TileIcon>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-muted-foreground">Resources</div>
+                      <div className="mt-1 text-lg font-semibold text-foreground">
+                        Reimbursement Policy
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Read the policy and submission guidelines.
                       </p>
                     </div>
                   </div>
