@@ -13,6 +13,14 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CreateTeamForm } from "@/components/admin/create-team-form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default async function AdminTeamsPage({
   searchParams,
@@ -243,73 +251,74 @@ type TeamStatRow = {
 
 function ManageTeamsTable({ teams }: { teams: TeamStatRow[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left">
-            <th className="pb-3 pr-4 font-medium text-muted-foreground">Team</th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground lg:table-cell">
-              School / Program
-            </th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
-              Short Code
-            </th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
-              GL Account
-            </th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
-              Coaches
-            </th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
-              Parents/Mentors
-            </th>
-            <th className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
-              Requests
-            </th>
-            <th className="pb-3 font-medium text-muted-foreground">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teams.map((team) => (
-            <tr key={team.id} className="border-b border-border/60 last:border-0">
-              <td className="py-3 pr-4">
-                <Link
-                  href={`/admin/teams/${team.id}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  {team.name}
-                </Link>
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground lg:table-cell">
-                <div>{team.schoolName}</div>
-                <div className="text-xs text-muted-foreground">{team.programName}</div>
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground sm:table-cell">
-                {team.shortCode || (
-                  <span className="italic text-muted-foreground">—</span>
-                )}
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground sm:table-cell">
-                {team.glAccount || (
-                  <span className="italic text-muted-foreground">—</span>
-                )}
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
-                {team.coaches}
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
-                {team.parents}
-              </td>
-              <td className="hidden py-3 pr-4 text-foreground md:table-cell">
-                {team.totalRequests}
-              </td>
-              <td className="py-3">
-                <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table className="w-full text-sm">
+      <TableHeader>
+        <TableRow className="border-border hover:bg-transparent">
+          <TableHead className="pb-3 pr-4 font-medium text-muted-foreground">Team</TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground lg:table-cell">
+            School / Program
+          </TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
+            Short Code
+          </TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground sm:table-cell">
+            GL Account
+          </TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+            Coaches
+          </TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+            Parents/Mentors
+          </TableHead>
+          <TableHead className="hidden pb-3 pr-4 font-medium text-muted-foreground md:table-cell">
+            Requests
+          </TableHead>
+          <TableHead className="pb-3 font-medium text-muted-foreground">Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {teams.map((team) => (
+          <TableRow
+            key={team.id}
+            className="border-border/60 hover:bg-transparent"
+          >
+            <TableCell className="py-3 pr-4">
+              <Link
+                href={`/admin/teams/${team.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {team.name}
+              </Link>
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground lg:table-cell">
+              <div>{team.schoolName}</div>
+              <div className="text-xs text-muted-foreground">{team.programName}</div>
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground sm:table-cell">
+              {team.shortCode || (
+                <span className="italic text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground sm:table-cell">
+              {team.glAccount || (
+                <span className="italic text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground md:table-cell">
+              {team.coaches}
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground md:table-cell">
+              {team.parents}
+            </TableCell>
+            <TableCell className="hidden py-3 pr-4 text-foreground md:table-cell">
+              {team.totalRequests}
+            </TableCell>
+            <TableCell className="py-3">
+              <StatusBadge status={team.active ? "APPROVED" : "REJECTED"} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
