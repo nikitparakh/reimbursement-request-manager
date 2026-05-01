@@ -1,46 +1,61 @@
-import Link from "next/link";
+import Link from "next/link"
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/ui/pagination"
+import { cn } from "@/lib/utils"
 
 type PaginationControlsProps = {
-  basePath: string;
-  prevCursor: string | null;
-  nextCursor: string | null;
-};
+  basePath: string
+  prevCursor: string | null
+  nextCursor: string | null
+}
 
 export function PaginationControls({
   basePath,
   prevCursor,
   nextCursor,
 }: PaginationControlsProps) {
-  if (!prevCursor && !nextCursor) return null;
+  if (!prevCursor && !nextCursor) return null
 
   return (
-    <div className="flex items-center justify-between gap-2 pt-4">
-      {prevCursor ? (
-        <Link
-          href={`${basePath}?cursor=${prevCursor}&dir=prev`}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
-          Previous
-        </Link>
-      ) : (
-        <span />
-      )}
-      {nextCursor ? (
-        <Link
-          href={`${basePath}?cursor=${nextCursor}`}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-        >
-          Next
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-          </svg>
-        </Link>
-      ) : (
-        <span />
-      )}
-    </div>
-  );
+    <Pagination className="mx-0 w-full justify-between pt-4">
+      <PaginationContent className="w-full justify-between">
+        <PaginationItem>
+          {prevCursor ? (
+            <Button variant="ghost" size="default" asChild className="pl-2">
+              <Link
+                href={`${basePath}?cursor=${prevCursor}&dir=prev`}
+                aria-label="Go to previous page"
+              >
+                <ChevronLeftIcon data-icon="inline-start" />
+                <span className="hidden sm:inline">Previous</span>
+              </Link>
+            </Button>
+          ) : (
+            <span className="inline-flex h-8 min-w-24" aria-hidden />
+          )}
+        </PaginationItem>
+        <PaginationItem>
+          {nextCursor ? (
+            <Button variant="ghost" size="default" asChild className={cn("pr-2")}>
+              <Link
+                href={`${basePath}?cursor=${nextCursor}`}
+                aria-label="Go to next page"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRightIcon data-icon="inline-end" />
+              </Link>
+            </Button>
+          ) : (
+            <span className="inline-flex h-8 min-w-24" aria-hidden />
+          )}
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
+  )
 }
