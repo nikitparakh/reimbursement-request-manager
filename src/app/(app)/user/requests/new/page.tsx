@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { RequestForm } from "@/components/reimbursements/request-form";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
 export default async function NewRequestPage() {
@@ -32,6 +32,10 @@ export default async function NewRequestPage() {
         </Alert>
       ) : (
         <Card>
+          <CardHeader>
+            <CardTitle>Request details</CardTitle>
+            <CardDescription>Select a team, then add title, receipts, and line items.</CardDescription>
+          </CardHeader>
           <CardContent>
             <RequestForm teams={teams} />
           </CardContent>

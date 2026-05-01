@@ -7,11 +7,11 @@ import { ExtractionReview } from "@/components/reimbursements/extraction-review"
 import { ReceiptPollingWrapper } from "@/components/reimbursements/receipt-polling-wrapper";
 import { RequestActions } from "@/components/reimbursements/request-actions";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
-import { RequestTimeline } from "@/components/reimbursements/request-timeline";
 import { EditableRequestHeader } from "@/components/reimbursements/editable-request-header";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
@@ -136,28 +136,28 @@ export default async function UserRequestDetailPage({
         />
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Requested Total</div>
-            <div className="text-2xl font-bold text-slate-900">
+          <CardContent className="space-y-1">
+            <div className="text-sm text-muted-foreground">Requested total</div>
+            <div className="text-2xl font-semibold text-foreground">
               <LiveRequestedTotal />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Team</div>
-            <div className="text-lg font-semibold text-slate-900">{requestRecord.team.name}</div>
-            {requestRecord.team.glAccount && (
-              <div className="text-xs text-slate-500 mt-1">GL: {requestRecord.team.glAccount}</div>
-            )}
+          <CardContent className="space-y-1">
+            <div className="text-sm text-muted-foreground">Team</div>
+            <div className="text-lg font-semibold text-foreground">{requestRecord.team.name}</div>
+            {requestRecord.team.glAccount ? (
+              <div className="mt-1 text-xs text-muted-foreground">GL: {requestRecord.team.glAccount}</div>
+            ) : null}
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <div className="text-sm text-slate-500">Created</div>
-            <div className="text-lg font-semibold text-slate-900">
+          <CardContent className="space-y-1">
+            <div className="text-sm text-muted-foreground">Created</div>
+            <div className="text-lg font-semibold text-foreground">
               {requestRecord.createdAt.toLocaleDateString()}
             </div>
           </CardContent>
@@ -166,6 +166,9 @@ export default async function UserRequestDetailPage({
 
       {draftUi.showEditableDraftSections ? (
         <Card>
+          <CardHeader>
+            <CardTitle>Draft actions</CardTitle>
+          </CardHeader>
           <CardContent>
             <RequestActions
               requestId={requestRecord.id}
@@ -188,8 +191,11 @@ export default async function UserRequestDetailPage({
 
       {draftUi.showReadOnlyDraftSections ? (
         <Card>
+          <CardHeader>
+            <CardTitle>Receipts</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               This draft is view-only for you. Only the request creator, team
               coach, or a scoped admin can edit it.
             </p>
@@ -215,41 +221,60 @@ export default async function UserRequestDetailPage({
       ) : null}
 
       {status !== "DRAFT" && !canEditLineItems ? (
-        <ReceiptPollingWrapper
-          requestId={requestRecord.id}
-          hasProcessing={requestRecord.receiptFiles.some(
-            (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
-          )}
-        >
-          <ExtractionReview
-            receipts={receiptsWithExtractions}
-            parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
-          />
-        </ReceiptPollingWrapper>
+        <Card>
+          <CardHeader>
+            <CardTitle>Receipts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ReceiptPollingWrapper
+              requestId={requestRecord.id}
+              hasProcessing={requestRecord.receiptFiles.some(
+                (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
+              )}
+            >
+              <ExtractionReview
+                receipts={receiptsWithExtractions}
+                parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+              />
+            </ReceiptPollingWrapper>
+          </CardContent>
+        </Card>
       ) : null}
 
       {decision ? (
         <Card>
-          <CardFooter>
+          <CardHeader>
+            <CardTitle>Review decision</CardTitle>
+          </CardHeader>
+          <CardContent>
             <ApprovalDecision
               requestId={requestRecord.id}
               endpoint={decision.endpoint}
               showApproveReject={decision.showApproveReject}
               allowMarkPaid={decision.allowMarkPaid}
             />
-          </CardFooter>
+          </CardContent>
         </Card>
       ) : null}
 
-      <RequestTimeline
-        items={requestRecord.approvals.map((approval) => ({
-          id: approval.id,
-          action: approval.action,
-          actor: approval.actor.email,
-          comment: approval.comment,
-          createdAt: approval.createdAt,
-        }))}
-      />
+      {requestRecord.approvals.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Approval history</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusTimeline
+              items={requestRecord.approvals.map((approval) => ({
+                id: approval.id,
+                action: approval.action,
+                actor: approval.actor.email,
+                comment: approval.comment,
+                createdAt: approval.createdAt,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
     </LiveTotalProvider>
   );
