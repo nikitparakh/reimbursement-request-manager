@@ -1,14 +1,42 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldGroup } from "@/components/ui/field-group";
 
-type Decision = "APPROVE" | "REJECT" | "MARK_PAID";
+type DecisionPayload = "APPROVE" | "REJECT" | "MARK_PAID";
+
+const approvalDecisionSchema = z
+  .object({
+    decision: z.enum(["APPROVE", "REJECT"]),
+    comment: z.string().max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.decision === "REJECT" && !(data.comment ?? "").trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["comment"],
+        message: "Rejection requires a comment.",
+      });
+    }
+  });
+
+type ApprovalDecisionFormValues = z.infer<typeof approvalDecisionSchema>;
 
 export function ApprovalDecision({
   requestId,
@@ -21,52 +49,132 @@ export function ApprovalDecision({
   allowMarkPaid?: boolean;
   showApproveReject?: boolean;
 }) {
-  const [comment, setComment] = useState("");
   const router = useRouter();
+  const [markPaidBusy, setMarkPaidBusy] = useState(false);
 
-  async function handleDecision(decision: Decision) {
+  const form = useForm<ApprovalDecisionFormValues>({
+    resolver: zodResolver(approvalDecisionSchema),
+    defaultValues: { decision: "APPROVE", comment: "" },
+  });
+
+  const busy = form.formState.isSubmitting || markPaidBusy;
+
+  async function postDecision(decision: DecisionPayload, comment: string) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, comment }),
+      body: JSON.stringify({
+        decision,
+        comment: comment.trim() === "" ? undefined : comment.trim(),
+      }),
     });
 
     if (!response.ok) {
-      toast.error("Decision failed.");
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      const msg = body.error ?? "Decision failed.";
+      const commentMsg =
+        decision === "REJECT" &&
+        (typeof msg === "string" &&
+          (msg.toLowerCase().includes("rejection comment") ||
+            msg.toLowerCase().includes("comment is required")));
+
+      if (commentMsg) {
+        form.setError("comment", { type: "server", message: msg });
+      } else {
+        toast.error(msg);
+      }
       return;
     }
-    toast.success(`Decision recorded: ${decision.replace("_", " ")}`);
+
+    form.clearErrors("comment");
+    toast.success("Decision recorded.");
     router.refresh();
   }
 
+  async function onSubmit(values: ApprovalDecisionFormValues) {
+    await postDecision(values.decision, values.comment ?? "");
+  }
+
+  async function handleMarkPaid() {
+    const comment = form.getValues("comment") ?? "";
+    setMarkPaidBusy(true);
+    try {
+      await postDecision("MARK_PAID", comment);
+    } finally {
+      setMarkPaidBusy(false);
+    }
+  }
+
   return (
-    <div className="space-y-3">
-      <FieldGroup label="Comment" htmlFor={`comment-${requestId}`} hint="Required for rejection">
-        <Textarea
-          id={`comment-${requestId}`}
-          value={comment}
-          placeholder="Add a comment..."
-          onChange={(event) => setComment(event.target.value)}
-          rows={2}
+    <Form {...form}>
+      <form className="space-y-3">
+        <FormField
+          control={form.control}
+          name="comment"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Comment</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  id={`comment-${requestId}`}
+                  placeholder="Add a comment..."
+                  rows={2}
+                  disabled={busy}
+                />
+              </FormControl>
+              <FormDescription>
+                Optional for approval; required for rejection.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
-      <div className="flex gap-2">
-        {showApproveReject && (
-          <>
-            <Button variant="default" size="sm" onClick={() => void handleDecision("APPROVE")}>
-              Approve
+        <div className="flex gap-2">
+          {showApproveReject && (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                type="button"
+                loading={busy}
+                disabled={busy}
+                onClick={() => {
+                  form.setValue("decision", "APPROVE");
+                  void form.handleSubmit(onSubmit)();
+                }}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                type="button"
+                loading={busy}
+                disabled={busy}
+                onClick={() => {
+                  form.setValue("decision", "REJECT");
+                  void form.handleSubmit(onSubmit)();
+                }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+          {allowMarkPaid ? (
+            <Button
+              variant="default"
+              size="sm"
+              type="button"
+              loading={markPaidBusy}
+              disabled={form.formState.isSubmitting || markPaidBusy}
+              onClick={() => void handleMarkPaid()}
+            >
+              Mark Paid
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => void handleDecision("REJECT")}>
-              Reject
-            </Button>
-          </>
-        )}
-        {allowMarkPaid ? (
-          <Button variant="default" size="sm" onClick={() => void handleDecision("MARK_PAID")}>
-            Mark Paid
-          </Button>
-        ) : null}
-      </div>
-    </div>
+          ) : null}
+        </div>
+      </form>
+    </Form>
   );
 }
