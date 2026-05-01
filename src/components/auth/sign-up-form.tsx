@@ -1,130 +1,166 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import { signIn } from "next-auth/react";
+import { toast } from "sonner";
 import { POLICY_PATH } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FieldGroup } from "@/components/ui/field-group";
-import { Alert } from "@/components/ui/alert";
+import { registerFormSchema, type RegisterFormValues } from "./register-schema";
+import { toAppRouterHref } from "./router-redirect-path";
 
 export function SignUpForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [policyAccepted, setPolicyAccepted] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      policyAccepted: false,
+    },
+  });
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    setIsSubmitting(true);
-
-    let response: Response;
+  async function onSubmit(values: RegisterFormValues) {
     try {
-      response = await fetch("/api/auth/register", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, policyAccepted }),
+        body: JSON.stringify(values),
       });
+
+      if (!response.ok) {
+        toast.error(await getErrorMessage(response));
+        return;
+      }
+
+      const signInResult = await signIn("credentials", {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+        callbackUrl: "/onboarding",
+      });
+
+      if (!signInResult || signInResult.error) {
+        toast.info("Account created. Please sign in manually.");
+        return;
+      }
+
+      toast.success("Welcome! Your account is ready.");
+      router.replace(toAppRouterHref(signInResult.url, "/onboarding"));
     } catch {
-      setMessage("Network error while creating account.");
-      setIsSubmitting(false);
-      return;
+      toast.error("Network error while creating account.");
     }
-
-    if (!response.ok) {
-      setMessage(await getErrorMessage(response));
-      setIsSubmitting(false);
-      return;
-    }
-
-    const signInResult = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl: "/onboarding",
-    });
-
-    setIsSubmitting(false);
-
-    if (!signInResult || signInResult.error) {
-      setMessage("Account created. Please sign in manually.");
-      return;
-    }
-
-    window.location.href = signInResult.url ?? "/onboarding";
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {message ? <Alert variant="destructive">{message}</Alert> : null}
-
-      <FieldGroup label="Name" htmlFor="name">
-        <Input
-          id="name"
-          required
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Your full name"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Your full name" autoComplete="name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
 
-      <FieldGroup label="Email" htmlFor="email">
-        <Input
-          id="email"
-          type="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
 
-      <FieldGroup
-        label="Password"
-        htmlFor="password"
-        hint="Must include at least one uppercase letter, one lowercase letter, and one number."
-      >
-        <Input
-          id="password"
-          type="password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormDescription>
+                Must include at least one uppercase letter, one lowercase letter, and one number.
+              </FormDescription>
+              <FormControl>
+                <Input type="password" autoComplete="new-password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </FieldGroup>
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
-        <label className="flex items-start gap-3 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={policyAccepted}
-            onChange={(event) => setPolicyAccepted(event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            required
-          />
-          <span>
-            I agree to the{" "}
-            <Link
-              href={POLICY_PATH}
-              className="font-medium text-emerald-600 hover:text-emerald-500"
-              target="_blank"
-            >
-              reimbursement policy
-            </Link>
-            .
-          </span>
-        </label>
-      </div>
+        <FormField
+          control={form.control}
+          name="policyAccepted"
+          render={({ field }) => (
+            <FormItem className="rounded-md border border-border bg-muted/50 px-3 py-3">
+              <div className="flex items-start gap-3">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value === true}
+                    disabled={field.disabled}
+                    onBlur={field.onBlur}
+                    onCheckedChange={(v) => field.onChange(v === true)}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-snug">
+                  <FormLabel className="cursor-pointer font-normal text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    <span className="text-sm">
+                      I agree to the{" "}
+                      <Link
+                        href={POLICY_PATH}
+                        className="font-medium text-primary hover:text-primary/80"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        reimbursement policy
+                      </Link>
+                      .
+                    </span>
+                  </FormLabel>
+                  <FormMessage />
+                </div>
+              </div>
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" loading={isSubmitting} className="w-full">
-        {isSubmitting ? "Creating account..." : "Create account"}
-      </Button>
-    </form>
+        <Button type="submit" loading={form.formState.isSubmitting} className="w-full">
+          {form.formState.isSubmitting ? "Creating account..." : "Create account"}
+        </Button>
+      </form>
+    </Form>
   );
 }
 
