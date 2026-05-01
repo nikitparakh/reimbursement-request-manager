@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatDate } from "@/lib/format";
 import { getTeamReimbursementsDescription } from "@/lib/ui-copy";
 
 export default async function TeamReimbursementsPage() {
@@ -56,7 +57,7 @@ export default async function TeamReimbursementsPage() {
     requester: r.createdBy.email,
     amount: Number(r.requestedTotal),
     status: r.status,
-    date: r.createdAt.toLocaleDateString(),
+    date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
   }));
 
@@ -80,7 +81,7 @@ export default async function TeamReimbursementsPage() {
       ) : (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-semibold text-foreground">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
               Requests ({rows.length})
             </h2>
           </CardHeader>

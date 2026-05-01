@@ -110,7 +110,7 @@ export default async function TeamPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-foreground">{team.name}</h2>
+                    <h2 className="text-lg font-semibold tracking-tight text-foreground">{team.name}</h2>
                     {team.shortCode ? <StatusBadge status={team.shortCode} /> : null}
                     {team.glAccount ? (
                       <span className="text-sm text-muted-foreground">GL: {team.glAccount}</span>
@@ -129,9 +129,9 @@ export default async function TeamPage() {
                     {team.districtName} · {team.schoolName} · {team.programName}
                     {team.fllDivision ? ` · FLL ${team.fllDivision}` : ""}
                   </div>
-                  <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Coaches
-                  </h3>
+                  </p>
                   {team.coaches.length === 0 ? (
                     <p className="text-sm italic text-muted-foreground">No coach assigned</p>
                   ) : (
@@ -154,9 +154,9 @@ export default async function TeamPage() {
                 <Separator />
 
                 <div className="pt-4">
-                  <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Parents/Mentors
-                  </h3>
+                  </p>
                   {team.parents.length === 0 ? (
                     <p className="text-sm italic text-muted-foreground">No parents/mentors yet</p>
                   ) : (
