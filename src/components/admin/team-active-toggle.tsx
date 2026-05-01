@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import { Switch } from "@/components/ui/switch";
 
 type TeamActiveToggleProps = {
   teamId: string;
@@ -12,16 +15,20 @@ export function TeamActiveToggle({ teamId, active }: TeamActiveToggleProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
-  async function handleToggle() {
+  async function persist(next: boolean) {
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/teams/${teamId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: !active }),
+        body: JSON.stringify({ active: next }),
       });
+
       if (res.ok) {
+        toast.success(next ? "Team activated" : "Team deactivated");
         router.refresh();
+      } else {
+        toast.error("Could not update team status");
       }
     } finally {
       setSaving(false);
@@ -29,21 +36,14 @@ export function TeamActiveToggle({ teamId, active }: TeamActiveToggleProps) {
   }
 
   return (
-    <button
-      onClick={handleToggle}
+    <Switch
+      checked={active}
       disabled={saving}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 ${
-        active ? "bg-emerald-600" : "bg-slate-200"
-      }`}
-      role="switch"
-      aria-checked={active}
       aria-label={active ? "Deactivate team" : "Activate team"}
-    >
-      <span
-        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          active ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
+      onCheckedChange={(next) => {
+        if (next === active || saving) return;
+        void persist(next);
+      }}
+    />
   );
 }

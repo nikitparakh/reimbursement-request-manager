@@ -1,8 +1,12 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
+
+import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+
 import { RemoveMemberButton } from "@/components/admin/remove-member-button";
-import { type Column, SortableTable } from "@/components/ui/sortable-table";
+import { SortableColumnHeader } from "@/components/admin/sortable-column-header";
 
 export type MemberRow = {
   id: string;
@@ -12,41 +16,50 @@ export type MemberRow = {
   roleInTeam: string;
 };
 
-const columns: Column<MemberRow>[] = [
+const columns: ColumnDef<MemberRow>[] = [
   {
-    key: "name",
-    label: "Name",
-    sortValue: (m) => (m.name || "").toLowerCase(),
-    cellClassName: "text-slate-900",
-    render: (m) =>
-      m.name || <span className="text-slate-400 italic">No name</span>,
+    accessorFn: (m) => (m.name || "").toLowerCase(),
+    id: "name",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Name" />,
+    cell: ({ row }) =>
+      row.original.name ? (
+        <span className="text-foreground">{row.original.name}</span>
+      ) : (
+        <span className="italic text-muted-foreground">No name</span>
+      ),
   },
   {
-    key: "email",
-    label: "Email",
-    sortValue: (m) => m.email.toLowerCase(),
-    cellClassName: "text-slate-600",
-    render: (m) => m.email,
+    accessorFn: (m) => m.email.toLowerCase(),
+    id: "email",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Email" />,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{row.original.email}</span>
+    ),
   },
   {
-    key: "role",
-    label: "Role",
-    sortValue: (m) => m.roleInTeam,
-    render: (m) => <StatusBadge status={m.roleInTeam} />,
+    accessorKey: "roleInTeam",
+    id: "role",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Role" />,
+    cell: ({ row }) => <StatusBadge status={row.original.roleInTeam} />,
   },
   {
-    key: "actions",
-    label: "Actions",
-    render: (m) => (
+    id: "actions",
+    enableSorting: false,
+    header: ({ column }) => <SortableColumnHeader column={column} title="Actions" />,
+    cell: ({ row }) => (
       <RemoveMemberButton
-        teamId={m.teamId}
-        membershipId={m.id}
-        memberName={m.name || m.email}
+        teamId={row.original.teamId}
+        membershipId={row.original.id}
+        memberName={row.original.name || row.original.email}
       />
     ),
   },
 ];
 
 export function TeamMembersTable({ data }: { data: MemberRow[] }) {
-  return <SortableTable columns={columns} data={data} rowKey={(r) => r.id} />;
+  return (
+    <div className="overflow-x-auto">
+      <DataTable columns={columns} data={data} />
+    </div>
+  );
 }

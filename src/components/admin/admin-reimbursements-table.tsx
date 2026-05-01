@@ -1,10 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
-import { type Column, SortableTable } from "@/components/ui/sortable-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StatusBadge } from "@/components/ui/status-badge";
+
+import { SortableColumnHeader } from "@/components/admin/sortable-column-header";
 
 export type AdminReimbursementRow = {
   id: string;
@@ -28,52 +39,6 @@ const STATUS_OPTIONS = [
   "PAID",
 ] as const;
 
-const columns: Column<AdminReimbursementRow>[] = [
-  {
-    key: "title",
-    label: "Title",
-    sortValue: (r) => r.title.toLowerCase(),
-    render: (r) => <span className="font-medium text-slate-900">{r.title}</span>,
-  },
-  {
-    key: "requester",
-    label: "Requester",
-    sortValue: (r) => r.requester.toLowerCase(),
-    headerClassName: "hidden sm:table-cell",
-    cellClassName: "text-slate-600 hidden sm:table-cell",
-    render: (r) => r.requester,
-  },
-  {
-    key: "team",
-    label: "Team",
-    sortValue: (r) => r.team.toLowerCase(),
-    headerClassName: "hidden sm:table-cell",
-    cellClassName: "text-slate-600 hidden sm:table-cell",
-    render: (r) => r.team,
-  },
-  {
-    key: "amount",
-    label: "Amount",
-    sortValue: (r) => r.amount,
-    cellClassName: "text-slate-700 font-medium",
-    render: (r) => `$${r.amount.toFixed(2)}`,
-  },
-  {
-    key: "date",
-    label: "Date",
-    sortValue: (r) => r.dateMs,
-    headerClassName: "hidden md:table-cell",
-    cellClassName: "text-slate-500 hidden md:table-cell",
-    render: (r) => r.date,
-  },
-  {
-    key: "status",
-    label: "Status",
-    sortValue: (r) => r.status,
-    render: (r) => <StatusBadge status={r.status} />,
-  },
-];
-
 type Filters = {
   search: string;
   status: string;
@@ -96,8 +61,9 @@ const INITIAL_FILTERS: Filters = {
   dateTo: "",
 };
 
+const ALL = "__all__";
+
 export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow[] }) {
-  const router = useRouter();
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
 
   const uniqueDistricts = useMemo(
@@ -115,10 +81,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
     [data],
   );
 
-  const uniqueTeams = useMemo(
-    () => [...new Set(data.map((r) => r.team))].sort(),
-    [data],
-  );
+  const uniqueTeams = useMemo(() => [...new Set(data.map((r) => r.team))].sort(), [data]);
 
   const filtered = useMemo(() => {
     let rows = data;
@@ -175,11 +138,92 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
     setFilters((prev) => ({ ...prev, [key]: value }));
   }
 
+  const columns = useMemo<ColumnDef<AdminReimbursementRow>[]>(
+    () => [
+      {
+        accessorFn: (r) => r.title.toLowerCase(),
+        id: "title",
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Title" />
+        ),
+        cell: ({ row }) => (
+          <Link
+            href={`/admin/requests/${row.original.id}?from=requests`}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {row.original.title}
+          </Link>
+        ),
+      },
+      {
+        accessorFn: (r) => r.requester.toLowerCase(),
+        id: "requester",
+        header: ({ column }) => (
+          <div className="hidden sm:table-cell">
+            <SortableColumnHeader column={column} title="Requester" />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <span className="hidden text-muted-foreground sm:table-cell">
+            {row.original.requester}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (r) => r.team.toLowerCase(),
+        id: "team",
+        header: ({ column }) => (
+          <div className="hidden sm:table-cell">
+            <SortableColumnHeader column={column} title="Team" />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <span className="hidden text-muted-foreground sm:table-cell">{row.original.team}</span>
+        ),
+      },
+      {
+        accessorKey: "amount",
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Amount" />
+        ),
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground">
+            ${row.original.amount.toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "dateMs",
+        sortingFn: "basic",
+        header: ({ column }) => (
+          <div className="hidden md:table-cell">
+            <SortableColumnHeader column={column} title="Date" />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <span className="hidden text-muted-foreground md:table-cell">
+            {row.original.date}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Status" />
+        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
         <div className="flex-1 sm:min-w-[200px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Search
+          </label>
           <Input
             type="text"
             placeholder="Search by title, requester, or team..."
@@ -190,87 +234,109 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         </div>
 
         <div className="sm:min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilter("status", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+          <Select
+            value={filters.status || ALL}
+            onValueChange={(v) => setFilter("status", v === ALL ? "" : v)}
           >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All statuses</SelectItem>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.replace(/_/g, " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="sm:min-w-[180px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">District</label>
-          <select
-            value={filters.district}
-            onChange={(e) => setFilter("district", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">District</label>
+          <Select
+            value={filters.district || ALL}
+            onValueChange={(v) => setFilter("district", v === ALL ? "" : v)}
           >
-            <option value="">All districts</option>
-            {uniqueDistricts.map((district) => (
-              <option key={district} value={district}>
-                {district}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All districts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All districts</SelectItem>
+              {uniqueDistricts.map((district) => (
+                <SelectItem key={district} value={district}>
+                  {district}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="sm:min-w-[180px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">School</label>
-          <select
-            value={filters.school}
-            onChange={(e) => setFilter("school", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">School</label>
+          <Select
+            value={filters.school || ALL}
+            onValueChange={(v) => setFilter("school", v === ALL ? "" : v)}
           >
-            <option value="">All schools</option>
-            {uniqueSchools.map((school) => (
-              <option key={school} value={school}>
-                {school}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All schools" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All schools</SelectItem>
+              {uniqueSchools.map((school) => (
+                <SelectItem key={school} value={school}>
+                  {school}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="sm:min-w-[180px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Program</label>
-          <select
-            value={filters.program}
-            onChange={(e) => setFilter("program", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Program</label>
+          <Select
+            value={filters.program || ALL}
+            onValueChange={(v) => setFilter("program", v === ALL ? "" : v)}
           >
-            <option value="">All programs</option>
-            {uniquePrograms.map((program) => (
-              <option key={program} value={program}>
-                {program}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All programs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All programs</SelectItem>
+              {uniquePrograms.map((program) => (
+                <SelectItem key={program} value={program}>
+                  {program}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="sm:min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Team</label>
-          <select
-            value={filters.team}
-            onChange={(e) => setFilter("team", e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-          >
-            <option value="">All teams</option>
-            {uniqueTeams.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Team</label>
+          <Select value={filters.team || ALL} onValueChange={(v) => setFilter("team", v === ALL ? "" : v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All teams" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All teams</SelectItem>
+              {uniqueTeams.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="sm:min-w-[140px]">
-          <label htmlFor="admin-reimbursements-date-from" className="block text-xs font-medium text-slate-500 mb-1">From</label>
+          <label
+            htmlFor="admin-reimbursements-date-from"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            From
+          </label>
           <Input
             id="admin-reimbursements-date-from"
             aria-label="From date"
@@ -281,7 +347,12 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         </div>
 
         <div className="sm:min-w-[140px]">
-          <label htmlFor="admin-reimbursements-date-to" className="block text-xs font-medium text-slate-500 mb-1">To</label>
+          <label
+            htmlFor="admin-reimbursements-date-to"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            To
+          </label>
           <Input
             id="admin-reimbursements-date-to"
             aria-label="To date"
@@ -292,31 +363,29 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         </div>
 
         {hasActiveFilters && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            className="shrink-0 text-muted-foreground"
             onClick={() => setFilters(INITIAL_FILTERS)}
-            className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition cursor-pointer"
           >
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center py-8 text-sm text-slate-400">
+        <p className="py-8 text-center text-sm text-muted-foreground">
           No requests match your filters.
         </p>
       ) : (
         <>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             {filtered.length} request{filtered.length !== 1 ? "s" : ""}
           </p>
-          <SortableTable
-            columns={columns}
-            data={filtered}
-            rowKey={(r) => r.id}
-            onRowClick={(r) => router.push(`/admin/requests/${r.id}?from=requests`)}
-          />
+          <div className="overflow-x-auto">
+            <DataTable columns={columns} data={filtered} />
+          </div>
         </>
       )}
     </div>
