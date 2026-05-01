@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarCheck } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -122,6 +121,7 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
       zelleValue: initialProfile.zelleValue ?? "",
     },
   });
+  const zelleType = useWatch({ control: form.control, name: "zelleType" });
 
   async function onSubmit(values: ProfileFormValues) {
     try {
@@ -145,123 +145,142 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="mailingAddressLine1"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Address line 1</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="mailingAddressLine2"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Address line 2</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="mailingCity"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>City</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="mailingState"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>State / Province</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="mailingPostalCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Postal code</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="zelleType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Zelle type</FormLabel>
-                <Select
-                  value={field.value === "" ? ZELLE_NONE : field.value}
-                  onValueChange={(v) => field.onChange(v === ZELLE_NONE ? "" : v)}
-                >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <section className="space-y-3">
+          <header>
+            <h3 className="text-sm font-semibold text-foreground">Mailing address</h3>
+            <p className="text-xs text-muted-foreground">
+              Where reimbursement checks are sent if Zelle is unavailable.
+            </p>
+          </header>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+            <FormField
+              control={form.control}
+              name="mailingAddressLine1"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-12">
+                  <FormLabel>Address line 1</FormLabel>
                   <FormControl>
-                    <SelectTrigger aria-label="Zelle type" className="w-full">
-                      <SelectValue placeholder="Select one" />
-                    </SelectTrigger>
+                    <Input {...field} autoComplete="address-line1" />
                   </FormControl>
-                  <SelectContent>
-                    <SelectItem value={ZELLE_NONE}>Select one</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="phone">Phone</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name="zelleValue"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Zelle destination</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormDescription>
-                  Provide the email address or phone number that should receive reimbursement.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+            <FormField
+              control={form.control}
+              name="mailingAddressLine2"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-12">
+                  <FormLabel>Address line 2</FormLabel>
+                  <FormControl>
+                    <Input {...field} autoComplete="address-line2" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="mailingCity"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-6">
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input {...field} autoComplete="address-level2" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="mailingState"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-3">
+                  <FormLabel>State / Province</FormLabel>
+                  <FormControl>
+                    <Input {...field} autoComplete="address-level1" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="mailingPostalCode"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-3">
+                  <FormLabel>Postal code</FormLabel>
+                  <FormControl>
+                    <Input {...field} autoComplete="postal-code" inputMode="numeric" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <header>
+            <h3 className="text-sm font-semibold text-foreground">Zelle payout</h3>
+            <p className="text-xs text-muted-foreground">
+              Provide the email address or phone number that should receive reimbursement.
+            </p>
+          </header>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+            <FormField
+              control={form.control}
+              name="zelleType"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-4">
+                  <FormLabel>Zelle type</FormLabel>
+                  <Select
+                    value={field.value === "" ? ZELLE_NONE : field.value}
+                    onValueChange={(v) => field.onChange(v === ZELLE_NONE ? "" : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger aria-label="Zelle type" className="w-full">
+                        <SelectValue placeholder="Select one" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={ZELLE_NONE}>Select one</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="phone">Phone</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="zelleValue"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-8">
+                  <FormLabel>Zelle destination</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type={zelleType === "phone" ? "tel" : "email"}
+                      placeholder={
+                        zelleType === "phone" ? "555-123-4567" : "name@example.com"
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </section>
 
         <Card className="border-muted bg-muted/40 shadow-none">
           <CardContent className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
