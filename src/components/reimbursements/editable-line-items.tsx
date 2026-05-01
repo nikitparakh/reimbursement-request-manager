@@ -384,7 +384,7 @@ export function EditableLineItems({
                             variant="ghost"
                             size="icon-xs"
                             type="button"
-                            className="text-amber-700 hover:text-amber-800 dark:text-amber-600"
+                            className="text-primary hover:text-primary/90"
                             aria-label="Restore line item"
                             title="Undo exclusion"
                             onClick={() => void restoreRow(ext.id, row.id)}
@@ -566,7 +566,8 @@ export function EditableLineItems({
                 {tax > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
-                      Sales Tax <span className="text-xs text-amber-700 dark:text-amber-600">(not reimbursable)</span>
+                      Sales Tax{" "}
+                      <span className="text-xs text-muted-foreground">(not reimbursable)</span>
                     </span>
                     <span className="font-medium text-muted-foreground line-through">{formatCurrency(tax, currency)}</span>
                   </div>

@@ -200,7 +200,8 @@ export function ExtractionReview({
                       {tax > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            Sales Tax <span className="text-xs text-amber-700 dark:text-amber-600">(not reimbursable)</span>
+                            Sales Tax{" "}
+                            <span className="text-xs text-muted-foreground">(not reimbursable)</span>
                           </span>
                           <span className="font-medium text-muted-foreground line-through">{currency} {tax.toFixed(2)}</span>
                         </div>

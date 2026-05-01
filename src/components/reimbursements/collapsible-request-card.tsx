@@ -131,7 +131,7 @@ export function CollapsibleRequestCard({
           size="xs"
           type="button"
           disabled={isReopening}
-          className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="border-border bg-muted text-foreground hover:bg-muted/80"
           title="Reopen as draft"
           onClick={(e) => {
             e.stopPropagation();
