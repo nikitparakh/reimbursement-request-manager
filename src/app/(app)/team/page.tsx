@@ -124,11 +124,38 @@ export default async function TeamPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="mb-3 text-sm text-muted-foreground">
-                    {team.districtName} · {team.schoolName} · {team.programName}
-                    {team.fllDivision ? ` · FLL ${team.fllDivision}` : ""}
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-0.5">
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      District
+                    </dt>
+                    <dd className="text-sm text-foreground">{team.districtName}</dd>
                   </div>
+                  <div className="space-y-0.5">
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      School
+                    </dt>
+                    <dd className="text-sm text-foreground">{team.schoolName}</dd>
+                  </div>
+                  <div className="space-y-0.5">
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Competition
+                    </dt>
+                    <dd className="text-sm text-foreground">{team.programName}</dd>
+                  </div>
+                  {team.fllDivision ? (
+                    <div className="space-y-0.5">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        FLL Division
+                      </dt>
+                      <dd className="text-sm text-foreground">{team.fllDivision}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+
+                <Separator className="my-4" />
+
+                <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Coaches
                   </p>
@@ -137,23 +164,15 @@ export default async function TeamPage() {
                   ) : (
                     <ul className="space-y-1">
                       {team.coaches.map((m) => (
-                        <li key={m.id} className="text-sm text-foreground">
-                          {m.name ?? m.email}
-                          {m.name ? (
-                            <span className="ml-1 text-muted-foreground">{m.email}</span>
-                          ) : null}
-                          {m.id === session.user.id ? (
-                            <span className="ml-1 text-muted-foreground">(You)</span>
-                          ) : null}
-                        </li>
+                        <MemberRow key={m.id} member={m} isYou={m.id === session.user.id} />
                       ))}
                     </ul>
                   )}
                 </div>
 
-                <Separator />
+                <Separator className="my-4" />
 
-                <div className="pt-4">
+                <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Parents/Mentors
                   </p>
@@ -162,15 +181,7 @@ export default async function TeamPage() {
                   ) : (
                     <ul className="space-y-1">
                       {team.parents.map((m) => (
-                        <li key={m.id} className="text-sm text-foreground">
-                          {m.name ?? m.email}
-                          {m.name ? (
-                            <span className="ml-1 text-muted-foreground">{m.email}</span>
-                          ) : null}
-                          {m.id === session.user.id ? (
-                            <span className="ml-1 text-muted-foreground">(You)</span>
-                          ) : null}
-                        </li>
+                        <MemberRow key={m.id} member={m} isYou={m.id === session.user.id} />
                       ))}
                     </ul>
                   )}
@@ -181,5 +192,22 @@ export default async function TeamPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function MemberRow({
+  member,
+  isYou,
+}: {
+  member: { name: string | null; email: string };
+  isYou: boolean;
+}) {
+  const showEmail = member.name !== null;
+  return (
+    <li className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground">
+      <span>{member.name ?? member.email}</span>
+      {showEmail ? <span className="text-muted-foreground">{member.email}</span> : null}
+      {isYou ? <span className="text-muted-foreground">(You)</span> : null}
+    </li>
   );
 }
