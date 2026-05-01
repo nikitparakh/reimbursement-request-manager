@@ -49,7 +49,6 @@ export function ExtractionReview({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-foreground">Receipts</h3>
       {receipts.map((receipt) => {
         const ext = receipt.extraction;
         const currency = ext?.currency ?? "USD";
