@@ -1,10 +1,22 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { ComponentProps } from "react";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Popover,
   PopoverContent,
@@ -12,6 +24,15 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import type { SerializedLineItemComment } from "@/lib/reimbursements/serialize-receipts";
+
+const commentBodySchema = z.object({
+  body: z
+    .string()
+    .min(1, "Comment is required")
+    .max(500, "Max 500 characters"),
+});
+
+type CommentBodyValues = z.infer<typeof commentBodySchema>;
 
 type LineItemCommentsProps = {
   requestId: string;
@@ -38,38 +59,36 @@ export function LineItemComments({
   canComment = false,
 }: LineItemCommentsProps) {
   const [comments, setComments] = useState(initialComments);
-  const [text, setText] = useState("");
-  const [posting, setPosting] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const form = useForm<CommentBodyValues>({
+    resolver: zodResolver(commentBodySchema),
+    defaultValues: { body: "" },
+  });
 
   useEffect(() => {
     setComments(initialComments);
   }, [initialComments]);
 
-  async function handlePost() {
-    const trimmed = text.trim();
-    if (!trimmed || posting) return;
-
-    setPosting(true);
+  async function onSubmit(values: CommentBodyValues) {
     try {
       const res = await fetch(`/api/requests/${requestId}/line-items/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineItemId, text: trimmed }),
+        body: JSON.stringify({ lineItemId, text: values.body.trim() }),
       });
       if (res.ok) {
         const created = (await res.json()) as SerializedLineItemComment;
         setComments((prev) => [...prev, created]);
-        setText("");
-        toast.success("Comment posted");
+        form.reset();
+        toast.success("Comment added.");
         setOpen(false);
       } else {
-        toast.error("Failed to post comment");
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Failed to post comment");
       }
     } catch {
       toast.error("Failed to post comment");
-    } finally {
-      setPosting(false);
     }
   }
 
@@ -94,22 +113,39 @@ export function LineItemComments({
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-80 gap-3">
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Write a comment…"
-              maxLength={500}
-              rows={3}
-              className="resize-none text-sm"
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" size="xs" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="button" size="xs" loading={posting} disabled={!text.trim()} onClick={() => void handlePost()}>
-                Post
-              </Button>
-            </div>
+            <Form {...form}>
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
+              >
+                <FormField
+                  control={form.control}
+                  name="body"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="sr-only">Comment</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Add a comment"
+                          rows={3}
+                          className="resize-none text-sm"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" size="xs" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="xs" loading={form.formState.isSubmitting}>
+                    Post
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </PopoverContent>
         </Popover>
       )}
@@ -117,7 +153,7 @@ export function LineItemComments({
   );
 }
 
-type CommentIconProps = Omit<React.ComponentProps<typeof Button>, "variant" | "size" | "children"> & {
+type CommentIconProps = Omit<ComponentProps<typeof Button>, "variant" | "size" | "children"> & {
   count: number;
 };
 
