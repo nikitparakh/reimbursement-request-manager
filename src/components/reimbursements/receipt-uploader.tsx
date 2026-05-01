@@ -6,12 +6,23 @@ import {
   Check,
   File,
   Loader2,
+  Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -147,16 +158,36 @@ export function ReceiptUploader({
                 <Check className="size-4 shrink-0 text-primary" aria-hidden />
               </a>
               {!hiddenDeleteIds.has(receipt.id) ? (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  type="button"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
-                  aria-label={`Delete ${receipt.fileName}`}
-                  onClick={() => void deleteReceipt(receipt.id)}
-                >
-                  <X className="size-4" />
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      type="button"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`Delete ${receipt.fileName}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this receipt?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove &quot;{receipt.fileName}&quot; from this request.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        onClick={() => void deleteReceipt(receipt.id)}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               ) : null}
             </div>
           ))}
