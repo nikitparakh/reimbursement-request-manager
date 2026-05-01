@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 import { ReceiptUploader } from "@/components/reimbursements/receipt-uploader";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/alert";
 import type { SerializedReceipt } from "@/lib/reimbursements/serialize-receipts";
 
 type RequestActionsProps = {
@@ -29,10 +40,8 @@ export function RequestActions({
   submitToAdmin = false,
   canSubmit = true,
 }: RequestActionsProps) {
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
   const receiptEditorDeleteIds = receiptsWithExtractions
@@ -41,7 +50,6 @@ export function RequestActions({
 
   async function triggerParse() {
     setIsParsing(true);
-    setMessage("");
 
     const MAX_RETRIES = 2;
 
@@ -54,8 +62,7 @@ export function RequestActions({
             await new Promise((resolve) => setTimeout(resolve, 1000 * (retry + 1)));
             continue;
           }
-          setMessage(body.error ?? "Failed to start parsing.");
-          setIsError(true);
+          toast.error(body.error ?? "Failed to start parsing.");
           setIsParsing(false);
           return;
         }
@@ -76,9 +83,8 @@ export function RequestActions({
 
           if (!stillProcessing) {
             if (hasFailed && retry < MAX_RETRIES) {
-              // Retry: re-trigger parse for any that failed (server re-queues them)
               await new Promise((resolve) => setTimeout(resolve, 1000));
-              break; // break inner poll loop → retry outer loop
+              break;
             }
             setIsParsing(false);
             router.refresh();
@@ -86,10 +92,8 @@ export function RequestActions({
           }
         }
 
-        // If we broke out of the poll loop for a retry, continue outer loop
         if (retry < MAX_RETRIES) continue;
 
-        // Final timeout — refresh anyway
         setIsParsing(false);
         router.refresh();
         return;
@@ -98,8 +102,7 @@ export function RequestActions({
           await new Promise((resolve) => setTimeout(resolve, 1000 * (retry + 1)));
           continue;
         }
-        setMessage("Failed to parse receipts. Please try again.");
-        setIsError(true);
+        toast.error("Failed to parse receipts. Please try again.");
         setIsParsing(false);
         return;
       }
@@ -107,7 +110,6 @@ export function RequestActions({
   }
 
   async function submit() {
-    setMessage("");
     const response = await fetch(`/api/requests/${requestId}/submit`, { method: "POST" });
     if (!response.ok) {
       const body = await response.text();
@@ -120,11 +122,35 @@ export function RequestActions({
           errorText = body;
         }
       }
-      setMessage(errorText);
-      setIsError(true);
+      toast.error(errorText);
       return;
     }
+    toast.success(
+      submitToAdmin ? "Submitted to admin successfully." : "Submitted to coach successfully.",
+    );
     router.push(redirectUrl);
+  }
+
+  async function confirmDelete() {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/requests/${requestId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Failed to delete request.");
+        setIsDeleting(false);
+        setDeleteOpen(false);
+        return;
+      }
+      toast.success("Draft deleted.");
+      router.push(redirectUrl);
+    } catch {
+      toast.error("Failed to delete request.");
+      setIsDeleting(false);
+      setDeleteOpen(false);
+    }
   }
 
   return (
@@ -149,14 +175,13 @@ export function RequestActions({
                 : "Generate Reimbursement Request"}
           </Button>
           {isParsing && (
-            <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-              <svg className="h-5 w-5 animate-spin text-amber-600" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+              <Loader2 className="size-5 animate-spin text-primary" aria-hidden />
               <div>
-                <p className="text-sm font-medium text-amber-800">Processing receipts...</p>
-                <p className="text-xs text-amber-600">This usually takes 15–60 seconds. The page will update automatically.</p>
+                <p className="text-sm font-medium text-foreground">Processing receipts...</p>
+                <p className="text-xs text-muted-foreground">
+                  This usually takes 15–60 seconds. The page will update automatically.
+                </p>
               </div>
             </div>
           )}
@@ -164,78 +189,49 @@ export function RequestActions({
       )}
 
       {hasExtractions && !hasUnparsedReceipts && canSubmit && (
-        <Button onClick={submit}>
+        <Button onClick={() => void submit()}>
           {submitToAdmin ? "Submit to Admin" : "Submit to Coach"}
         </Button>
       )}
 
       {hasExtractions && !hasUnparsedReceipts && !canSubmit && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Only the request creator can submit this draft.
         </p>
       )}
 
-      {message ? (
-        <Alert variant={isError ? "destructive" : "success"}>{message}</Alert>
-      ) : null}
-
-      <div className="border-t border-slate-200 pt-4">
-        {confirmingDelete ? (
-          <div className="space-y-2">
-            <p className="text-sm text-red-600 font-medium">
-              Are you sure? This cannot be undone.
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="destructive"
-                size="sm"
-                loading={isDeleting}
-                onClick={async () => {
-                  setIsDeleting(true);
-                  try {
-                    const res = await fetch(`/api/requests/${requestId}`, {
-                      method: "DELETE",
-                    });
-                    if (!res.ok) {
-                      const body = (await res.json().catch(() => ({}))) as {
-                        error?: string;
-                      };
-                      setMessage(body.error ?? "Failed to delete request.");
-                      setIsError(true);
-                      setConfirmingDelete(false);
-                      setIsDeleting(false);
-                      return;
-                    }
-                    router.push(redirectUrl);
-                  } catch {
-                    setMessage("Failed to delete request.");
-                    setIsError(true);
-                    setConfirmingDelete(false);
-                    setIsDeleting(false);
-                  }
-                }}
-              >
-                Delete
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmingDelete(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
+      <div className="border-t border-border pt-4">
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <Button
             variant="ghost"
             size="sm"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={() => setConfirmingDelete(true)}
+            type="button"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
           >
             Delete Draft
           </Button>
-        )}
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This cannot be undone. All uploaded receipts linked to this draft will be removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                loading={isDeleting}
+                disabled={isDeleting}
+                onClick={() => void confirmDelete()}
+              >
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
