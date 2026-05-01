@@ -223,6 +223,7 @@ export function RequestActions({
               <Button
                 type="button"
                 variant="destructive"
+                className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
                 loading={isDeleting}
                 disabled={isDeleting}
                 onClick={() => void confirmDelete()}

@@ -150,6 +150,7 @@ export function ApprovalDecision({
                 variant="destructive"
                 size="sm"
                 type="button"
+                className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
                 loading={busy}
                 disabled={busy}
                 onClick={() => {
