@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
+
+import { formatDate } from "@/lib/format";
 import { getAdminReimbursementsDescription } from "@/lib/ui-copy";
 
 const ADMIN_VISIBLE_STATUSES = [
@@ -73,7 +75,7 @@ export default async function AdminReimbursementsPage() {
     program: r.team.program.name,
     amount: Number(r.requestedTotal),
     status: r.status,
-    date: r.createdAt.toLocaleDateString(),
+    date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
   }));
 

@@ -101,7 +101,7 @@ test.describe("Full lifecycle E2E", () => {
       timeout: 10_000,
     });
     await page.getByRole("button", { name: /^approve$/i }).click();
-    await expect(page.getByText("COACH APPROVED")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Coach Approved")).toBeVisible({ timeout: 10_000 });
 
     await signOut(page);
     await signIn(page, "admin@school.org", "Admin1234");

@@ -1,5 +1,6 @@
 import { CircleDot } from "lucide-react";
 
+import { formatDateTime } from "@/lib/format";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ export function StatusTimeline({ items }: { items: TimelineEntry[] }) {
                     <StatusBadge status={item.action} />
                     <span className="text-sm text-muted-foreground">by {item.actor}</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.createdAt.toLocaleString()}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
                   {item.comment ? (
                     <p className="mt-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-foreground">
                       {item.comment}

@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { formatDate } from "@/lib/format";
+
 const ZELLE_NONE = "__none__";
 
 const profileFormSchema = z
@@ -267,7 +269,7 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
             <span>
               Policy accepted{" "}
               {initialProfile.policyAcceptedAt
-                ? `on ${initialProfile.policyAcceptedAt.toLocaleDateString()}`
+                ? `on ${formatDate(initialProfile.policyAcceptedAt)}`
                 : "during registration"}
               {initialProfile.policyVersion ? ` · version ${initialProfile.policyVersion}` : ""}
             </span>

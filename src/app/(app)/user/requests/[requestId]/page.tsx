@@ -17,6 +17,8 @@ import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursemen
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 import { getDraftRequestUiState } from "@/lib/reimbursements/request-detail-view";
 
+import { formatDate } from "@/lib/format";
+
 function decisionConfig(
   status: string,
   requestId: string,
@@ -158,7 +160,7 @@ export default async function UserRequestDetailPage({
           <CardContent className="space-y-1">
             <div className="text-sm text-muted-foreground">Created</div>
             <div className="text-lg font-semibold text-foreground">
-              {requestRecord.createdAt.toLocaleDateString()}
+              {formatDate(requestRecord.createdAt)}
             </div>
           </CardContent>
         </Card>

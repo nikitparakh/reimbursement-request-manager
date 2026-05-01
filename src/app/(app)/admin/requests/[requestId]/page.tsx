@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusTimeline } from "@/components/ui/status-timeline";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
+
+import { formatDate } from "@/lib/format";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
@@ -162,7 +164,7 @@ export default async function AdminRequestDetailPage({
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Created</div>
             <div className="text-lg font-semibold text-foreground">
-              {request.createdAt.toLocaleDateString()}
+              {formatDate(request.createdAt)}
             </div>
           </CardContent>
         </Card>

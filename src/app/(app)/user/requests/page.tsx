@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
+import { formatDate } from "@/lib/format";
+
 export default async function UserRequestsPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
@@ -36,7 +38,7 @@ export default async function UserRequestsPage() {
     requester: r.createdBy.email ?? "",
     amount: Number(r.requestedTotal),
     status: r.status,
-    date: r.createdAt.toLocaleDateString(),
+    date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
   }));
 

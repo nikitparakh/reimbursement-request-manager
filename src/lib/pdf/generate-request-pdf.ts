@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { Prisma } from "@prisma/client";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type FullRequest = Prisma.ReimbursementRequestGetPayload<{
   include: {
@@ -20,16 +21,6 @@ const CONTENT_W = PAGE_W - M * 2;
 
 function statusLabel(s: string) {
   return s.replace(/_/g, " ");
-}
-
-function fmtDate(d: Date | null | undefined): string {
-  if (!d) return "—";
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-}
-
-function fmtCurrency(v: unknown): string {
-  const n = Number(v);
-  return Number.isNaN(n) ? "$0.00" : `$${n.toFixed(2)}`;
 }
 
 function hr(doc: PDFKit.PDFDocument) {
@@ -86,7 +77,7 @@ function writeSummary(doc: PDFKit.PDFDocument, req: FullRequest) {
   const col3 = M + 340;
 
   const row1Y = doc.y;
-  writeField(doc, col1, row1Y, "Requested Total", fmtCurrency(req.requestedTotal), true);
+  writeField(doc, col1, row1Y, "Requested Total", formatCurrency(Number(req.requestedTotal)), true);
   const a1 = doc.y;
   writeField(doc, col2, row1Y, "Submitter", req.createdBy.email, false);
   const a2 = doc.y;
@@ -94,9 +85,9 @@ function writeSummary(doc: PDFKit.PDFDocument, req: FullRequest) {
   doc.y = Math.max(a1, a2, doc.y) + 8;
 
   const row2Y = doc.y;
-  writeField(doc, col1, row2Y, "Created", fmtDate(req.createdAt), false);
+  writeField(doc, col1, row2Y, "Created", formatDate(req.createdAt), false);
   const b1 = doc.y;
-  writeField(doc, col2, row2Y, "Submitted", fmtDate(req.submittedAt), false);
+  writeField(doc, col2, row2Y, "Submitted", formatDate(req.submittedAt), false);
   doc.y = Math.max(b1, doc.y) + 4;
 
   if (req.description) {
@@ -150,7 +141,7 @@ function writeReceipts(doc: PDFKit.PDFDocument, req: FullRequest) {
 
     const meta: string[] = [];
     if (ext.merchant) meta.push(ext.merchant);
-    if (ext.receiptDate) meta.push(fmtDate(ext.receiptDate));
+    if (ext.receiptDate) meta.push(formatDate(ext.receiptDate));
     if (ext.documentType !== "OTHER") meta.push(ext.documentType);
     if (meta.length > 0) {
       doc.font("Helvetica").fontSize(8).fillColor("#64748b")
@@ -163,9 +154,9 @@ function writeReceipts(doc: PDFKit.PDFDocument, req: FullRequest) {
     }
 
     const totals: string[] = [];
-    if (ext.subtotal !== null) totals.push(`Subtotal: ${fmtCurrency(ext.subtotal)}`);
-    if (ext.tax !== null && Number(ext.tax) > 0) totals.push(`Tax: ${fmtCurrency(ext.tax)}`);
-    if (ext.total !== null) totals.push(`Total: ${fmtCurrency(ext.total)}`);
+    if (ext.subtotal !== null) totals.push(`Subtotal: ${formatCurrency(Number(ext.subtotal))}`);
+    if (ext.tax !== null && Number(ext.tax) > 0) totals.push(`Tax: ${formatCurrency(Number(ext.tax))}`);
+    if (ext.total !== null) totals.push(`Total: ${formatCurrency(Number(ext.total))}`);
     if (totals.length > 0) {
       resetX(doc);
       doc.font("Helvetica").fontSize(8).fillColor("#64748b")
@@ -225,8 +216,8 @@ function writeLineItemsTable(doc: PDFKit.PDFDocument, items: LineItem) {
     const descBottom = doc.y;
 
     doc.text(item.quantity?.toString() ?? "", TBL.qty, rowY, { width: TBL_WIDTHS.qty });
-    doc.text(item.unitPrice ? fmtCurrency(item.unitPrice) : "", TBL.unit, rowY, { width: TBL_WIDTHS.unit });
-    doc.text(item.lineTotal ? fmtCurrency(item.lineTotal) : "", TBL.total, rowY, { width: TBL_WIDTHS.total });
+    doc.text(item.unitPrice ? formatCurrency(Number(item.unitPrice)) : "", TBL.unit, rowY, { width: TBL_WIDTHS.unit });
+    doc.text(item.lineTotal ? formatCurrency(Number(item.lineTotal)) : "", TBL.total, rowY, { width: TBL_WIDTHS.total });
     doc.text(item.category ?? "", TBL.cat, rowY, { width: TBL_WIDTHS.cat });
 
     doc.y = Math.max(descBottom, rowY + 12) + 2;
@@ -254,7 +245,7 @@ function writeTimeline(doc: PDFKit.PDFDocument, req: FullRequest) {
       .text(`${a.action}  —  ${a.actor.email}`, M, doc.y, { width: CONTENT_W });
 
     doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-      .text(fmtDate(a.createdAt), M, doc.y, { width: CONTENT_W });
+      .text(formatDate(a.createdAt), M, doc.y, { width: CONTENT_W });
 
     if (a.comment) {
       doc.font("Helvetica-Oblique").fontSize(8).fillColor("#475569")
