@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { unauthorized } from "next/navigation";
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import { getCachedAccessContext } from "@/lib/access";
-import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
+
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
@@ -13,6 +10,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { getCachedAccessContext } from "@/lib/access";
+import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
 
 const PAGE_SIZE = 10;
 const INBOX_STATUSES = ["COACH_APPROVED", "ADMIN_APPROVED"] as const;
@@ -108,15 +109,20 @@ export default async function AdminInboxPage({
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Link href={`/admin/requests/${request.id}`} className="text-base font-semibold text-slate-900 hover:text-emerald-600 transition">{request.title}</Link>
+                          <Link
+                            href={`/admin/requests/${request.id}`}
+                            className="text-base font-semibold text-foreground transition-colors hover:text-primary"
+                          >
+                            {request.title}
+                          </Link>
                           <StatusBadge status={request.status} />
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {request.team.name} &middot; {request.createdBy.email}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="text-xl font-bold text-slate-900">
+                        <div className="text-xl font-bold text-foreground">
                           ${Number(request.requestedTotal).toFixed(2)}
                         </div>
                         <DownloadPdfLink requestId={request.id} />
