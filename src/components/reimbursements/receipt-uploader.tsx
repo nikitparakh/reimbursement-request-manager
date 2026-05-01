@@ -172,7 +172,7 @@ export function ReceiptUploader({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this receipt?</AlertDialogTitle>
+                      <AlertDialogTitle>Delete receipt</AlertDialogTitle>
                       <AlertDialogDescription>
                         This will permanently remove &quot;{receipt.fileName}&quot; from this request.
                       </AlertDialogDescription>

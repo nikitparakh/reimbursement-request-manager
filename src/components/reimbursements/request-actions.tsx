@@ -213,7 +213,7 @@ export function RequestActions({
           </Button>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+              <AlertDialogTitle>Delete draft</AlertDialogTitle>
               <AlertDialogDescription>
                 This cannot be undone. All uploaded receipts linked to this draft will be removed.
               </AlertDialogDescription>
