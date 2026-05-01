@@ -79,7 +79,6 @@ export function EditTeamForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          error={!!error}
           className="w-48"
         />
       </div>

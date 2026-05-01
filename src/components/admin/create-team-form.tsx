@@ -137,7 +137,6 @@ export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Team 503"
           required
-          error={!!error}
           className="w-48"
         />
       </div>
