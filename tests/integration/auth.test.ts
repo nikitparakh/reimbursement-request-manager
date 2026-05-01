@@ -13,6 +13,7 @@ describe("POST /api/auth/register", () => {
     name: "Alice Test",
     email: "alice@test.com",
     password: "Password1",
+    policyAccepted: true,
   };
 
   it("registers a valid user → 201", async () => {
@@ -39,7 +40,7 @@ describe("POST /api/auth/register", () => {
   it("rejects missing name → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { email: "a@test.com", password: "Password1" },
+      body: { email: "a@test.com", password: "Password1", policyAccepted: true },
     });
     expect(status).toBe(400);
   });
@@ -47,7 +48,12 @@ describe("POST /api/auth/register", () => {
   it("rejects invalid email → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { name: "Alice", email: "not-an-email", password: "Password1" },
+      body: {
+        name: "Alice",
+        email: "not-an-email",
+        password: "Password1",
+        policyAccepted: true,
+      },
     });
     expect(status).toBe(400);
   });
@@ -55,7 +61,12 @@ describe("POST /api/auth/register", () => {
   it("rejects password too short → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { name: "Alice", email: "a@test.com", password: "Pass1" },
+      body: {
+        name: "Alice",
+        email: "a@test.com",
+        password: "Pass1",
+        policyAccepted: true,
+      },
     });
     expect(status).toBe(400);
   });
@@ -63,7 +74,12 @@ describe("POST /api/auth/register", () => {
   it("rejects password missing uppercase → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { name: "Alice", email: "a@test.com", password: "password1" },
+      body: {
+        name: "Alice",
+        email: "a@test.com",
+        password: "password1",
+        policyAccepted: true,
+      },
     });
     expect(status).toBe(400);
   });
@@ -71,7 +87,12 @@ describe("POST /api/auth/register", () => {
   it("rejects password missing lowercase → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { name: "Alice", email: "a@test.com", password: "PASSWORD1" },
+      body: {
+        name: "Alice",
+        email: "a@test.com",
+        password: "PASSWORD1",
+        policyAccepted: true,
+      },
     });
     expect(status).toBe(400);
   });
@@ -79,12 +100,17 @@ describe("POST /api/auth/register", () => {
   it("rejects password missing digit → 400", async () => {
     const { status } = await callRouteJSON(POST, {
       method: "POST",
-      body: { name: "Alice", email: "a@test.com", password: "Passwords" },
+      body: {
+        name: "Alice",
+        email: "a@test.com",
+        password: "Passwords",
+        policyAccepted: true,
+      },
     });
     expect(status).toBe(400);
   });
 
-  it("creates user with role=STUDENT and onboardingDone=false", async () => {
+  it("creates user with role=USER and onboardingDone=false", async () => {
     const { data } = await callRouteJSON(POST, {
       method: "POST",
       body: validBody,
@@ -92,7 +118,52 @@ describe("POST /api/auth/register", () => {
     const dbUser = await db.user.findUnique({
       where: { id: (data as any).user.id },
     });
-    expect(dbUser!.role).toBe("STUDENT");
+    expect(dbUser!.role).toBe("USER");
     expect(dbUser!.onboardingDone).toBe(false);
+  });
+
+  it("requires policy acceptance → 400", async () => {
+    const { status } = await callRouteJSON(POST, {
+      method: "POST",
+      body: {
+        name: "Alice Test",
+        email: "policy@test.com",
+        password: "Password1",
+      },
+    });
+
+    expect(status).toBe(400);
+  });
+
+  it("stores policy acceptance metadata on new accounts", async () => {
+    const { data } = await callRouteJSON(POST, {
+      method: "POST",
+      body: {
+        name: "Alice Test",
+        email: "accepted@test.com",
+        password: "Password1",
+        policyAccepted: true,
+      },
+    });
+
+    const dbUser = await db.user.findUnique({
+      where: { id: (data as any).user.id },
+    });
+
+    expect(dbUser?.policyAcceptedAt).toBeTruthy();
+    expect(dbUser?.policyVersion).toBeTruthy();
+  });
+
+  it("rejects attempts to self-register as SUPER_ADMIN → 400", async () => {
+    const { status } = await callRouteJSON(POST, {
+      method: "POST",
+      body: {
+        ...validBody,
+        email: "elevated@test.com",
+        role: "SUPER_ADMIN",
+      },
+    });
+
+    expect(status).toBe(400);
   });
 });

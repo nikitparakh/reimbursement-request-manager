@@ -7,6 +7,7 @@ import {
   createTeam,
   createMembership,
   createRequest,
+  createReceipt,
 } from "../helpers/factory";
 import { callRoute } from "../helpers/call-route";
 
@@ -16,10 +17,14 @@ vi.mock("@/lib/storage", () => ({
     key: `receipts/mock-${input.fileName}`,
     url: `file:///fake/path/mock-${input.fileName}`,
   })),
+  deleteStoredObject: vi.fn(async () => {}),
 }));
 
 // Import after mocks are set up
 const { POST } = await import("@/app/api/requests/[requestId]/receipts/route");
+const { DELETE } = await import(
+  "@/app/api/requests/[requestId]/receipts/[receiptId]/route"
+);
 
 function makeFormData(files: Array<{ name: string; content: string }>) {
   const formData = new FormData();
@@ -39,19 +44,19 @@ describe("POST /api/requests/[requestId]/receipts", () => {
   });
 
   it("upload to draft → 201, parseStatus=QUEUED", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const student = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: student.id,
       teamId: team.id,
-      roleInTeam: "STUDENT",
+      roleInTeam: "PARENT_MENTOR",
     });
     const req = await createRequest({
       teamId: team.id,
       createdById: student.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: student.id, email: student.email, role: "USER" });
 
     const response = await callRoute(
       POST,
@@ -69,6 +74,40 @@ describe("POST /api/requests/[requestId]/receipts", () => {
     expect(data.receipts[0].fileName).toBe("receipt.pdf");
   });
 
+  it("team coach can upload to another member's draft → 201", async () => {
+    const student = await createUser({ role: "USER" });
+    const coach = await createUser({ role: "USER" });
+    const team = await createTeam();
+    await createMembership({
+      userId: student.id,
+      teamId: team.id,
+      roleInTeam: "PARENT_MENTOR",
+    });
+    await createMembership({
+      userId: coach.id,
+      teamId: team.id,
+      roleInTeam: "COACH",
+    });
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+      coachId: coach.id,
+    });
+
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
+
+    const response = await callRoute(
+      POST,
+      {
+        method: "POST",
+        formData: makeFormData([{ name: "coach-receipt.pdf", content: "pdf-content" }]),
+      },
+      { requestId: req.id }
+    );
+
+    expect(response.status).toBe(201);
+  });
+
   it("unauthenticated → 401", async () => {
     const response = await callRoute(
       POST,
@@ -82,15 +121,15 @@ describe("POST /api/requests/[requestId]/receipts", () => {
   });
 
   it("non-creator → 404", async () => {
-    const student = await createUser({ role: "STUDENT" });
-    const other = await createUser({ role: "STUDENT" });
+    const student = await createUser({ role: "USER" });
+    const other = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
       createdById: student.id,
     });
 
-    setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
+    setMockUser({ id: other.id, email: other.email, role: "USER" });
 
     const response = await callRoute(
       POST,
@@ -104,7 +143,7 @@ describe("POST /api/requests/[requestId]/receipts", () => {
   });
 
   it("non-draft → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const student = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -112,7 +151,7 @@ describe("POST /api/requests/[requestId]/receipts", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: student.id, email: student.email, role: "USER" });
 
     const response = await callRoute(
       POST,
@@ -126,14 +165,14 @@ describe("POST /api/requests/[requestId]/receipts", () => {
   });
 
   it("no files → 400", async () => {
-    const student = await createUser({ role: "STUDENT" });
+    const student = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
       createdById: student.id,
     });
 
-    setMockUser({ id: student.id, email: student.email, role: "STUDENT" });
+    setMockUser({ id: student.id, email: student.email, role: "USER" });
 
     const response = await callRoute(
       POST,
@@ -141,5 +180,37 @@ describe("POST /api/requests/[requestId]/receipts", () => {
       { requestId: req.id }
     );
     expect(response.status).toBe(400);
+  });
+
+  it("team coach can delete a receipt from another member's draft → 200", async () => {
+    const student = await createUser({ role: "USER" });
+    const coach = await createUser({ role: "USER" });
+    const team = await createTeam();
+    await createMembership({
+      userId: student.id,
+      teamId: team.id,
+      roleInTeam: "PARENT_MENTOR",
+    });
+    await createMembership({
+      userId: coach.id,
+      teamId: team.id,
+      roleInTeam: "COACH",
+    });
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: student.id,
+      coachId: coach.id,
+    });
+    const receipt = await createReceipt({ requestId: req.id });
+
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
+
+    const response = await callRoute(
+      DELETE,
+      { method: "DELETE" },
+      { requestId: req.id, receiptId: receipt.id }
+    );
+
+    expect(response.status).toBe(200);
   });
 });

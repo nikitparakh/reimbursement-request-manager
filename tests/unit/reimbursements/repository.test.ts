@@ -37,7 +37,7 @@ describe("reimbursements/repository", () => {
 
     it("assigns coachId when provided", async () => {
       const user = await createUser();
-      const coach = await createUser({ role: "COACH" });
+      const coach = await createUser({ role: "USER" });
       const team = await createTeam();
 
       const req = await createRequestDraft({
@@ -76,7 +76,7 @@ describe("reimbursements/repository", () => {
 
   describe("findTeamCoach", () => {
     it("returns approved COACH membership", async () => {
-      const coach = await createUser({ role: "COACH" });
+      const coach = await createUser({ role: "USER" });
       const team = await createTeam();
       await createMembership({
         userId: coach.id,
@@ -97,7 +97,7 @@ describe("reimbursements/repository", () => {
     });
 
     it("ignores unapproved coaches", async () => {
-      const coach = await createUser({ role: "COACH" });
+      const coach = await createUser({ role: "USER" });
       const team = await createTeam();
       await createMembership({
         userId: coach.id,

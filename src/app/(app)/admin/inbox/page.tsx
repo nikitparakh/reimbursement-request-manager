@@ -2,6 +2,8 @@ import Link from "next/link";
 import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { getCachedAccessContext } from "@/lib/access";
+import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
@@ -26,14 +28,20 @@ export default async function AdminInboxPage({
 }) {
   const session = await auth();
   if (!session?.user) unauthorized();
-  if (session.user.role !== "ADMIN") unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
+  if (!access.canManageReimbursements) unauthorized();
 
   const { cursor } = await searchParams;
-  const statusFilter = { in: [...INBOX_STATUSES] };
+  const scopedWhere = buildManagedReimbursementWhere(access);
 
   const [requests, totalCount] = await Promise.all([
     db.reimbursementRequest.findMany({
-      where: { status: statusFilter },
+      where: {
+        AND: [
+          scopedWhere,
+          { status: { in: [...INBOX_STATUSES] } },
+        ],
+      },
       include: {
         createdBy: true,
         team: true,
@@ -59,7 +67,14 @@ export default async function AdminInboxPage({
       take: PAGE_SIZE + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     }),
-    db.reimbursementRequest.count({ where: { status: statusFilter } }),
+    db.reimbursementRequest.count({
+      where: {
+        AND: [
+          scopedWhere,
+          { status: { in: [...INBOX_STATUSES] } },
+        ],
+      },
+    }),
   ]);
 
   const hasMore = requests.length > PAGE_SIZE;

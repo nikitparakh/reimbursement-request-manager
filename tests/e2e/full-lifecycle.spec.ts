@@ -1,69 +1,121 @@
+import "dotenv/config";
 import { test, expect } from "@playwright/test";
-import { signIn } from "./helpers";
+import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  openPageAndExpectHeading,
+  signIn,
+  signOut,
+} from "./helpers";
+
+const db = new PrismaClient();
+
+async function seedLifecycleRequest(title: string) {
+  const [coach, requester, team] = await Promise.all([
+    db.user.findUniqueOrThrow({ where: { email: "coach@team.org" } }),
+    db.user.findUniqueOrThrow({ where: { email: "user@team.org" } }),
+    db.team.findFirstOrThrow({ where: { name: "Frog Force 503" } }),
+  ]);
+
+  const request = await db.reimbursementRequest.create({
+    data: {
+      title,
+      description: "Seeded for Playwright lifecycle validation",
+      requestedTotal: new Prisma.Decimal("47.83"),
+      status: "SUBMITTED",
+      submittedAt: new Date(),
+      teamId: team.id,
+      createdById: requester.id,
+      coachId: coach.id,
+    },
+  });
+
+  const receipt = await db.receiptFile.create({
+    data: {
+      requestId: request.id,
+      fileName: "lifecycle-receipt.jpg",
+      mimeType: "image/jpeg",
+      storageUrl: "file:///playwright/lifecycle-receipt.jpg",
+      parseStatus: "DONE",
+    },
+  });
+
+  const extraction = await db.receiptExtraction.create({
+    data: {
+      receiptFileId: receipt.id,
+      documentType: "RECEIPT",
+      merchant: "Playwright Store",
+      subtotal: new Prisma.Decimal("47.83"),
+      tax: new Prisma.Decimal("3.44"),
+      total: new Prisma.Decimal("51.27"),
+      currency: "USD",
+      confidence: 0.99,
+    },
+  });
+
+  await db.receiptLineItem.create({
+    data: {
+      receiptExtractionId: extraction.id,
+      position: 0,
+      description: "Field snacks",
+      quantity: new Prisma.Decimal("1"),
+      unitPrice: new Prisma.Decimal("47.83"),
+      lineTotal: new Prisma.Decimal("47.83"),
+      category: "Food",
+    },
+  });
+
+  await db.approvalAction.create({
+    data: {
+      requestId: request.id,
+      actorId: requester.id,
+      action: "SUBMIT",
+      comment: "Submitted for review",
+    },
+  });
+
+  return request;
+}
 
 test.describe("Full lifecycle E2E", () => {
-  test("user creates and submits → coach approves → admin approves", async ({
+  test.afterAll(async () => {
+    await db.$disconnect();
+  });
+
+  test("coach approves a submitted request and admin completes payout", async ({
     page,
   }) => {
-    // --- USER: Create and submit a request ---
-    await signIn(page, "user@team.org", "User1234");
-    await expect(page.getByText("Dashboard")).toBeVisible();
+    const title = `Lifecycle E2E ${Date.now()}`;
+    await seedLifecycleRequest(title);
 
-    // Navigate to new request
-    await page.getByText("New Request").click();
-    await expect(page.getByText("New Reimbursement Request")).toBeVisible();
-
-    // Fill form and create draft
-    await page.getByLabel("Title").fill("Lifecycle E2E Request");
-    await page.getByLabel("Description").fill("Full lifecycle test");
-    await page.getByRole("button", { name: /create draft/i }).click();
-    await expect(page.getByText("Draft created successfully")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Navigate to request detail
-    await page.getByText("Open request to upload receipts").click();
-    await expect(page.getByText("Lifecycle E2E Request")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Submit the request (look for submit button)
-    const submitButton = page.getByRole("button", { name: /submit/i });
-    if (await submitButton.isVisible().catch(() => false)) {
-      await submitButton.click();
-      // Wait for status update
-      await expect(
-        page.getByText(/submitted/i).first()
-      ).toBeVisible({ timeout: 10_000 });
-    }
-
-    // --- COACH: Approve the request ---
     await signIn(page, "coach@team.org", "Coach1234");
-    await expect(page.getByText("Dashboard")).toBeVisible();
+    await openPageAndExpectHeading(
+      page,
+      "/coach/team-reimbursements",
+      "Team Reimbursements"
+    );
+    await page.getByRole("row", { name: new RegExp(title, "i") }).click();
+    await expect(
+      page.getByRole("heading", { name: title })
+    ).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: /^approve$/i }).click();
+    await expect(page.getByText("COACH APPROVED")).toBeVisible({ timeout: 10_000 });
 
-    await page.getByText("Review Inbox").click();
-    await expect(page.getByText("Coach Inbox")).toBeVisible();
-
-    // Look for the request and approve it
-    const approveButton = page.getByRole("button", { name: /approve/i }).first();
-    if (await approveButton.isVisible().catch(() => false)) {
-      await approveButton.click();
-      // Wait for approval to process
-      await page.waitForTimeout(2000);
-    }
-
-    // --- ADMIN: Approve and mark paid ---
+    await signOut(page);
     await signIn(page, "admin@school.org", "Admin1234");
-    await expect(page.getByText("Dashboard")).toBeVisible();
-
-    // Check admin inbox
-    await page.getByText("Admin Inbox").click();
-
-    // Look for approve button
-    const adminApproveButton = page.getByRole("button", { name: /approve/i }).first();
-    if (await adminApproveButton.isVisible().catch(() => false)) {
-      await adminApproveButton.click();
-      await page.waitForTimeout(2000);
-    }
+    await openPageAndExpectHeading(page, "/admin/inbox", "Admin Inbox");
+    await page.getByRole("link", { name: title }).click();
+    await expect(
+      page.getByRole("heading", { name: title })
+    ).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: /^approve$/i }).click();
+    await expect(page.getByRole("button", { name: /mark paid/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: /mark paid/i }).click();
+    await expect(page.getByText("PAID")).toBeVisible({ timeout: 10_000 });
   });
 });

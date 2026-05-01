@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { requireUser } from "@/lib/rbac";
 import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 const schema = z.object({
   decision: z.enum(["APPROVE", "REJECT", "MARK_PAID"]),
@@ -17,8 +18,17 @@ export async function POST(
 ) {
   let actorId = "";
   try {
-    actorId = (await requireRole("ADMIN")).id;
+    actorId = (await requireUser()).id;
   } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { requestId } = await params;
+  const requestAccess = await getRequestAccess(actorId, requestId);
+  if (!requestAccess || !requestAccess.canView) {
+    return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  }
+  if (!requestAccess.isReimbursementAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -27,9 +37,7 @@ export async function POST(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const { requestId } = await params;
-  const current = await db.reimbursementRequest.findUnique({ where: { id: requestId } });
-  if (!current) return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  const current = requestAccess.request;
 
   if (body.data.decision === "REJECT" && !body.data.comment) {
     return NextResponse.json(

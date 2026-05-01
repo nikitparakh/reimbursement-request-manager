@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { requireSuperAdmin } from "@/lib/rbac";
 
 const schema = z.object({
-  role: z.enum(["STUDENT", "COACH", "ADMIN"]),
+  role: z.enum(["USER", "SUPER_ADMIN"]),
 });
 
 export async function PATCH(
@@ -12,7 +12,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRole("ADMIN");
+    await requireSuperAdmin();
   } catch {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

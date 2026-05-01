@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { canManageTeams, getAccessContext } from "@/lib/access";
+import { requireUser } from "@/lib/rbac";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -14,10 +15,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> },
 ) {
+  let userId = "";
   try {
-    await requireRole("ADMIN");
+    userId = (await requireUser()).id;
   } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { teamId } = await params;
@@ -26,9 +28,31 @@ export async function PATCH(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const team = await db.team.findUnique({ where: { id: teamId } });
+  const [access, team] = await Promise.all([
+    getAccessContext(userId),
+    db.team.findUnique({
+      where: { id: teamId },
+      include: {
+        school: {
+          select: {
+            districtId: true,
+          },
+        },
+      },
+    }),
+  ]);
   if (!team) {
     return NextResponse.json({ error: "Team not found" }, { status: 404 });
+  }
+  if (
+    !canManageTeams(access, {
+      districtId: team.school.districtId,
+      schoolId: team.schoolId,
+      programId: team.programId,
+      teamId: team.id,
+    })
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const updated = await db.team.update({

@@ -8,6 +8,7 @@ type CallOptions = {
   body?: unknown;
   formData?: FormData;
   headers?: Record<string, string>;
+  url?: string;
 };
 
 export async function callRoute<P extends Record<string, string>>(
@@ -29,7 +30,7 @@ export async function callRoute<P extends Record<string, string>>(
     };
   }
 
-  const request = new Request("http://localhost:3000/test", init);
+  const request = new Request(options.url ?? "http://localhost:3000/test", init);
 
   // Next.js 15+ passes params as Promise<Params>
   return handler(request, { params: Promise.resolve(params) });

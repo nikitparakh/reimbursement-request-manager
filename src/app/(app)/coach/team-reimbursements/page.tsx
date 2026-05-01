@@ -1,6 +1,8 @@
 import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { getCachedAccessContext } from "@/lib/access";
+import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import {
   TeamReimbursementsTable,
   type ReimbursementRow,
@@ -8,20 +10,30 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getTeamReimbursementsDescription } from "@/lib/ui-copy";
 
 export default async function TeamReimbursementsPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
-  if (session.user.role !== "COACH" && session.user.role !== "ADMIN") unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
+  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
 
-  const coachedTeamIds = (
-    await db.teamMembership.findMany({
-      where: { userId: session.user.id, roleInTeam: "COACH", approved: true },
-      select: { teamId: true },
-    })
-  ).map((item) => item.teamId);
+  const managedTeamIds = access.canManageReimbursements
+    ? await db.team.findMany({
+        where: buildManagedTeamWhere(access),
+        select: { id: true },
+      })
+    : [];
 
-  const teamFilter = { teamId: { in: coachedTeamIds } };
+  const teamIds = Array.from(
+    new Set([
+      ...access.teamMemberships
+        .filter((membership) => membership.roleInTeam === "COACH")
+        .map((membership) => membership.teamId),
+      ...managedTeamIds.map((team) => team.id),
+    ])
+  );
+  const teamFilter = { teamId: { in: teamIds } };
 
   const [requests, pendingCount] = await Promise.all([
     db.reimbursementRequest.findMany({
@@ -33,7 +45,7 @@ export default async function TeamReimbursementsPage() {
       orderBy: { createdAt: "desc" },
     }),
     db.reimbursementRequest.count({
-      where: { teamId: { in: coachedTeamIds }, status: "SUBMITTED" },
+      where: { teamId: { in: teamIds }, status: "SUBMITTED" },
     }),
   ]);
 
@@ -52,13 +64,17 @@ export default async function TeamReimbursementsPage() {
       <PageHeader
         title="Team Reimbursements"
         badge={pendingCount > 0 ? <Badge status={`${pendingCount} pending review`} /> : undefined}
-        description="View and manage all reimbursement requests across your coached teams."
+        description={getTeamReimbursementsDescription(access)}
       />
 
       {rows.length === 0 ? (
         <EmptyState
           title="No team requests"
-          description="There are no reimbursement requests for your teams yet."
+          description={
+            access.canManageReimbursements
+              ? "There are no reimbursement requests for teams in your scope yet."
+              : "There are no reimbursement requests for your teams yet."
+          }
         />
       ) : (
         <TeamReimbursementsTable data={rows} />

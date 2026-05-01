@@ -5,6 +5,10 @@ import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import {
+  sessionTokenCookieName,
+  sessionTokenCookieOptions,
+} from "@/lib/auth-cookies";
 import { env } from "@/lib/env";
 
 const credentialsSchema = z.object({
@@ -46,17 +50,23 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/sign-in",
   },
+  cookies: {
+    sessionToken: {
+      name: sessionTokenCookieName,
+      options: sessionTokenCookieOptions,
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as { role?: GlobalRole }).role ?? "STUDENT";
+        token.role = (user as { role?: GlobalRole }).role ?? "USER";
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.role = (token.role as GlobalRole | undefined) ?? "STUDENT";
+        session.user.role = (token.role as GlobalRole | undefined) ?? "USER";
       }
       return session;
     },

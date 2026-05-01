@@ -156,7 +156,7 @@ describe("gemini payload normalization", () => {
     expect(normalized.lineItems).toHaveLength(1);
   });
 
-  it("deduplicates identical line items across candidates", () => {
+  it("keeps identical line items from separate candidates", () => {
     const payload = [
       {
         documentType: "RECEIPT",
@@ -176,7 +176,7 @@ describe("gemini payload normalization", () => {
       },
     ];
     const normalized = normalizeGeminiPayload(payload, "gemini-2.5-flash");
-    expect(normalized.lineItems).toHaveLength(1);
+    expect(normalized.lineItems).toHaveLength(2);
   });
 });
 

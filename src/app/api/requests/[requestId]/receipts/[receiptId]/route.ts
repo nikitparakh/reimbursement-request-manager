@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { recomputeRequestTotal } from "@/lib/jobs/process-receipt";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 import { deleteStoredObject } from "@/lib/storage";
 
 export async function DELETE(
@@ -16,17 +17,12 @@ export async function DELETE(
   }
 
   const { requestId, receiptId } = await params;
-
-  const request = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    select: { createdById: true, status: true },
-  });
-
-  if (!request || request.createdById !== userId) {
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (request.status !== "DRAFT") {
+  if (!requestAccess.canEditDraft) {
     return NextResponse.json(
       { error: "Receipts can only be deleted from draft requests" },
       { status: 400 }

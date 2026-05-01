@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { processReceipt, recomputeRequestTotal } from "@/lib/jobs/process-receipt";
+import { db } from "@/lib/db";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function POST(
   _request: Request,
@@ -15,12 +16,16 @@ export async function POST(
   }
 
   const { requestId } = await params;
-  const reimbursementRequest = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-  });
+  const requestAccess = await getRequestAccess(userId, requestId);
 
-  if (!reimbursementRequest || reimbursementRequest.createdById !== userId) {
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  }
+  if (!requestAccess.canEditDraft) {
+    return NextResponse.json(
+      { error: "Receipts can only be parsed while request is draft" },
+      { status: 400 }
+    );
   }
 
   const receiptsToProcess = await db.receiptFile.findMany({

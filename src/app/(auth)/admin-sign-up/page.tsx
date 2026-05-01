@@ -1,27 +1,5 @@
-import Image from "next/image";
-import Link from "next/link";
-import { SignUpForm } from "@/components/auth/sign-up-form";
-import { Card, CardContent } from "@/components/ui/card";
+import { redirect } from "next/navigation";
 
 export default function AdminSignUpPage() {
-  return (
-    <div className="w-full max-w-md">
-      <div className="text-center mb-8">
-        <Image src="/novi-logo.png" alt="Novi Community School District" width={131} height={40} className="h-12 w-auto mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-emerald-600">Reimbursement Request Manager</h1>
-        <p className="mt-2 text-sm text-slate-500">Create an admin account</p>
-      </div>
-      <Card>
-        <CardContent>
-          <SignUpForm role="ADMIN" />
-        </CardContent>
-      </Card>
-      <p className="mt-4 text-center text-sm text-slate-500">
-        Already have an account?{" "}
-        <Link href="/sign-in" className="font-medium text-emerald-600 hover:text-emerald-500">
-          Sign in
-        </Link>
-      </p>
-    </div>
-  );
+  redirect("/sign-up");
 }

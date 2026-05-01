@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
 import { type Column, SortableTable } from "@/components/ui/sortable-table";
 
 export type ReimbursementRow = {
@@ -128,12 +129,21 @@ export function TeamReimbursementsTable({
   const router = useRouter();
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [reopeningId, setReopeningId] = useState<string | null>(null);
+  const [reopenError, setReopenError] = useState("");
 
   const handleReopen = useCallback(async (id: string) => {
     setReopeningId(id);
+    setReopenError("");
     try {
       const res = await fetch(`/api/requests/${id}/reopen`, { method: "POST" });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setReopenError(body.error ?? "Failed to reopen request.");
+      }
+    } catch {
+      setReopenError("Failed to reopen request.");
     } finally {
       setReopeningId(null);
     }
@@ -195,7 +205,7 @@ export function TeamReimbursementsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search + Filters */}
+      {reopenError ? <Alert variant="error">{reopenError}</Alert> : null}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
@@ -243,8 +253,10 @@ export function TeamReimbursementsTable({
         )}
 
         <div className="min-w-[140px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">From</label>
+          <label htmlFor="team-reimbursements-date-from" className="block text-xs font-medium text-slate-500 mb-1">From</label>
           <Input
+            id="team-reimbursements-date-from"
+            aria-label="From date"
             type="date"
             value={filters.dateFrom}
             onChange={(e) => setFilter("dateFrom", e.target.value)}
@@ -252,8 +264,10 @@ export function TeamReimbursementsTable({
         </div>
 
         <div className="min-w-[140px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">To</label>
+          <label htmlFor="team-reimbursements-date-to" className="block text-xs font-medium text-slate-500 mb-1">To</label>
           <Input
+            id="team-reimbursements-date-to"
+            aria-label="To date"
             type="date"
             value={filters.dateTo}
             onChange={(e) => setFilter("dateTo", e.target.value)}

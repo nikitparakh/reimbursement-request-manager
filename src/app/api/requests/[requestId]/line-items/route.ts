@@ -3,44 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
-
-async function authorizeForRequest(requestId: string) {
-  const user = await requireUser();
-
-  const request = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-  });
-  if (!request) return null;
-
-  if (user.role === "ADMIN") {
-    return { request, isCoach: false, isAdmin: true, userId: user.id };
-  }
-
-  const coachMembership = await db.teamMembership.findFirst({
-    where: {
-      userId: user.id,
-      teamId: request.teamId,
-      roleInTeam: "COACH",
-      approved: true,
-    },
-  });
-
-  if (request.createdById === user.id || coachMembership) {
-    return { request, isCoach: !!coachMembership, isAdmin: false, userId: user.id };
-  }
-
-  return null;
-}
-
-function assertLineItemEditable(
-  status: string,
-  { isCoach, isAdmin }: { isCoach: boolean; isAdmin: boolean },
-): string | null {
-  if (status === "DRAFT") return null;
-  if (status === "SUBMITTED" && (isCoach || isAdmin)) return null;
-  if (status === "COACH_APPROVED" && isAdmin) return null;
-  return "Line items are not editable in the current request state";
-}
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 async function recalculateRequestTotal(requestId: string) {
   const extractions = await db.receiptExtraction.findMany({
@@ -71,18 +34,21 @@ export async function PUT(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let authResult;
+  let requestAccess;
   try {
-    authResult = await authorizeForRequest(requestId);
+    const user = await requireUser();
+    requestAccess = await getRequestAccess(user.id, requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!authResult) {
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult);
-  if (editError) {
-    return NextResponse.json({ error: editError }, { status: 400 });
+  if (!requestAccess.canEditLineItems) {
+    return NextResponse.json(
+      { error: "Line items are not editable in the current request state" },
+      { status: 400 }
+    );
   }
 
   const body = updateSchema.safeParse(await request.json());
@@ -130,18 +96,21 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let authResult;
+  let requestAccess;
   try {
-    authResult = await authorizeForRequest(requestId);
+    const user = await requireUser();
+    requestAccess = await getRequestAccess(user.id, requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!authResult) {
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult);
-  if (editError) {
-    return NextResponse.json({ error: editError }, { status: 400 });
+  if (!requestAccess.canEditLineItems) {
+    return NextResponse.json(
+      { error: "Line items are not editable in the current request state" },
+      { status: 400 }
+    );
   }
 
   const body = createSchema.safeParse(await request.json());
@@ -183,18 +152,21 @@ export async function DELETE(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
-  let authResult;
+  let requestAccess;
   try {
-    authResult = await authorizeForRequest(requestId);
+    const user = await requireUser();
+    requestAccess = await getRequestAccess(user.id, requestId);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!authResult) {
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const editError = assertLineItemEditable(authResult.request.status, authResult);
-  if (editError) {
-    return NextResponse.json({ error: editError }, { status: 400 });
+  if (!requestAccess.canEditLineItems) {
+    return NextResponse.json(
+      { error: "Line items are not editable in the current request state" },
+      { status: 400 }
+    );
   }
 
   const body = deleteSchema.safeParse(await request.json());
@@ -211,12 +183,13 @@ export async function DELETE(
   }
 
   const isReviewerExclusion =
-    (authResult.isCoach || authResult.isAdmin) && authResult.request.status !== "DRAFT";
+    (requestAccess.isCoach || requestAccess.isReimbursementAdmin) &&
+    requestAccess.request.status !== "DRAFT";
 
   if (isReviewerExclusion) {
     await db.receiptLineItem.update({
       where: { id: body.data.lineItemId },
-      data: { excludedAt: new Date(), excludedById: authResult.userId },
+      data: { excludedAt: new Date(), excludedById: requestAccess.userId },
     });
   } else {
     await db.receiptLineItem.delete({ where: { id: body.data.lineItemId } });

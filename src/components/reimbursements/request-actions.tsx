@@ -15,7 +15,8 @@ type RequestActionsProps = {
   hasUnparsedReceipts?: boolean;
   receiptsWithExtractions?: SerializedReceipt[];
   redirectUrl?: string;
-  userRole?: string;
+  submitToAdmin?: boolean;
+  canSubmit?: boolean;
 };
 
 export function RequestActions({
@@ -25,7 +26,8 @@ export function RequestActions({
   hasUnparsedReceipts = false,
   receiptsWithExtractions = [],
   redirectUrl = "/user/requests",
-  userRole = "STUDENT",
+  submitToAdmin = false,
+  canSubmit = true,
 }: RequestActionsProps) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -33,6 +35,9 @@ export function RequestActions({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
+  const receiptEditorDeleteIds = receiptsWithExtractions
+    .filter((receipt) => receipt.extraction)
+    .map((receipt) => receipt.id);
 
   async function triggerParse() {
     setIsParsing(true);
@@ -124,7 +129,11 @@ export function RequestActions({
 
   return (
     <div className="space-y-6">
-      <ReceiptUploader requestId={requestId} existingReceipts={existingReceipts} />
+      <ReceiptUploader
+        requestId={requestId}
+        existingReceipts={existingReceipts}
+        hideExistingReceiptDeleteIds={receiptEditorDeleteIds}
+      />
 
       {hasExtractions && (
         <EditableLineItems requestId={requestId} receipts={receiptsWithExtractions} allowReceiptDeletion />
@@ -154,12 +163,16 @@ export function RequestActions({
         </div>
       )}
 
-      {hasExtractions && !hasUnparsedReceipts && (
+      {hasExtractions && !hasUnparsedReceipts && canSubmit && (
         <Button onClick={submit}>
-          {userRole === "ADMIN" || userRole === "COACH"
-            ? "Submit to Admin"
-            : "Submit to Coach"}
+          {submitToAdmin ? "Submit to Admin" : "Submit to Coach"}
         </Button>
+      )}
+
+      {hasExtractions && !hasUnparsedReceipts && !canSubmit && (
+        <p className="text-sm text-slate-500">
+          Only the request creator can submit this draft.
+        </p>
       )}
 
       {message ? (

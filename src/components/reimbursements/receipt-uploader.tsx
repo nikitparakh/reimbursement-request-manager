@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 
@@ -12,6 +12,7 @@ type UploadedReceipt = {
 type ReceiptUploaderProps = {
   requestId: string;
   existingReceipts?: UploadedReceipt[];
+  hideExistingReceiptDeleteIds?: string[];
 };
 
 type UploadingFile = {
@@ -20,7 +21,11 @@ type UploadingFile = {
   status: "uploading" | "uploaded" | "failed";
 };
 
-export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUploaderProps) {
+export function ReceiptUploader({
+  requestId,
+  existingReceipts = [],
+  hideExistingReceiptDeleteIds = [],
+}: ReceiptUploaderProps) {
   const [uploads, setUploads] = useState<UploadingFile[]>([]);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
@@ -28,12 +33,9 @@ export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUpl
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    setUploads((prev) => {
-      const next = prev.filter((u) => u.status === "uploading");
-      return next.length === prev.length ? prev : next;
-    });
-  }, [existingReceipts]);
+  const visibleUploads = uploads.filter(
+    (upload) => upload.status === "uploading" || !existingReceipts.some((receipt) => receipt.fileName === upload.fileName)
+  );
 
   async function deleteReceipt(receiptId: string) {
     setDeletedIds((prev) => new Set(prev).add(receiptId));
@@ -113,14 +115,15 @@ export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUpl
     }
   }
 
-  const uploadedFileNames = new Set(uploads.map((u) => u.fileName));
+  const uploadedFileNames = new Set(visibleUploads.map((u) => u.fileName));
+  const hiddenDeleteIds = new Set(hideExistingReceiptDeleteIds);
   const serverOnly = existingReceipts.filter(
     (r) => !uploadedFileNames.has(r.fileName) && !deletedIds.has(r.id)
   );
 
   return (
     <div className="space-y-4">
-      {(serverOnly.length > 0 || uploads.length > 0) ? (
+        {(serverOnly.length > 0 || visibleUploads.length > 0) ? (
         <div className="flex flex-wrap gap-2">
           {serverOnly.map((receipt) => (
             <div
@@ -137,18 +140,20 @@ export function ReceiptUploader({ requestId, existingReceipts = [] }: ReceiptUpl
                 <span className="truncate text-slate-700">{receipt.fileName}</span>
                 <CheckIcon />
               </a>
-              <button
-                type="button"
-                onClick={() => void deleteReceipt(receipt.id)}
-                className="ml-1 shrink-0 text-slate-400 hover:text-red-500 transition"
-                aria-label={`Delete ${receipt.fileName}`}
-              >
-                <DeleteIcon />
-              </button>
+              {!hiddenDeleteIds.has(receipt.id) ? (
+                <button
+                  type="button"
+                  onClick={() => void deleteReceipt(receipt.id)}
+                  className="ml-1 shrink-0 text-slate-400 hover:text-red-500 transition"
+                  aria-label={`Delete ${receipt.fileName}`}
+                >
+                  <DeleteIcon />
+                </button>
+              ) : null}
             </div>
           ))}
 
-          {uploads.map((upload) => (
+          {visibleUploads.map((upload) => (
             <div
               key={upload.key}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm max-w-xs"

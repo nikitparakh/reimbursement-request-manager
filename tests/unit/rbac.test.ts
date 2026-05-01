@@ -19,9 +19,9 @@ describe("rbac helpers", () => {
 
   it("enforces role checks", async () => {
     vi.mocked(auth).mockResolvedValueOnce({
-      user: { id: "u1", role: "STUDENT", email: "s@example.com" },
+      user: { id: "u1", role: "USER", email: "s@example.com" },
     } as never);
 
-    await expect(requireRole("ADMIN")).rejects.toThrow("FORBIDDEN");
+    await expect(requireRole("SUPER_ADMIN")).rejects.toThrow("FORBIDDEN");
   });
 });

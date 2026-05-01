@@ -1,20 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { POLICY_PATH } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
 import { Alert } from "@/components/ui/alert";
 
-type SignUpFormProps = {
-  role?: "STUDENT" | "ADMIN";
-};
-
-export function SignUpForm({ role = "STUDENT" }: SignUpFormProps) {
+export function SignUpForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,7 +27,7 @@ export function SignUpForm({ role = "STUDENT" }: SignUpFormProps) {
       response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, policyAccepted }),
       });
     } catch {
       setMessage("Network error while creating account.");
@@ -98,6 +97,29 @@ export function SignUpForm({ role = "STUDENT" }: SignUpFormProps) {
           onChange={(event) => setPassword(event.target.value)}
         />
       </FormField>
+
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+        <label className="flex items-start gap-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={policyAccepted}
+            onChange={(event) => setPolicyAccepted(event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            required
+          />
+          <span>
+            I agree to the{" "}
+            <Link
+              href={POLICY_PATH}
+              className="font-medium text-emerald-600 hover:text-emerald-500"
+              target="_blank"
+            >
+              reimbursement policy
+            </Link>
+            .
+          </span>
+        </label>
+      </div>
 
       <Button type="submit" loading={isSubmitting} className="w-full">
         {isSubmitting ? "Creating account..." : "Create account"}

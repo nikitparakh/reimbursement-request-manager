@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { requireUser } from "@/lib/rbac";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 const schema = z.object({
   lineItemId: z.string(),
@@ -12,11 +13,18 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  let actor;
+  let actorId = "";
+  let requestAccess;
   try {
-    actor = await requireRole("COACH", "ADMIN");
+    const actor = await requireUser();
+    actorId = actor.id;
+    const { requestId } = await params;
+    requestAccess = await getRequestAccess(actor.id, requestId);
+    if (!requestAccess || !requestAccess.canView) {
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
+    }
   } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = schema.safeParse(await request.json());
@@ -25,33 +33,11 @@ export async function POST(
   }
 
   const { requestId } = await params;
-  const reimbursementRequest = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-  });
-  if (!reimbursementRequest) {
+  if (!requestAccess) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
-  if (actor.role === "COACH") {
-    const membership = await db.teamMembership.findFirst({
-      where: {
-        userId: actor.id,
-        teamId: reimbursementRequest.teamId,
-        roleInTeam: "COACH",
-        approved: true,
-      },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden for this team" }, { status: 403 });
-    }
-  }
-
-  const canComment =
-    (actor.role === "ADMIN" &&
-      (reimbursementRequest.status === "SUBMITTED" || reimbursementRequest.status === "COACH_APPROVED")) ||
-    (actor.role === "COACH" && reimbursementRequest.status === "SUBMITTED");
-
-  if (!canComment) {
+  if (!requestAccess.canCommentOnLineItems) {
     return NextResponse.json(
       { error: "Comments are only allowed during review" },
       { status: 400 }
@@ -69,7 +55,7 @@ export async function POST(
   const comment = await db.lineItemComment.create({
     data: {
       lineItemId: body.data.lineItemId,
-      authorId: actor.id,
+      authorId: actorId,
       text: body.data.text,
     },
     include: {

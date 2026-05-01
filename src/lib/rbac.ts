@@ -16,3 +16,7 @@ export async function requireRole(...allowed: GlobalRole[]) {
   }
   return user;
 }
+
+export async function requireSuperAdmin() {
+  return requireRole("SUPER_ADMIN");
+}

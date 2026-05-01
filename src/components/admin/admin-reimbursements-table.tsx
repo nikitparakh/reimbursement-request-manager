@@ -11,6 +11,9 @@ export type AdminReimbursementRow = {
   title: string;
   requester: string;
   team: string;
+  district: string;
+  school: string;
+  program: string;
   amount: number;
   status: string;
   date: string;
@@ -19,6 +22,7 @@ export type AdminReimbursementRow = {
 
 const STATUS_OPTIONS = [
   "COACH_APPROVED",
+  "COACH_REJECTED",
   "ADMIN_APPROVED",
   "ADMIN_REJECTED",
   "PAID",
@@ -73,6 +77,9 @@ const columns: Column<AdminReimbursementRow>[] = [
 type Filters = {
   search: string;
   status: string;
+  district: string;
+  school: string;
+  program: string;
   team: string;
   dateFrom: string;
   dateTo: string;
@@ -81,6 +88,9 @@ type Filters = {
 const INITIAL_FILTERS: Filters = {
   search: "",
   status: "",
+  district: "",
+  school: "",
+  program: "",
   team: "",
   dateFrom: "",
   dateTo: "",
@@ -89,6 +99,21 @@ const INITIAL_FILTERS: Filters = {
 export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow[] }) {
   const router = useRouter();
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+
+  const uniqueDistricts = useMemo(
+    () => [...new Set(data.map((r) => r.district))].sort(),
+    [data],
+  );
+
+  const uniqueSchools = useMemo(
+    () => [...new Set(data.map((r) => r.school))].sort(),
+    [data],
+  );
+
+  const uniquePrograms = useMemo(
+    () => [...new Set(data.map((r) => r.program))].sort(),
+    [data],
+  );
 
   const uniqueTeams = useMemo(
     () => [...new Set(data.map((r) => r.team))].sort(),
@@ -104,12 +129,27 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         (r) =>
           r.title.toLowerCase().includes(q) ||
           r.requester.toLowerCase().includes(q) ||
-          r.team.toLowerCase().includes(q),
+          r.team.toLowerCase().includes(q) ||
+          r.school.toLowerCase().includes(q) ||
+          r.program.toLowerCase().includes(q) ||
+          r.district.toLowerCase().includes(q),
       );
     }
 
     if (filters.status) {
       rows = rows.filter((r) => r.status === filters.status);
+    }
+
+    if (filters.district) {
+      rows = rows.filter((r) => r.district === filters.district);
+    }
+
+    if (filters.school) {
+      rows = rows.filter((r) => r.school === filters.school);
+    }
+
+    if (filters.program) {
+      rows = rows.filter((r) => r.program === filters.program);
     }
 
     if (filters.team) {
@@ -165,6 +205,54 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
           </select>
         </div>
 
+        <div className="sm:min-w-[180px]">
+          <label className="block text-xs font-medium text-slate-500 mb-1">District</label>
+          <select
+            value={filters.district}
+            onChange={(e) => setFilter("district", e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          >
+            <option value="">All districts</option>
+            {uniqueDistricts.map((district) => (
+              <option key={district} value={district}>
+                {district}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sm:min-w-[180px]">
+          <label className="block text-xs font-medium text-slate-500 mb-1">School</label>
+          <select
+            value={filters.school}
+            onChange={(e) => setFilter("school", e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          >
+            <option value="">All schools</option>
+            {uniqueSchools.map((school) => (
+              <option key={school} value={school}>
+                {school}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sm:min-w-[180px]">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Program</label>
+          <select
+            value={filters.program}
+            onChange={(e) => setFilter("program", e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          >
+            <option value="">All programs</option>
+            {uniquePrograms.map((program) => (
+              <option key={program} value={program}>
+                {program}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="sm:min-w-[160px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Team</label>
           <select
@@ -182,8 +270,10 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         </div>
 
         <div className="sm:min-w-[140px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">From</label>
+          <label htmlFor="admin-reimbursements-date-from" className="block text-xs font-medium text-slate-500 mb-1">From</label>
           <Input
+            id="admin-reimbursements-date-from"
+            aria-label="From date"
             type="date"
             value={filters.dateFrom}
             onChange={(e) => setFilter("dateFrom", e.target.value)}
@@ -191,8 +281,10 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
         </div>
 
         <div className="sm:min-w-[140px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">To</label>
+          <label htmlFor="admin-reimbursements-date-to" className="block text-xs font-medium text-slate-500 mb-1">To</label>
           <Input
+            id="admin-reimbursements-date-to"
+            aria-label="To date"
             type="date"
             value={filters.dateTo}
             onChange={(e) => setFilter("dateTo", e.target.value)}
@@ -223,7 +315,7 @@ export function AdminReimbursementsTable({ data }: { data: AdminReimbursementRow
             columns={columns}
             data={filtered}
             rowKey={(r) => r.id}
-            onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
+            onRowClick={(r) => router.push(`/admin/requests/${r.id}?from=requests`)}
           />
         </>
       )}

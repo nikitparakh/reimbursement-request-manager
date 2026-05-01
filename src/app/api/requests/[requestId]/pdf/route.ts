@@ -4,19 +4,28 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { readStoredObject } from "@/lib/storage";
 import { generateRequestPdf } from "@/lib/pdf/generate-request-pdf";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ requestId: string }> },
 ) {
-  let user: { id: string; role: string };
+  let userId = "";
   try {
-    user = await requireUser();
+    userId = (await requireUser()).id;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { requestId } = await params;
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (!requestAccess.canDownloadPdf) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const request = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
     include: {
@@ -35,19 +44,6 @@ export async function GET(
 
   if (!request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const isCreator = request.createdById === user.id;
-  const isAdmin = user.role === "ADMIN";
-  const isTeamMember =
-    !isCreator &&
-    !isAdmin &&
-    (await db.teamMembership.findFirst({
-      where: { userId: user.id, teamId: request.teamId, approved: true },
-    })) !== null;
-
-  if (!isCreator && !isAdmin && !isTeamMember) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const receiptBuffers = new Map<string, { buffer: Buffer; mimeType: string }>();

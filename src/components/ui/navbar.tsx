@@ -1,44 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { getCachedAccessContext } from "@/lib/access";
+import { getNavigationLinks } from "@/lib/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { MobileNavMenu } from "@/components/ui/mobile-nav-menu";
 
-type NavLink = { href: string; label: string };
-
-const userLinks: NavLink[] = [
-  { href: "/team", label: "My Team" },
-  { href: "/user/requests/new", label: "New Request" },
-  { href: "/user/requests", label: "My Requests" },
-];
-
-const coachLinks: NavLink[] = [
-  { href: "/coach/team-overview", label: "Team Overview" },
-  { href: "/user/requests/new", label: "New Request" },
-  { href: "/coach/team-reimbursements", label: "Team Reimbursements" },
-];
-
-const adminLinks: NavLink[] = [
-  { href: "/admin/inbox", label: "Admin Inbox" },
-  { href: "/admin/requests", label: "Reimbursements" },
-  { href: "/admin/teams", label: "Manage Teams" },
-  { href: "/admin/users", label: "Manage Users" },
-];
-
-function getLinksForRole(role: string): NavLink[] {
-  switch (role) {
-    case "ADMIN":
-      return adminLinks;
-    case "COACH":
-      return coachLinks;
-    default:
-      return userLinks;
-  }
-}
-
 export async function NavBar() {
   const session = await auth();
+  const access = session?.user
+    ? await getCachedAccessContext(session.user.id)
+    : null;
+  const links = access ? getNavigationLinks(access) : [];
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
@@ -50,10 +24,11 @@ export async function NavBar() {
         {session?.user ? (
           <>
             <div className="hidden sm:flex items-center gap-6">
-              {getLinksForRole(session.user.role).map((link) => (
+              {links.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={link.prefetch}
                   className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition"
                 >
                   {link.label}
@@ -61,14 +36,13 @@ export async function NavBar() {
               ))}
             </div>
             <div className="hidden sm:flex items-center gap-4">
-              <NotificationBell userRole={session.user.role} />
+              <NotificationBell />
               <span className="hidden md:inline text-sm text-slate-500">{session.user.email}</span>
               <SignOutButton />
             </div>
             <MobileNavMenu
-              links={getLinksForRole(session.user.role)}
+              links={links}
               userEmail={session.user.email!}
-              userRole={session.user.role}
             />
           </>
         ) : (

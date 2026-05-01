@@ -4,29 +4,30 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
+import { getAdminReviewRecipientEmails } from "@/lib/notifications/admin-review-recipients";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   let userId = "";
-  let userRole = "STUDENT";
   try {
     const user = await requireUser();
     userId = user.id;
-    userRole = user.role;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { requestId } = await params;
-  const current = await db.reimbursementRequest.findUnique({ where: { id: requestId } });
-  if (!current || current.createdById !== userId) {
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess || requestAccess.request.createdById !== userId) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
+  const current = requestAccess.request;
   const skipCoachApproval =
-    userRole === "ADMIN" || current.coachId === userId;
+    requestAccess.isReimbursementAdmin || current.coachId === userId;
 
   let updated = await transitionRequestStatus({
     requestId,
@@ -42,23 +43,26 @@ export async function POST(
       actorId: userId,
       nextStatus: "COACH_APPROVED",
       action: "APPROVE",
-      comment: "Auto-approved (submitted by coach/admin)",
+      comment:
+        "Auto-approved at the initial review stage (submitted by a coach or reimbursement admin)",
     });
     invalidateApprovalCaches(current.teamId);
 
-    const [actor, admins] = await Promise.all([
+    const [actor, adminEmails] = await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
-      db.user.findMany({ where: { role: "ADMIN" }, select: { email: true } }),
+      getAdminReviewRecipientEmails({
+        districtId: current.team.school.districtId,
+        schoolId: current.team.schoolId,
+        programId: current.team.programId,
+      }),
     ]);
     if (actor?.email) {
-      const adminEmails = admins
-        .map((a) => a.email)
-        .filter((e): e is string => !!e && e !== actor.email);
-      if (adminEmails.length > 0) {
+      const otherAdminEmails = adminEmails.filter((email) => email !== actor.email);
+      if (otherAdminEmails.length > 0) {
         await sendNotification("COACH_APPROVED", {
           requestId,
           actorEmail: actor.email,
-          recipients: adminEmails,
+          recipients: otherAdminEmails,
           message: `Reimbursement ready for admin review: ${updated.title}`,
         });
       }

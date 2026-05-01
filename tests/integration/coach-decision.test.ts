@@ -9,6 +9,8 @@ import {
   createTeam,
   createMembership,
   createRequest,
+  createScopedRole,
+  createScopedRoleForTeam,
 } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
 
@@ -18,9 +20,27 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
     clearMockSession();
   });
 
-  it("coach approves SUBMITTED → 200, status=COACH_APPROVED", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+  it("unauthenticated → 401", async () => {
+    const user = await createUser({ role: "USER" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: user.id,
+      status: "SUBMITTED",
+    });
+
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+
+    expect(status).toBe(401);
+  });
+
+  it("membership-only coach approves SUBMITTED → 200, status=COACH_APPROVED", async () => {
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: coach.id,
@@ -34,7 +54,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -46,15 +66,11 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
     expect((data as any).status).toBe("COACH_APPROVED");
   });
 
-  it("coach rejects with comment → 200, status=COACH_REJECTED", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+  it("deprecated scoped coach rows without a team membership do not grant coach access", async () => {
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
-    await createMembership({
-      userId: coach.id,
-      teamId: team.id,
-      roleInTeam: "COACH",
-    });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
@@ -62,7 +78,35 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
+
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+
+    expect(status).toBe(404);
+  });
+
+  it("coach rejects with comment → 200, status=COACH_REJECTED", async () => {
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
+    const team = await createTeam();
+    await createMembership({
+      userId: coach.id,
+      teamId: team.id,
+      roleInTeam: "COACH",
+    });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: user.id,
+      coachId: coach.id,
+      status: "SUBMITTED",
+    });
+
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -78,21 +122,22 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
   });
 
   it("reject without comment → 400", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: coach.id,
       teamId: team.id,
       roleInTeam: "COACH",
     });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -103,8 +148,8 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
   });
 
   it("admin can also decide → 200", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -112,7 +157,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -124,7 +169,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
   });
 
   it("user → 403", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -132,7 +177,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -142,9 +187,9 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
     expect(status).toBe(403);
   });
 
-  it("coach not on this team → 403", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+  it("coach not on this team → 404", async () => {
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const otherTeam = await createTeam();
     // Coach is member of otherTeam, not the request's team
@@ -153,38 +198,40 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       teamId: otherTeam.id,
       roleInTeam: "COACH",
     });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: otherTeam.id, role: "COACH" });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
       { method: "POST", body: { decision: "APPROVE" } },
       { requestId: req.id }
     );
-    expect(status).toBe(403);
+    expect(status).toBe(404);
   });
 
   it("non-SUBMITTED request → throws (assertTransition)", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: coach.id,
       teamId: team.id,
       roleInTeam: "COACH",
     });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
       status: "DRAFT",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     await expect(
       callRouteJSON(
@@ -196,14 +243,15 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const coach = await createUser({ role: "COACH" });
+    const coach = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: coach.id,
       teamId: team.id,
       roleInTeam: "COACH",
     });
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -214,14 +262,15 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
   });
 
   it("creates ApprovalAction + AuditLog", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: coach.id,
       teamId: team.id,
       roleInTeam: "COACH",
     });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
@@ -229,7 +278,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
     await callRouteJSON(
       POST,
       { method: "POST", body: { decision: "APPROVE" } },
@@ -245,5 +294,49 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       where: { requestId: req.id },
     });
     expect(log!.eventType).toBe("REQUEST_STATUS_UPDATED");
+  });
+
+  it("notifies district-scoped school admins when approval advances to admin review", async () => {
+    const coach = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
+    const districtAdmin = await createUser({ role: "USER" });
+    const team = await createTeam();
+    const school = await db.school.findUniqueOrThrow({ where: { id: team.schoolId } });
+    await createMembership({
+      userId: coach.id,
+      teamId: team.id,
+      roleInTeam: "COACH",
+    });
+    await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
+    await createScopedRole({
+      userId: districtAdmin.id,
+      role: "SCHOOL_ADMIN",
+      districtId: school.districtId,
+    });
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: user.id,
+      coachId: coach.id,
+      status: "SUBMITTED",
+    });
+
+    setMockUser({ id: coach.id, email: coach.email, role: "USER" });
+
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+
+    expect(status).toBe(200);
+    expect(
+      await db.notification.findFirst({
+        where: {
+          userId: districtAdmin.id,
+          requestId: req.id,
+          event: "COACH_APPROVED",
+        },
+      })
+    ).toBeTruthy();
   });
 });

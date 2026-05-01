@@ -4,10 +4,26 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
-export function CreateTeamForm() {
+type CreateTeamFormProps = {
+  schools: Array<{
+    id: string;
+    name: string;
+    districtName: string;
+  }>;
+  programs: Array<{
+    id: string;
+    name: string;
+    code: string;
+  }>;
+};
+
+export function CreateTeamForm({ schools, programs }: CreateTeamFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [schoolId, setSchoolId] = useState(schools[0]?.id ?? "");
+  const [programId, setProgramId] = useState(programs[0]?.id ?? "");
   const [name, setName] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [glAccount, setGlAccount] = useState("");
@@ -16,7 +32,7 @@ export function CreateTeamForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !schoolId || !programId) return;
 
     setSaving(true);
     setError("");
@@ -26,6 +42,8 @@ export function CreateTeamForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          schoolId,
+          programId,
           name: name.trim(),
           shortCode: shortCode.trim() || undefined,
           glAccount: glAccount.trim() || undefined,
@@ -34,7 +52,13 @@ export function CreateTeamForm() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error?.fieldErrors?.name?.[0] ?? "Failed to create team");
+        setError(
+          data.error?.fieldErrors?.name?.[0] ??
+            data.error?.fieldErrors?.schoolId?.[0] ??
+            data.error?.fieldErrors?.programId?.[0] ??
+            data.error ??
+            "Failed to create team"
+        );
         return;
       }
 
@@ -59,10 +83,56 @@ export function CreateTeamForm() {
   return (
     <form onSubmit={handleSubmit} className="flex items-end gap-3">
       <div>
-        <label className="block text-xs font-medium text-slate-500 mb-1">
+        <label
+          htmlFor="create-team-school"
+          className="block text-xs font-medium text-slate-500 mb-1"
+        >
+          School
+        </label>
+        <Select
+          id="create-team-school"
+          value={schoolId}
+          onChange={(e) => setSchoolId(e.target.value)}
+          className="w-56"
+          disabled={schools.length === 0}
+        >
+          {schools.map((school) => (
+            <option key={school.id} value={school.id}>
+              {school.districtName} · {school.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div>
+        <label
+          htmlFor="create-team-program"
+          className="block text-xs font-medium text-slate-500 mb-1"
+        >
+          Program
+        </label>
+        <Select
+          id="create-team-program"
+          value={programId}
+          onChange={(e) => setProgramId(e.target.value)}
+          className="w-44"
+          disabled={programs.length === 0}
+        >
+          {programs.map((program) => (
+            <option key={program.id} value={program.id}>
+              {program.code} · {program.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div>
+        <label
+          htmlFor="create-team-name"
+          className="block text-xs font-medium text-slate-500 mb-1"
+        >
           Team Name
         </label>
         <Input
+          id="create-team-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Team 503"
@@ -72,10 +142,14 @@ export function CreateTeamForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500 mb-1">
+        <label
+          htmlFor="create-team-short-code"
+          className="block text-xs font-medium text-slate-500 mb-1"
+        >
           Short Code
         </label>
         <Input
+          id="create-team-short-code"
           value={shortCode}
           onChange={(e) => setShortCode(e.target.value)}
           placeholder="e.g. FF503"
@@ -84,10 +158,14 @@ export function CreateTeamForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500 mb-1">
+        <label
+          htmlFor="create-team-gl-account"
+          className="block text-xs font-medium text-slate-500 mb-1"
+        >
           GL Account
         </label>
         <Input
+          id="create-team-gl-account"
           value={glAccount}
           onChange={(e) => setGlAccount(e.target.value)}
           placeholder="e.g. 61-296-7920-099-978-0000"
@@ -95,7 +173,13 @@ export function CreateTeamForm() {
           className="w-56"
         />
       </div>
-      <Button type="submit" variant="primary" size="md" loading={saving}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="md"
+        loading={saving}
+        disabled={!schoolId || !programId}
+      >
         Create
       </Button>
       <Button

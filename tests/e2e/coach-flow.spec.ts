@@ -1,20 +1,30 @@
 import { test, expect } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openPageAndExpectHeading, signIn } from "./helpers";
 
 test.describe("Coach flow", () => {
-  test("sign in and view coach inbox", async ({ page }) => {
+  test("coach can load team pages and open a request", async ({ page }) => {
     await signIn(page, "coach@team.org", "Coach1234");
 
-    // Should land on dashboard
-    await expect(page.getByText("Dashboard")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
-    // Navigate to coach inbox
-    await page.getByText("Review Inbox").click();
-    await expect(page.getByText("Coach Inbox")).toBeVisible();
+    await openPageAndExpectHeading(page, "/coach/team-overview", "Team Overview");
+    await expect(page.getByText("Frog Force 503")).toBeVisible();
 
-    // Should show either pending requests or empty state
-    const hasPending = await page.getByText("pending").first().isVisible().catch(() => false);
-    const hasEmpty = await page.getByText("No pending requests").isVisible().catch(() => false);
-    expect(hasPending || hasEmpty).toBe(true);
+    await openPageAndExpectHeading(
+      page,
+      "/coach/team-reimbursements",
+      "Team Reimbursements"
+    );
+    const fieldTripRow = page.getByRole("row", { name: /Field Trip Supplies/i });
+    await expect(fieldTripRow).toBeVisible();
+    await fieldTripRow.click();
+    await expect(
+      page.getByRole("heading", { name: "Field Trip Supplies" })
+    ).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await openPageAndExpectHeading(page, "/team", "My Team");
+    await openPageAndExpectHeading(page, "/profile", "Profile");
   });
 });

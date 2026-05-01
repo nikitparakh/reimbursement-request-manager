@@ -1,4 +1,4 @@
-import { unauthorized } from "next/navigation";
+import { redirect, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,6 +10,11 @@ export default async function TeamPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
 
+  const hasMembership = await db.teamMembership.count({
+    where: { userId: session.user.id, approved: true },
+  });
+  if (!hasMembership) redirect("/onboarding");
+
   const myMemberships = await db.teamMembership.findMany({
     where: { userId: session.user.id, approved: true },
     select: {
@@ -20,6 +25,9 @@ export default async function TeamPage() {
           name: true,
           shortCode: true,
           glAccount: true,
+          fllDivision: true,
+          school: { select: { name: true, district: { select: { name: true } } } },
+          program: { select: { name: true } },
           memberships: {
             where: { approved: true },
             select: {
@@ -35,7 +43,7 @@ export default async function TeamPage() {
     },
   });
 
-  // Deduplicate by team (user could have both STUDENT and COACH roles in same team)
+  // Deduplicate by team in case a user has multiple scoped roles on the same team.
   const teamMap = new Map<
     string,
     {
@@ -43,6 +51,10 @@ export default async function TeamPage() {
       name: string;
       shortCode: string | null;
       glAccount: string | null;
+      schoolName: string;
+      districtName: string;
+      programName: string;
+      fllDivision: string | null;
       myRoles: string[];
       coaches: { id: string; name: string | null; email: string }[];
       parents: { id: string; name: string | null; email: string }[];
@@ -61,12 +73,16 @@ export default async function TeamPage() {
         name: membership.team.name,
         shortCode: membership.team.shortCode,
         glAccount: membership.team.glAccount,
+        schoolName: membership.team.school.name,
+        districtName: membership.team.school.district.name,
+        programName: membership.team.program.name,
+        fllDivision: membership.team.fllDivision,
         myRoles: [membership.roleInTeam],
         coaches: membership.team.memberships
           .filter((m) => m.roleInTeam === "COACH")
           .map((m) => m.user),
         parents: membership.team.memberships
-          .filter((m) => m.roleInTeam === "STUDENT")
+          .filter((m) => m.roleInTeam === "PARENT_MENTOR")
           .map((m) => m.user),
       });
     }
@@ -108,6 +124,10 @@ export default async function TeamPage() {
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
+                  <div className="mb-3 text-sm text-slate-500">
+                    {team.districtName} · {team.schoolName} · {team.programName}
+                    {team.fllDivision ? ` · FLL ${team.fllDivision}` : ""}
+                  </div>
                   <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-2">
                     Coaches
                   </h3>

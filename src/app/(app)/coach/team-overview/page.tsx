@@ -1,40 +1,52 @@
 import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { getCachedAccessContext } from "@/lib/access";
+import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CoachTeamRequestsTable } from "@/components/coach/coach-team-requests-table";
 import { CoachTeamMembersTable } from "@/components/coach/coach-team-members-table";
+import { getTeamOverviewDescription } from "@/lib/ui-copy";
 
 export default async function CoachTeamOverviewPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
-  if (session.user.role !== "COACH" && session.user.role !== "ADMIN")
-    unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
+  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
 
-  const coachedMemberships = await db.teamMembership.findMany({
-    where: {
-      userId: session.user.id,
-      roleInTeam: "COACH",
-      approved: true,
-    },
-    select: { teamId: true },
-  });
+  const managedTeams = access.canManageReimbursements
+    ? await db.team.findMany({
+        where: buildManagedTeamWhere(access),
+        select: { id: true },
+      })
+    : [];
 
-  const teamIds = coachedMemberships.map((m) => m.teamId);
+  const teamIds = Array.from(
+    new Set([
+      ...access.teamMemberships
+        .filter((membership) => membership.roleInTeam === "COACH")
+        .map((membership) => membership.teamId),
+      ...managedTeams.map((team) => team.id),
+    ])
+  );
 
   if (teamIds.length === 0) {
     return (
       <div className="space-y-6">
         <PageHeader
           title="Team Overview"
-          description="View your team details, requests, and members."
+          description={getTeamOverviewDescription(access)}
         />
         <EmptyState
           title="No team found"
-          description="You are not currently coaching any team."
+          description={
+            access.canManageReimbursements
+              ? "No teams are available in your managed scope."
+              : "You are not currently coaching any team."
+          }
         />
       </div>
     );
@@ -43,6 +55,8 @@ export default async function CoachTeamOverviewPage() {
   const teams = await db.team.findMany({
     where: { id: { in: teamIds } },
     include: {
+      school: { include: { district: true } },
+      program: true,
       memberships: {
         where: { approved: true },
         include: {
@@ -68,7 +82,7 @@ export default async function CoachTeamOverviewPage() {
     <div className="space-y-6">
       <PageHeader
         title="Team Overview"
-        description="View your team details, requests, and members."
+        description={getTeamOverviewDescription(access)}
       />
 
       {teams.map((team) => {
@@ -125,8 +139,11 @@ export default async function CoachTeamOverviewPage() {
                 }
                 description={
                   [
+                    `${team.school.district.name} / ${team.school.name}`,
+                    team.program.name,
                     team.shortCode ? `Code: ${team.shortCode}` : null,
                     team.glAccount ? `GL: ${team.glAccount}` : null,
+                    team.fllDivision ? `FLL ${team.fllDivision}` : null,
                   ]
                     .filter(Boolean)
                     .join("  ·  ") || "No short code"

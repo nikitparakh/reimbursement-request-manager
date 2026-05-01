@@ -14,14 +14,33 @@ datasource db {
 }
 
 enum GlobalRole {
-  STUDENT
+  USER
+  SUPER_ADMIN
+}
+
+enum ScopedRole {
+  SCHOOL_ADMIN
+  PROGRAM_ADMIN
   COACH
-  ADMIN
+  PARENT_MENTOR
 }
 
 enum TeamMembershipRole {
-  STUDENT
+  PARENT_MENTOR
   COACH
+}
+
+enum ProgramCode {
+  LEGACY
+  FLL
+  FTC
+  FRC
+}
+
+enum FllDivision {
+  DISCOVER
+  EXPLORE
+  CHALLENGE
 }
 
 enum TeamRegistrationStatus {
@@ -70,12 +89,22 @@ model User {
   passwordHash    String?
   emailVerified   DateTime?
   image           String?
-  role            GlobalRole         @default(STUDENT)
+  role            GlobalRole         @default(USER)
   onboardingDone  Boolean            @default(false)
+  mailingAddressLine1 String?
+  mailingAddressLine2 String?
+  mailingCity     String?
+  mailingState    String?
+  mailingPostalCode String?
+  zelleType       String?
+  zelleValue      String?
+  policyAcceptedAt DateTime?
+  policyVersion   String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   accounts        Account[]
   sessions        Session[]
+  scopedRoles     UserScopeRole[]
   memberships     TeamMembership[]
   createdRequests ReimbursementRequest[] @relation("RequestCreatedBy")
   coachedRequests ReimbursementRequest[] @relation("RequestCoach")
@@ -88,17 +117,95 @@ model User {
   lineItemComments  LineItemComment[]
 }
 
+model District {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  schools   School[]
+  teamRegistrationRequests TeamRegistrationRequest[]
+  scopedRoles UserScopeRole[]
+}
+
+model School {
+  id         String   @id @default(cuid())
+  districtId String
+  name       String
+  slug       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  teams      Team[]
+  teamRegistrationRequests TeamRegistrationRequest[]
+  scopedRoles UserScopeRole[]
+
+  @@unique([districtId, slug])
+  @@unique([districtId, name])
+}
+
+model Program {
+  id              String      @id @default(cuid())
+  code            ProgramCode @unique
+  name            String
+  description     String?
+  gradeRangeLabel String?
+  ageRangeLabel   String?
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  teams           Team[]
+  teamRegistrationRequests TeamRegistrationRequest[]
+  scopedRoles     UserScopeRole[]
+}
+
+model UserScopeRole {
+  id         String     @id @default(cuid())
+  userId      String
+  role        ScopedRole
+  districtId  String?
+  schoolId    String?
+  programId   String?
+  teamId      String?
+  scopeKey    String
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  district    District?  @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  school      School?    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  program      Program?   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  team        Team?      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role, scopeKey])
+  @@index([userId, role])
+  @@index([districtId, role])
+  @@index([schoolId, role])
+  @@index([programId, role])
+  @@index([teamId, role])
+}
+
 model Team {
   id                     String                    @id @default(cuid())
-  name                   String                    @unique
-  shortCode              String?                   @unique
+  schoolId               String
+  programId              String
+  name                   String
+  shortCode              String?
   glAccount              String?
+  fllDivision            FllDivision?
   active                 Boolean                   @default(true)
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
+  school                 School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  program                Program                   @relation(fields: [programId], references: [id], onDelete: Restrict)
+  scopedRoles            UserScopeRole[]
   memberships            TeamMembership[]
   requests               ReimbursementRequest[]
   teamRegistrationSource TeamRegistrationRequest?  @relation("ApprovedTeamSource")
+
+  @@unique([schoolId, programId, name])
+  @@unique([schoolId, shortCode])
+  @@index([schoolId, programId, active])
 }
 
 model TeamMembership {
@@ -118,9 +225,13 @@ model TeamMembership {
 
 model TeamRegistrationRequest {
   id            String                 @id @default(cuid())
+  districtId     String
+  schoolId       String
+  programId      String
   teamName       String
   shortCode      String?
   glAccount      String?
+  fllDivision    FllDivision?
   notes          String?
   status         TeamRegistrationStatus @default(PENDING)
   requestedById  String
@@ -130,11 +241,15 @@ model TeamRegistrationRequest {
   approvedTeamId String?                @unique
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
+  district       District               @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  school         School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  program        Program                @relation(fields: [programId], references: [id], onDelete: Restrict)
   requestedBy    User                   @relation("TeamRequestCreatedBy", fields: [requestedById], references: [id], onDelete: Cascade)
   reviewedBy     User?                  @relation("TeamRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   approvedTeam   Team?                  @relation("ApprovedTeamSource", fields: [approvedTeamId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
+  @@index([districtId, schoolId, programId, status])
 }
 
 model ReimbursementRequest {
@@ -146,7 +261,7 @@ model ReimbursementRequest {
   submittedAt    DateTime?
   teamId         String
   createdById    String
-  coachId        String?           @map("managerId")
+  coachId        String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   team           Team              @relation(fields: [teamId], references: [id], onDelete: Restrict)

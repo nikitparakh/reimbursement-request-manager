@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { canManageTeams, getCachedAccessContext } from "@/lib/access";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,13 +19,16 @@ export default async function AdminTeamDetailPage({
 }) {
   const session = await auth();
   if (!session?.user) unauthorized();
-  if (session.user.role !== "ADMIN") unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
+  if (!access.canManageTeams) unauthorized();
 
   const { teamId } = await params;
 
   const team = await db.team.findUnique({
     where: { id: teamId },
     include: {
+      school: { include: { district: true } },
+      program: true,
       memberships: {
         include: { user: { select: { id: true, name: true, email: true } } },
         orderBy: [{ roleInTeam: "asc" }, { createdAt: "asc" }],
@@ -50,6 +54,17 @@ export default async function AdminTeamDetailPage({
   });
 
   if (!team) notFound();
+
+  if (
+    !canManageTeams(access, {
+      districtId: team.school.district.id,
+      schoolId: team.schoolId,
+      programId: team.programId,
+      teamId: team.id,
+    })
+  ) {
+    notFound();
+  }
 
   const paidAmount = team.requests
     .filter((r) => r.status === "PAID")
@@ -92,8 +107,11 @@ export default async function AdminTeamDetailPage({
         badge={<Badge status={team.active ? "APPROVED" : "REJECTED"} />}
         description={
           [
+            `${team.school.district.name} / ${team.school.name}`,
+            team.program.name,
             team.shortCode ? `Code: ${team.shortCode}` : null,
             team.glAccount ? `GL: ${team.glAccount}` : null,
+            team.fllDivision ? `FLL ${team.fllDivision}` : null,
           ]
             .filter(Boolean)
             .join("  ·  ") || "No short code"
@@ -146,7 +164,7 @@ export default async function AdminTeamDetailPage({
               description="No submitted requests for this team yet."
             />
           ) : (
-            <TeamRequestsTable data={requestRows} />
+            <TeamRequestsTable data={requestRows} teamId={team.id} />
           )}
         </CardContent>
       </Card>

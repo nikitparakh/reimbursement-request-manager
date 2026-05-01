@@ -1,6 +1,7 @@
 import { redirect, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { getCachedAccessContext } from "@/lib/access";
 import {
   TeamReimbursementsTable,
   type ReimbursementRow,
@@ -11,9 +12,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 export default async function UserRequestsPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
 
-  if (session.user.role === "COACH") redirect("/coach/team-reimbursements");
-  if (session.user.role === "ADMIN") redirect("/admin/requests");
+  if (access.canManageReimbursements) redirect("/admin/requests");
+  if (access.isCoach) redirect("/coach/team-reimbursements");
 
   const requests = await db.reimbursementRequest.findMany({
     where: { createdById: session.user.id },

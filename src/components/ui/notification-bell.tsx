@@ -8,15 +8,10 @@ type Notification = {
   event: string;
   message: string;
   requestId: string | null;
+  requestHref: string | null;
   read: boolean;
   createdAt: string;
 };
-
-function requestHref(requestId: string, role: string): string {
-  return role === "ADMIN"
-    ? `/admin/requests/${requestId}`
-    : `/user/requests/${requestId}`;
-}
 
 function formatTime(iso: string, now: number) {
   const diff = now - new Date(iso).getTime();
@@ -34,7 +29,7 @@ async function fetchNotificationsData() {
   return res.json() as Promise<{ notifications: Notification[]; unreadCount: number }>;
 }
 
-export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }) {
+export function NotificationBell() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -44,6 +39,9 @@ export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }
 
   useEffect(() => {
     let cancelled = false;
+    if (!open) {
+      return;
+    }
 
     async function poll() {
       const data = await fetchNotificationsData().catch(() => null);
@@ -63,7 +61,7 @@ export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }
       clearInterval(fetchInterval);
       clearInterval(timeInterval);
     };
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -94,9 +92,9 @@ export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }
 
   function handleNotificationClick(n: Notification) {
     if (!n.read) void markAsRead(n.id);
-    if (n.requestId) {
+    if (n.requestHref) {
       setOpen(false);
-      router.push(requestHref(n.requestId, userRole));
+      router.push(n.requestHref);
     }
   }
 
@@ -136,7 +134,7 @@ export function NotificationBell({ userRole = "STUDENT" }: { userRole?: string }
                   onClick={() => handleNotificationClick(n)}
                   className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition ${
                     n.read ? "opacity-60" : ""
-                  } ${n.requestId ? "cursor-pointer" : ""}`}
+                  } ${n.requestHref ? "cursor-pointer" : ""}`}
                 >
                   <div className="flex items-start gap-2">
                     {!n.read && (

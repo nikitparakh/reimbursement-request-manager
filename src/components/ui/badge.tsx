@@ -17,11 +17,21 @@ const colorMap: Record<string, string> = {
   REJECT: "bg-red-100 text-red-800",
   REOPEN: "bg-amber-100 text-amber-800",
   MARK_PAID: "bg-indigo-100 text-indigo-800",
+  SUPER_ADMIN: "bg-slate-900 text-white",
+  USER: "bg-slate-100 text-slate-700",
+  SCHOOL_ADMIN: "bg-emerald-100 text-emerald-800",
+  PROGRAM_ADMIN: "bg-cyan-100 text-cyan-800",
+  PARENT_MENTOR: "bg-blue-100 text-blue-800",
   STUDENT: "bg-blue-100 text-blue-800",
   COACH: "bg-purple-100 text-purple-800",
 };
 
 const labelMap: Record<string, string> = {
+  SUPER_ADMIN: "SUPER ADMIN",
+  USER: "USER",
+  SCHOOL_ADMIN: "SCHOOL ADMIN",
+  PROGRAM_ADMIN: "PROGRAM ADMIN",
+  PARENT_MENTOR: "PARENT / MENTOR",
   STUDENT: "PARENT/MENTOR",
   COACH: "COACH",
   COACH_APPROVED: "COACH APPROVED",

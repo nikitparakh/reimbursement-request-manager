@@ -9,9 +9,8 @@ type UserRoleSelectProps = {
 };
 
 const roleOptions: { value: GlobalRole; label: string }[] = [
-  { value: "STUDENT", label: "Parent/Mentor" },
-  { value: "COACH", label: "Coach" },
-  { value: "ADMIN", label: "Admin" },
+  { value: "USER", label: "User" },
+  { value: "SUPER_ADMIN", label: "Super Admin" },
 ];
 
 export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {

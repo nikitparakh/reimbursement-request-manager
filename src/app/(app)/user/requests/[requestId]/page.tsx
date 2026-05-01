@@ -14,20 +14,30 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
+import { getDraftRequestUiState } from "@/lib/reimbursements/request-detail-view";
 
-function decisionConfig(status: string, requestId: string, isAdmin: boolean) {
-  if (isAdmin && status === "ADMIN_APPROVED") {
+function decisionConfig(
+  status: string,
+  requestId: string,
+  isReimbursementAdmin: boolean
+) {
+  if (isReimbursementAdmin && status === "ADMIN_APPROVED") {
     return {
       endpoint: `/api/requests/${requestId}/admin-decision`,
       showApproveReject: false,
       allowMarkPaid: true,
     };
   }
-  if (isAdmin && (status === "COACH_APPROVED" || status === "SUBMITTED")) {
+  if (
+    isReimbursementAdmin &&
+    (status === "COACH_APPROVED" || status === "SUBMITTED")
+  ) {
     return {
-      endpoint: status === "SUBMITTED"
-        ? `/api/requests/${requestId}/coach-decision`
-        : `/api/requests/${requestId}/admin-decision`,
+      endpoint:
+        status === "SUBMITTED"
+          ? `/api/requests/${requestId}/coach-decision`
+          : `/api/requests/${requestId}/admin-decision`,
       showApproveReject: true,
       allowMarkPaid: status === "COACH_APPROVED",
     };
@@ -51,6 +61,9 @@ export default async function UserRequestDetailPage({
   if (!session?.user) unauthorized();
 
   const { requestId } = await params;
+  const requestAccess = await getRequestAccess(session.user.id, requestId);
+  if (!requestAccess || !requestAccess.canView) notFound();
+
   const requestRecord = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
     include: {
@@ -78,18 +91,6 @@ export default async function UserRequestDetailPage({
 
   if (!requestRecord) notFound();
 
-  const isOwner = requestRecord.createdById === session.user.id;
-  const isAdmin = session.user.role === "ADMIN";
-  const isTeamCoach =
-    session.user.role === "COACH" &&
-    !!(await db.teamMembership.findFirst({
-      where: { userId: session.user.id, teamId: requestRecord.teamId },
-    }));
-
-  if (!isOwner && !isAdmin && !isTeamCoach) {
-    notFound();
-  }
-
   const status = requestRecord.status;
   const hasExtractions = requestRecord.receiptFiles.some((f) => f.extraction !== null);
   const hasUnparsedReceipts = requestRecord.receiptFiles.some(
@@ -97,27 +98,30 @@ export default async function UserRequestDetailPage({
   );
 
   const receiptsWithExtractions = serializeReceipts(requestRecord.receiptFiles);
+  const draftUi = getDraftRequestUiState({
+    status,
+    canEditDraft: requestAccess.canEditDraft,
+    isOwner: requestAccess.isOwner,
+  });
 
-  const canEditLineItems =
-    (isAdmin && (status === "SUBMITTED" || status === "COACH_APPROVED")) ||
-    (isTeamCoach && status === "SUBMITTED");
-
+  const canEditLineItems = status !== "DRAFT" && requestAccess.canEditLineItems;
   const canDecide =
-    (isAdmin && ["SUBMITTED", "COACH_APPROVED", "ADMIN_APPROVED"].includes(status)) ||
-    (isTeamCoach && status === "SUBMITTED");
+    (requestAccess.isReimbursementAdmin &&
+      ["SUBMITTED", "COACH_APPROVED", "ADMIN_APPROVED"].includes(status)) ||
+    (requestAccess.isCoach && status === "SUBMITTED");
 
-  const redirectUrl = session.user.role === "COACH"
-    ? "/coach/team-reimbursements"
-    : session.user.role === "ADMIN"
-      ? "/admin/team-requests"
-      : "/user/requests";
-
-  const decision = canDecide ? decisionConfig(status, requestRecord.id, isAdmin) : null;
+  const decision = canDecide
+    ? decisionConfig(
+        status,
+        requestRecord.id,
+        requestAccess.isReimbursementAdmin
+      )
+    : null;
 
   return (
     <LiveTotalProvider initialTotal={Number(requestRecord.requestedTotal)}>
     <div className="space-y-6">
-      {status === "DRAFT" ? (
+      {draftUi.showEditableDraftSections ? (
         <EditableRequestHeader
           requestId={requestRecord.id}
           initialTitle={requestRecord.title}
@@ -126,6 +130,7 @@ export default async function UserRequestDetailPage({
       ) : (
         <PageHeader
           title={requestRecord.title}
+          description={requestRecord.description ?? undefined}
           badge={<Badge status={status} />}
           action={<DownloadPdfLink requestId={requestRecord.id} />}
         />
@@ -159,7 +164,7 @@ export default async function UserRequestDetailPage({
         </Card>
       </div>
 
-      {status === "DRAFT" ? (
+      {draftUi.showEditableDraftSections ? (
         <Card>
           <CardContent>
             <RequestActions
@@ -171,9 +176,36 @@ export default async function UserRequestDetailPage({
               hasExtractions={hasExtractions}
               hasUnparsedReceipts={hasUnparsedReceipts}
               receiptsWithExtractions={receiptsWithExtractions}
-              redirectUrl={redirectUrl}
-              userRole={session.user.role}
+              redirectUrl={requestAccess.redirectUrl}
+              submitToAdmin={
+                requestAccess.isReimbursementAdmin || requestAccess.isCoach
+              }
+              canSubmit={draftUi.canSubmitDraft}
             />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {draftUi.showReadOnlyDraftSections ? (
+        <Card>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-500">
+              This draft is view-only for you. Only the request creator, team
+              coach, or a scoped admin can edit it.
+            </p>
+            <ReceiptPollingWrapper
+              requestId={requestRecord.id}
+              hasProcessing={requestRecord.receiptFiles.some(
+                (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
+              )}
+            >
+              <ExtractionReview
+                receipts={receiptsWithExtractions}
+                parseStatuses={Object.fromEntries(
+                  requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus])
+                )}
+              />
+            </ReceiptPollingWrapper>
           </CardContent>
         </Card>
       ) : null}

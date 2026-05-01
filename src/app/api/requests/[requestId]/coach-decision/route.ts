@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { requireUser } from "@/lib/rbac";
 import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
+import { getAdminReviewRecipientEmails } from "@/lib/notifications/admin-review-recipients";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 const schema = z.object({
   decision: z.enum(["APPROVE", "REJECT"]),
@@ -16,12 +18,18 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   let actorId = "";
-  let actorRole: "COACH" | "ADMIN" = "COACH";
   try {
-    const actor = await requireRole("COACH", "ADMIN");
-    actorId = actor.id;
-    actorRole = actor.role === "ADMIN" ? "ADMIN" : "COACH";
+    actorId = (await requireUser()).id;
   } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { requestId } = await params;
+  const requestAccess = await getRequestAccess(actorId, requestId);
+  if (!requestAccess || !requestAccess.canView) {
+    return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  }
+  if (!requestAccess.isCoach && !requestAccess.isReimbursementAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,23 +38,7 @@ export async function POST(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const { requestId } = await params;
-  const current = await db.reimbursementRequest.findUnique({ where: { id: requestId } });
-  if (!current) return NextResponse.json({ error: "Request not found" }, { status: 404 });
-
-  if (actorRole === "COACH") {
-    const coachMembership = await db.teamMembership.findFirst({
-      where: {
-        userId: actorId,
-        teamId: current.teamId,
-        roleInTeam: "COACH",
-        approved: true,
-      },
-    });
-    if (!coachMembership) {
-      return NextResponse.json({ error: "Forbidden for this team" }, { status: 403 });
-    }
-  }
+  const current = requestAccess.request;
 
   if (body.data.decision === "REJECT" && !body.data.comment) {
     return NextResponse.json(
@@ -63,14 +55,19 @@ export async function POST(
     comment: body.data.comment,
   });
   invalidateApprovalCaches(current.teamId);
-  const [creator, actor, admins] = await Promise.all([
+  const [creator, actor, adminEmails] = await Promise.all([
     db.user.findUnique({ where: { id: current.createdById } }),
     db.user.findUnique({ where: { id: actorId } }),
-    db.user.findMany({ where: { role: "ADMIN" }, select: { email: true } }),
+    getAdminReviewRecipientEmails({
+      districtId: current.team.school.districtId,
+      schoolId: current.team.schoolId,
+      programId: current.team.programId,
+    }),
   ]);
   if (creator?.email && actor?.email) {
     const event = body.data.decision === "APPROVE" ? "COACH_APPROVED" as const : "COACH_REJECTED" as const;
-    const message = `Coach ${body.data.decision.toLowerCase()}d reimbursement: ${current.title}`;
+    const reviewerLabel = requestAccess.isReimbursementAdmin ? "Admin" : "Coach";
+    const message = `${reviewerLabel} ${body.data.decision.toLowerCase()}d reimbursement: ${current.title}`;
 
     await sendNotification(event, {
       requestId,
@@ -80,14 +77,12 @@ export async function POST(
     });
 
     if (body.data.decision === "APPROVE") {
-      const adminEmails = admins
-        .map((a) => a.email)
-        .filter((e): e is string => !!e && e !== actor.email);
-      if (adminEmails.length > 0) {
+      const otherAdminEmails = adminEmails.filter((email) => email !== actor.email);
+      if (otherAdminEmails.length > 0) {
         await sendNotification("COACH_APPROVED", {
           requestId,
           actorEmail: actor.email,
-          recipients: adminEmails,
+          recipients: otherAdminEmails,
           message: `Reimbursement ready for admin review: ${current.title}`,
         });
       }

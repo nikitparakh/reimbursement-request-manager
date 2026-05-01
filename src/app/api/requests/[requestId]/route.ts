@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -22,6 +23,10 @@ export async function GET(
   }
   const { requestId } = await params;
 
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!requestAccess.canView) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const record = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
     include: {
@@ -32,14 +37,6 @@ export async function GET(
 
   if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const canView =
-    record.createdById === userId ||
-    (await db.teamMembership.findFirst({
-      where: { userId, teamId: record.teamId, approved: true },
-    })) !== null;
-
-  if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   return NextResponse.json(record);
 }
 
@@ -47,32 +44,24 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  let user;
+  let userId = "";
   try {
-    user = await requireUser();
+    userId = (await requireUser()).id;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { requestId } = await params;
-  const record = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    select: { createdById: true, status: true, teamId: true },
-  });
-
-  if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (record.status !== "DRAFT")
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!requestAccess.canView) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (requestAccess.request.status !== "DRAFT")
     return NextResponse.json(
       { error: "Only draft requests can be edited" },
       { status: 400 }
     );
-
-  if (record.createdById !== user.id && user.role !== "ADMIN") {
-    const coachMembership = await db.teamMembership.findFirst({
-      where: { userId: user.id, teamId: record.teamId, roleInTeam: "COACH", approved: true },
-    });
-    if (!coachMembership)
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!requestAccess.canEditDraft) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = patchSchema.safeParse(await request.json());
@@ -95,32 +84,24 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  let user;
+  let userId = "";
   try {
-    user = await requireUser();
+    userId = (await requireUser()).id;
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { requestId } = await params;
 
-  const record = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    select: { createdById: true, status: true, teamId: true },
-  });
-
-  if (!record) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (record.status !== "DRAFT")
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!requestAccess.canView) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (requestAccess.request.status !== "DRAFT")
     return NextResponse.json(
       { error: "Only draft requests can be deleted" },
       { status: 400 }
     );
-
-  if (record.createdById !== user.id && user.role !== "ADMIN") {
-    const coachMembership = await db.teamMembership.findFirst({
-      where: { userId: user.id, teamId: record.teamId, roleInTeam: "COACH", approved: true },
-    });
-    if (!coachMembership)
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!requestAccess.canEditDraft) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await db.reimbursementRequest.delete({ where: { id: requestId } });

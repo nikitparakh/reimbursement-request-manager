@@ -19,19 +19,19 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("user submits draft → 200, status=SUBMITTED", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     await createMembership({
       userId: user.id,
       teamId: team.id,
-      roleInTeam: "STUDENT",
+      roleInTeam: "PARENT_MENTOR",
     });
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -45,14 +45,14 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("creates ApprovalAction with action=SUBMIT", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
     const approval = await db.approvalAction.findFirst({
@@ -64,14 +64,14 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("creates AuditLog entry", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
     const log = await db.auditLog.findFirst({
@@ -82,15 +82,15 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("non-creator → 404", async () => {
-    const user = await createUser({ role: "STUDENT" });
-    const other = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
+    const other = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
       createdById: user.id,
     });
 
-    setMockUser({ id: other.id, email: other.email, role: "STUDENT" });
+    setMockUser({ id: other.id, email: other.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -101,7 +101,7 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("already submitted → throws (assertTransition)", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -109,7 +109,7 @@ describe("POST /api/requests/[requestId]/submit", () => {
       status: "SUBMITTED",
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
 
     await expect(
       callRouteJSON(POST, { method: "POST" }, { requestId: req.id })
@@ -117,8 +117,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const user = await createUser({ role: "STUDENT" });
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,

@@ -13,9 +13,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
     clearMockSession();
   });
 
-  it("admin approves COACH_APPROVED → 200, status=ADMIN_APPROVED", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+  it("unauthenticated → 401", async () => {
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -23,7 +22,26 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+
+    expect(status).toBe(401);
+  });
+
+  it("admin approves COACH_APPROVED → 200, status=ADMIN_APPROVED", async () => {
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
+    const team = await createTeam();
+    const req = await createRequest({
+      teamId: team.id,
+      createdById: user.id,
+      status: "COACH_APPROVED",
+    });
+
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -36,8 +54,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("admin rejects with comment → 200, status=ADMIN_REJECTED", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -45,7 +63,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -61,8 +79,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("reject without comment → 400", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -70,7 +88,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -81,8 +99,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("admin marks ADMIN_APPROVED as PAID → 200", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -90,7 +108,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "ADMIN_APPROVED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status, data } = await callRouteJSON(
       POST,
@@ -103,7 +121,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("user → 403", async () => {
-    const user = await createUser({ role: "STUDENT" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -111,7 +129,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: user.id, email: user.email, role: "STUDENT" });
+    setMockUser({ id: user.id, email: user.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -121,9 +139,9 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
     expect(status).toBe(403);
   });
 
-  it("coach → 403", async () => {
-    const coach = await createUser({ role: "COACH" });
-    const user = await createUser({ role: "STUDENT" });
+  it("outsider → 404", async () => {
+    const outsider = await createUser({ role: "USER" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -131,19 +149,19 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: coach.id, email: coach.email, role: "COACH" });
+    setMockUser({ id: outsider.id, email: outsider.email, role: "USER" });
 
     const { status } = await callRouteJSON(
       POST,
       { method: "POST", body: { decision: "APPROVE" } },
       { requestId: req.id }
     );
-    expect(status).toBe(403);
+    expect(status).toBe(404);
   });
 
   it("wrong starting status → throws (assertTransition)", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -151,7 +169,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "DRAFT",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     await expect(
       callRouteJSON(
@@ -163,8 +181,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("nonexistent → 404", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status } = await callRouteJSON(
       POST,
@@ -175,8 +193,8 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
   });
 
   it("creates ApprovalAction + AuditLog", async () => {
-    const admin = await createUser({ role: "ADMIN" });
-    const user = await createUser({ role: "STUDENT" });
+    const admin = await createUser({ role: "SUPER_ADMIN" });
+    const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
       teamId: team.id,
@@ -184,7 +202,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       status: "COACH_APPROVED",
     });
 
-    setMockUser({ id: admin.id, email: admin.email, role: "ADMIN" });
+    setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
     await callRouteJSON(
       POST,
       { method: "POST", body: { decision: "APPROVE" } },

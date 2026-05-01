@@ -1,11 +1,15 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
+import { buildGetTokenOptions } from "@/lib/auth-cookies";
+import { env } from "@/lib/env";
+import { POLICY_PATH } from "@/lib/policy";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublic =
     pathname === "/" ||
+    pathname === POLICY_PATH ||
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
     pathname.startsWith("/admin-sign-up") ||
@@ -17,7 +21,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
+  const token = await getToken({
+    req: request,
+    ...buildGetTokenOptions(env.AUTH_SECRET),
+  });
 
   if (!token) {
     if (pathname.startsWith("/api/")) {

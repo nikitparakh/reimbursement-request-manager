@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
 import { uploadReceiptFile } from "@/lib/storage";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function POST(
   request: Request,
@@ -15,15 +16,13 @@ export async function POST(
   }
 
   const { requestId } = await params;
-  const reimbursementRequest = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-  });
+  const requestAccess = await getRequestAccess(userId, requestId);
 
-  if (!reimbursementRequest || reimbursementRequest.createdById !== userId) {
+  if (!requestAccess || !requestAccess.canView) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
 
-  if (reimbursementRequest.status !== "DRAFT") {
+  if (!requestAccess.canEditDraft) {
     return NextResponse.json(
       { error: "Receipts can only be added while request is draft" },
       { status: 400 }

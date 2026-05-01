@@ -1,6 +1,6 @@
 # Reimbursement Request Manager
 
-A multi-role reimbursement workflow app for school robotics teams. Parents/mentors submit receipt-backed reimbursement requests, coaches review and approve, and admins give final sign-off and mark payment.
+A multi-tenant reimbursement workflow app for school robotics teams. Parents and mentors submit receipt-backed reimbursement requests, coaches handle team-level review, and scoped reimbursement admins or super admins complete approval and payment.
 
 **Live demo:** [reimbursement-request-manager.vercel.app](https://reimbursement-request-manager.vercel.app)
 
@@ -21,26 +21,39 @@ A multi-role reimbursement workflow app for school robotics teams. Parents/mento
 ## Workflow
 
 ```
-Parent/Mentor                 Coach                  Admin
-     |                          |                      |
-  Create Draft ──► Upload       |                      |
-  Receipts ──► AI Parse ──►     |                      |
-  Review Line Items ──►         |                      |
-  Submit ──────────────► Review & Approve ──────►      |
-                         or Reject ◄─────────── Review & Approve
-                                                 or Reject
-                                                 or Mark Paid
+Parent/Mentor           Coach / Reimbursement Admin      Reimbursement Admin
+     |                               |                           |
+  Create Draft ──► Upload            |                           |
+  Receipts ──► AI Parse ──►          |                           |
+  Review Line Items ──►              |                           |
+  Submit ───────────────────────► Initial Review ───────────► Final Review
+                                 Approve / Reject            Approve / Reject
+                                                             or Mark Paid
 ```
 
 **Statuses:** `DRAFT` → `SUBMITTED` → `COACH_APPROVED` / `COACH_REJECTED` → `ADMIN_APPROVED` / `ADMIN_REJECTED` → `PAID`
 
-## Roles
+## Access Model
 
-| Role | Label | Capabilities |
-|------|-------|-------------|
-| `STUDENT` | Parent/Mentor | Create requests, upload receipts, edit line items, submit |
-| `COACH` | Coach | All parent/mentor abilities + review/approve/reject submitted requests |
-| `ADMIN` | Admin | Approve/reject coach-approved requests, mark paid, manage teams and users |
+| Layer | Value | What it means | Capabilities |
+|------|-------|---------------|--------------|
+| Global role | `USER` | Standard signed-in account | Can onboard, hold team memberships, and submit requests through team membership |
+| Global role | `SUPER_ADMIN` | Platform-wide administrator | Manage users, teams, registrations, reimbursements, and settings everywhere |
+| Scoped admin role | `SCHOOL_ADMIN` | Reimbursement admin for one school (or a district-scoped school admin row) | Manage users, teams, registrations, and reimbursements inside the assigned school scope |
+| Scoped admin role | `PROGRAM_ADMIN` | Reimbursement admin for one school + program pair | Manage teams, registrations, and reimbursements inside the assigned program scope |
+| Team membership | `COACH` | Team-level reviewer and workspace manager | Review submitted requests, manage the team workspace, and see coach surfaces |
+| Team membership | `PARENT_MENTOR` | Team member / requester | Create drafts, upload receipts, edit line items, submit requests, and view the team roster |
+
+Canonical rules in the app:
+
+- `User.role` is global-only and currently supports `USER` or `SUPER_ADMIN`.
+- `UserScopeRole` is used for scoped admin assignments such as `SCHOOL_ADMIN` and `PROGRAM_ADMIN`.
+- `TeamMembership` is the source of truth for roster roles such as `COACH` and `PARENT_MENTOR`.
+- Scoped reimbursement admins may act at the initial review stage when needed, but those actions are labeled as admin actions in the workflow and notifications.
+
+### Legacy Upgrade Note
+
+Pre-refactor databases are migrated into a placeholder inactive `LEGACY` program and default legacy district/school records so existing teams, requests, and memberships remain valid until they are reclassified into active school/program assignments.
 
 ## Getting Started
 
@@ -97,15 +110,24 @@ The setup script auto-generates `AUTH_SECRET`. To set other values, edit `.env`:
 
 ### Seed Accounts
 
-The seed script creates a team ("Demo Team 503") with three users you can sign in with immediately:
+The seed script loads a verified Novi-area catalog for `Novi Community School District` and creates five demo users you can sign in with immediately:
 
-| Email | Password | Role |
-|-------|----------|------|
-| `admin@school.org` | `Admin1234` | Admin |
-| `coach@team.org` | `Coach1234` | Coach |
-| `user@team.org` | `User1234` | Parent/Mentor |
+| Email | Password | Access |
+|-------|----------|--------|
+| `admin@school.org` | `Admin1234` | Super admin |
+| `schooladmin@school.org` | `SchoolAdmin1234` | School admin across the seeded Novi schools |
+| `programadmin@school.org` | `ProgramAdmin1234` | Program admin for seeded FLL schools |
+| `coach@team.org` | `Coach1234` | Coach on `Frog Force 503` |
+| `user@team.org` | `User1234` | Parent/Mentor on `Frog Force 503` |
 
-It also creates sample reimbursement requests in various statuses (draft, submitted, coach-approved) with receipts and line items, plus a pending team registration request.
+Seeded public teams include:
+
+- `Frog Force 503` at `Novi High School` (`FRC`)
+- `Robo Rhinos` at `Novi Middle School` (`FTC`)
+- `Frog Tech` at `Novi Meadows Elementary School` (`FLL Challenge`)
+- `Galaxy Frogs`, `LEGO RYDERS`, and `Whale Titans` at `Parkview Elementary School` (`FLL`)
+
+It also creates sample reimbursement requests in various statuses (draft, submitted, coach-approved) for `Frog Force 503`, with receipts and line items, plus a pending sample team registration request.
 
 ## Project Structure
 
@@ -119,7 +141,7 @@ src/
 │   │   ├── user/requests/      # Create, view, manage requests
 │   │   ├── coach/              # Coach inbox + team reimbursements
 │   │   └── admin/              # Inbox, requests, users, teams, team-requests
-│   ├── (auth)/                 # Public auth routes (sign-in, sign-up, admin-sign-up)
+│   ├── (auth)/                 # Public auth routes (sign-in, sign-up)
 │   └── api/                    # Route handlers
 │       ├── auth/               # Registration + NextAuth
 │       ├── requests/           # CRUD, submit, reopen, parse, autofill, line-items,

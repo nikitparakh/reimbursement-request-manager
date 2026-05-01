@@ -1,36 +1,44 @@
 import { test, expect } from "@playwright/test";
-import { signIn } from "./helpers";
+import { createDraft, openPageAndExpectHeading, signIn } from "./helpers";
 
 test.describe("User flow", () => {
-  test("sign in and create a new request", async ({ page }) => {
-    // Sign in as the seeded user
-    await signIn(page, "user@team.org", "User1234");
-
-    // Should land on dashboard
-    await expect(page.getByText("Dashboard")).toBeVisible();
-
-    // Navigate to new request page
-    await page.getByText("New Request").click();
-    await expect(page.getByText("New Reimbursement Request")).toBeVisible();
-
-    // Fill request form
-    await page.getByLabel("Title").fill("E2E Test Request");
-    await page.getByLabel("Description").fill("Testing via Playwright");
-
-    // Team should already be selected (seeded team)
-    const createButton = page.getByRole("button", { name: /create draft/i });
-    await createButton.click();
-
-    // Button should show loading state
-    await expect(createButton).toBeDisabled();
-
-    // Should show success message
-    await expect(page.getByText("Draft created successfully")).toBeVisible({
-      timeout: 10_000,
+  test("notification polling waits until the bell is opened", async ({ page }) => {
+    const notificationRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/notifications")) {
+        notificationRequests.push(request.url());
+      }
     });
 
-    // Should have a link to open the request
-    const openLink = page.getByText("Open request to upload receipts");
-    await expect(openLink).toBeVisible();
+    await signIn(page, "user@team.org", "User1234");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    await page.waitForTimeout(1_000);
+
+    expect(notificationRequests).toHaveLength(0);
+
+    await page.getByRole("button", { name: /notifications/i }).click();
+    await expect
+      .poll(() => notificationRequests.length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThan(0);
+  });
+
+  test("parent mentor can load member pages and create a draft", async ({
+    page,
+  }) => {
+    const title = `E2E User Draft ${Date.now()}`;
+
+    await signIn(page, "user@team.org", "User1234");
+
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+    await openPageAndExpectHeading(page, "/team", "My Team");
+    await expect(page.getByText("Frog Force 503")).toBeVisible();
+    await openPageAndExpectHeading(page, "/user/requests", "My Requests");
+    await openPageAndExpectHeading(page, "/profile", "Profile");
+
+    await createDraft(page, title, "Testing via Playwright");
+    await expect(page.getByRole("button", { name: /delete draft/i })).toBeVisible();
   });
 });

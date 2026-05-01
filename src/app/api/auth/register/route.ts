@@ -2,6 +2,7 @@ import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { CURRENT_POLICY_VERSION } from "@/lib/policy";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -13,8 +14,10 @@ const registerSchema = z.object({
     .regex(/[A-Z]/, "Password must include at least one uppercase letter")
     .regex(/[a-z]/, "Password must include at least one lowercase letter")
     .regex(/[0-9]/, "Password must include at least one number"),
-  role: z.enum(["STUDENT", "ADMIN"]).default("STUDENT"),
-});
+  policyAccepted: z.literal(true, {
+    error: "Policy acceptance is required",
+  }),
+}).strict();
 
 export async function POST(request: Request) {
   try {
@@ -35,8 +38,10 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         email,
         passwordHash,
-        role: parsed.data.role,
+        role: "USER",
         onboardingDone: false,
+        policyAcceptedAt: new Date(),
+        policyVersion: CURRENT_POLICY_VERSION,
       },
       select: {
         id: true,

@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import {
+  canManageReimbursements,
+  getCachedAccessContext,
+} from "@/lib/access";
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
 import { ExtractionReview } from "@/components/reimbursements/extraction-review";
@@ -21,21 +25,42 @@ const ADMIN_VISIBLE_STATUSES = [
   "PAID",
 ];
 
+const BACK_LABELS: Record<string, { href: string; label: string }> = {
+  inbox: { href: "/admin/inbox", label: "Back to inbox" },
+  requests: { href: "/admin/requests", label: "Back to reimbursements" },
+};
+
 export default async function AdminRequestDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ requestId: string }>;
+  searchParams: Promise<{ from?: string; teamId?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) unauthorized();
-  if (session.user.role !== "ADMIN") unauthorized();
+  const access = await getCachedAccessContext(session.user.id);
+  if (!access.canManageReimbursements) unauthorized();
 
-  const { requestId } = await params;
+  const [{ requestId }, resolvedSearch] = await Promise.all([params, searchParams]);
+
+  const backTarget = resolvedSearch.teamId
+    ? { href: `/admin/teams/${resolvedSearch.teamId}`, label: "Back to team" }
+    : BACK_LABELS[resolvedSearch.from ?? ""] ?? BACK_LABELS.inbox;
   const request = await db.reimbursementRequest.findUnique({
     where: { id: requestId },
     include: {
       createdBy: { select: { name: true, email: true } },
-      team: { select: { id: true, name: true, glAccount: true } },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          glAccount: true,
+          schoolId: true,
+          programId: true,
+          school: { select: { districtId: true } },
+        },
+      },
       receiptFiles: {
         include: {
           extraction: {
@@ -60,7 +85,16 @@ export default async function AdminRequestDetailPage({
     },
   });
 
-  if (!request || !ADMIN_VISIBLE_STATUSES.includes(request.status)) {
+  if (
+    !request ||
+    !ADMIN_VISIBLE_STATUSES.includes(request.status) ||
+    !canManageReimbursements(access, {
+      districtId: request.team.school.districtId,
+      schoolId: request.team.schoolId,
+      programId: request.team.programId,
+      teamId: request.team.id,
+    })
+  ) {
     notFound();
   }
 
@@ -76,10 +110,10 @@ export default async function AdminRequestDetailPage({
     <div className="space-y-6">
       <div>
         <Link
-          href="/admin/inbox"
+          href={backTarget.href}
           className="text-sm text-slate-500 hover:text-emerald-600 transition"
         >
-          &larr; Back to inbox
+          &larr; {backTarget.label}
         </Link>
       </div>
 

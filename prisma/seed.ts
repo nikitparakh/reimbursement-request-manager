@@ -1,5 +1,168 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  type FllDivision,
+  type GlobalRole,
+  type Program,
+  type School,
+  type Team,
+  type User,
+} from "@prisma/client";
 import { hash } from "bcryptjs";
+import { CURRENT_POLICY_VERSION } from "../src/lib/policy";
+import { buildUserScopeRoleKey } from "../src/lib/user-scope-role";
+import { cleanupLegacyTeamScopedRoles } from "./seed-cleanup";
+
+const PROGRAM_SEEDS = [
+  {
+    code: "FLL",
+    name: "FIRST LEGO League",
+    description: "Grades K-8 robotics program with Discover, Explore, and Challenge divisions.",
+    gradeRangeLabel: "Grades K-8",
+    ageRangeLabel: "Ages 5-16",
+  },
+  {
+    code: "FTC",
+    name: "FIRST Tech Challenge",
+    description: "Grades 7-12 robotics program with classroom-scale robot competitions.",
+    gradeRangeLabel: "Grades 7-12",
+    ageRangeLabel: "Ages 12-18",
+  },
+  {
+    code: "FRC",
+    name: "FIRST Robotics Competition",
+    description: "Grades 9-12 robotics program with industrial-sized robots.",
+    gradeRangeLabel: "Grades 9-12",
+    ageRangeLabel: "Ages 14-18",
+  },
+] as const;
+
+type ProgramCode = (typeof PROGRAM_SEEDS)[number]["code"];
+const VERIFIED_NOVI_DISTRICT = {
+  name: "Novi Community School District",
+  slug: "novi-community-school-district",
+} as const;
+
+const VERIFIED_NOVI_SCHOOLS = [
+  {
+    name: "Novi High School",
+    slug: "novi-high-school",
+  },
+  {
+    name: "Novi Middle School",
+    slug: "novi-middle-school",
+  },
+  {
+    name: "Novi Meadows Elementary School",
+    slug: "novi-meadows-elementary-school",
+  },
+  {
+    name: "Parkview Elementary School",
+    slug: "parkview-elementary-school",
+  },
+] as const;
+
+type VerifiedNoviTeam = {
+  name: string;
+  shortCode: string;
+  schoolSlug: (typeof VERIFIED_NOVI_SCHOOLS)[number]["slug"];
+  programCode: ProgramCode;
+  fllDivision?: FllDivision;
+};
+
+const VERIFIED_NOVI_TEAMS: readonly VerifiedNoviTeam[] = [
+  {
+    name: "Frog Force 503",
+    shortCode: "503",
+    schoolSlug: "novi-high-school",
+    programCode: "FRC",
+  },
+  {
+    name: "Robo Rhinos",
+    shortCode: "11254",
+    schoolSlug: "novi-middle-school",
+    programCode: "FTC",
+  },
+  {
+    name: "Frog Tech",
+    shortCode: "45080",
+    schoolSlug: "novi-meadows-elementary-school",
+    programCode: "FLL",
+    fllDivision: "CHALLENGE",
+  },
+  {
+    name: "Galaxy Frogs",
+    shortCode: "45081",
+    schoolSlug: "parkview-elementary-school",
+    programCode: "FLL",
+    fllDivision: "CHALLENGE",
+  },
+  {
+    name: "LEGO RYDERS",
+    shortCode: "19397",
+    schoolSlug: "parkview-elementary-school",
+    programCode: "FLL",
+    fllDivision: "EXPLORE",
+  },
+  {
+    name: "Whale Titans",
+    shortCode: "19399",
+    schoolSlug: "parkview-elementary-school",
+    programCode: "FLL",
+    fllDivision: "EXPLORE",
+  },
+] as const;
+
+type DemoUserAccount = {
+  key: string;
+  email: string;
+  name: string;
+  password: string;
+  globalRole: GlobalRole;
+};
+
+const DEMO_USER_ACCOUNTS: readonly DemoUserAccount[] = [
+  {
+    key: "super-admin",
+    email: "admin@school.org",
+    name: "District Super Admin",
+    password: "Admin1234",
+    globalRole: "SUPER_ADMIN",
+  },
+  {
+    key: "school-admin",
+    email: "schooladmin@school.org",
+    name: "Novi School Admin",
+    password: "SchoolAdmin1234",
+    globalRole: "USER",
+  },
+  {
+    key: "program-admin",
+    email: "programadmin@school.org",
+    name: "Novi FLL Program Admin",
+    password: "ProgramAdmin1234",
+    globalRole: "USER",
+  },
+  {
+    key: "coach",
+    email: "coach@team.org",
+    name: "Frog Force Coach",
+    password: "Coach1234",
+    globalRole: "USER",
+  },
+  {
+    key: "parent-mentor",
+    email: "user@team.org",
+    name: "Frog Force Parent Mentor",
+    password: "User1234",
+    globalRole: "USER",
+  },
+] as const;
+
+const SAMPLE_WORKFLOW_TEAM_SHORT_CODE = "503";
+type DemoUserKey = (typeof DEMO_USER_ACCOUNTS)[number]["key"];
+type SchoolSlug = (typeof VERIFIED_NOVI_SCHOOLS)[number]["slug"];
+type TeamShortCode = (typeof VERIFIED_NOVI_TEAMS)[number]["shortCode"];
 
 async function createSeedClient(): Promise<PrismaClient> {
   if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
@@ -15,244 +178,481 @@ async function createSeedClient(): Promise<PrismaClient> {
   return new PrismaClient();
 }
 
-async function main() {
-  const prisma = await createSeedClient();
+function getRequired<K, V>(map: Map<K, V>, key: K, label: string) {
+  const value = map.get(key);
 
-  try {
-    const [adminPassword, coachPassword, userPassword] = await Promise.all([
-      hash("Admin1234", 12),
-      hash("Coach1234", 12),
-      hash("User1234", 12),
-    ]);
+  if (!value) {
+    throw new Error(`Missing ${label}`);
+  }
 
-    const [admin, coach, user] = await Promise.all([
-      prisma.user.upsert({
-        where: { email: "admin@school.org" },
-        update: { role: "ADMIN", onboardingDone: true, passwordHash: adminPassword },
+  return value;
+}
+
+async function ensurePrograms(prisma: PrismaClient) {
+  const programs = await Promise.all(
+    PROGRAM_SEEDS.map((program) =>
+      prisma.program.upsert({
+        where: { code: program.code },
+        update: {
+          name: program.name,
+          description: program.description,
+          gradeRangeLabel: program.gradeRangeLabel,
+          ageRangeLabel: program.ageRangeLabel,
+          active: true,
+        },
         create: {
-          email: "admin@school.org",
-          name: "School Admin",
-          role: "ADMIN",
-          onboardingDone: true,
-          passwordHash: adminPassword,
+          code: program.code,
+          name: program.name,
+          description: program.description,
+          gradeRangeLabel: program.gradeRangeLabel,
+          ageRangeLabel: program.ageRangeLabel,
+          active: true,
         },
-      }),
-      prisma.user.upsert({
-        where: { email: "coach@team.org" },
-        update: { role: "COACH", onboardingDone: true, passwordHash: coachPassword },
-        create: {
-          email: "coach@team.org",
-          name: "Team Coach",
-          role: "COACH",
-          onboardingDone: true,
-          passwordHash: coachPassword,
-        },
-      }),
-      prisma.user.upsert({
-        where: { email: "user@team.org" },
-        update: { role: "STUDENT", onboardingDone: true, passwordHash: userPassword },
-        create: {
-          email: "user@team.org",
-          name: "Team Member",
-          role: "STUDENT",
-          onboardingDone: true,
-          passwordHash: userPassword,
-        },
-      }),
-    ]);
+      })
+    )
+  );
 
-    const team = await prisma.team.upsert({
-      where: { name: "Demo Team 503" },
-      update: { shortCode: "DT503", glAccount: "61-296-7920-099-978-0000", active: true },
-      create: { name: "Demo Team 503", shortCode: "DT503", glAccount: "61-296-7920-099-978-0000", active: true },
-    });
+  return new Map(programs.map((program) => [program.code, program])) as Map<ProgramCode, Program>;
+}
 
-    await prisma.teamMembership.upsert({
-      where: {
-        userId_teamId_roleInTeam: {
-          userId: coach.id,
-          teamId: team.id,
-          roleInTeam: "COACH",
+async function ensureDistrictAndSchools(prisma: PrismaClient) {
+  const district = await prisma.district.upsert({
+    where: { slug: VERIFIED_NOVI_DISTRICT.slug },
+    update: { name: VERIFIED_NOVI_DISTRICT.name, active: true },
+    create: {
+      name: VERIFIED_NOVI_DISTRICT.name,
+      slug: VERIFIED_NOVI_DISTRICT.slug,
+      active: true,
+    },
+  });
+
+  const schools = await Promise.all(
+    VERIFIED_NOVI_SCHOOLS.map((school) =>
+      prisma.school.upsert({
+        where: {
+          districtId_slug: {
+            districtId: district.id,
+            slug: school.slug,
+          },
         },
-      },
-      update: {},
-      create: {
+        update: {
+          name: school.name,
+          active: true,
+        },
+        create: {
+          districtId: district.id,
+          name: school.name,
+          slug: school.slug,
+          active: true,
+        },
+      })
+    )
+  );
+
+  return {
+    district,
+    schoolsBySlug: new Map(schools.map((school) => [school.slug, school])) as Map<SchoolSlug, School>,
+  };
+}
+
+async function ensureDemoUsers(prisma: PrismaClient) {
+  const users = await Promise.all(
+    DEMO_USER_ACCOUNTS.map(async (account) => {
+      const passwordHash = await hash(account.password, 12);
+      const policyAcceptedAt = new Date();
+
+      const user = await prisma.user.upsert({
+        where: { email: account.email },
+        update: {
+          name: account.name,
+          role: account.globalRole,
+          onboardingDone: true,
+          passwordHash,
+          policyAcceptedAt,
+          policyVersion: CURRENT_POLICY_VERSION,
+        },
+        create: {
+          email: account.email,
+          name: account.name,
+          role: account.globalRole,
+          onboardingDone: true,
+          passwordHash,
+          policyAcceptedAt,
+          policyVersion: CURRENT_POLICY_VERSION,
+        },
+      });
+
+      return [account.key, user] as const;
+    })
+  );
+
+  return new Map(users) as Map<DemoUserKey, User>;
+}
+
+async function resetSeedOwnedData(
+  prisma: PrismaClient,
+  demoUsersByKey: Map<DemoUserKey, User>
+) {
+  const demoUserIds = Array.from(demoUsersByKey.values()).map((user) => user.id);
+
+  await prisma.notification.deleteMany({
+    where: {
+      userId: { in: demoUserIds },
+    },
+  });
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      actorId: { in: demoUserIds },
+    },
+  });
+
+  await prisma.teamRegistrationRequest.deleteMany({
+    where: {
+      requestedById: { in: demoUserIds },
+    },
+  });
+
+  await prisma.reimbursementRequest.deleteMany({
+    where: {
+      createdById: { in: demoUserIds },
+    },
+  });
+
+  await prisma.teamMembership.deleteMany({
+    where: {
+      userId: { in: demoUserIds },
+    },
+  });
+
+  await prisma.userScopeRole.deleteMany({
+    where: {
+      userId: { in: demoUserIds },
+    },
+  });
+}
+
+async function createVerifiedTeams(
+  prisma: PrismaClient,
+  schoolsBySlug: Map<SchoolSlug, School>,
+  programsByCode: Map<ProgramCode, Program>
+) {
+  const teams = await Promise.all(
+    VERIFIED_NOVI_TEAMS.map((team) =>
+      prisma.team.upsert({
+        where: {
+          schoolId_programId_name: {
+            schoolId: getRequired(schoolsBySlug, team.schoolSlug, `school ${team.schoolSlug}`).id,
+            programId: getRequired(programsByCode, team.programCode, `program ${team.programCode}`).id,
+            name: team.name,
+          },
+        },
+        update: {
+          shortCode: team.shortCode,
+          fllDivision: team.fllDivision ?? null,
+          active: true,
+        },
+        create: {
+          schoolId: getRequired(schoolsBySlug, team.schoolSlug, `school ${team.schoolSlug}`).id,
+          programId: getRequired(programsByCode, team.programCode, `program ${team.programCode}`).id,
+          name: team.name,
+          shortCode: team.shortCode,
+          fllDivision: team.fllDivision,
+          active: true,
+        },
+      })
+    )
+  );
+
+  return new Map(teams.map((team) => [team.shortCode, team])) as Map<TeamShortCode, Team>;
+}
+
+async function seedAccessAndMemberships(
+  prisma: PrismaClient,
+  districtId: string,
+  schoolsBySlug: Map<SchoolSlug, School>,
+  programsByCode: Map<ProgramCode, Program>,
+  teamsByShortCode: Map<TeamShortCode, Team>,
+  demoUsersByKey: Map<DemoUserKey, User>
+) {
+  const schoolAdmin = getRequired(demoUsersByKey, "school-admin", "school admin user");
+  const programAdmin = getRequired(demoUsersByKey, "program-admin", "program admin user");
+  const coach = getRequired(demoUsersByKey, "coach", "coach user");
+  const parentMentor = getRequired(demoUsersByKey, "parent-mentor", "parent mentor user");
+  const workflowTeam = getRequired(teamsByShortCode, SAMPLE_WORKFLOW_TEAM_SHORT_CODE, "workflow team");
+  const fllProgram = getRequired(programsByCode, "FLL", "FLL program");
+
+  await prisma.userScopeRole.createMany({
+    data: [
+      ...Array.from(schoolsBySlug.values()).map((school) => ({
+        userId: schoolAdmin.id,
+        role: "SCHOOL_ADMIN" as const,
+        districtId,
+        schoolId: school.id,
+        scopeKey: buildUserScopeRoleKey({
+          districtId,
+          schoolId: school.id,
+        }),
+      })),
+      ...(["novi-meadows-elementary-school", "parkview-elementary-school"] as const).map((schoolSlug) => ({
+        userId: programAdmin.id,
+        role: "PROGRAM_ADMIN" as const,
+        districtId,
+        schoolId: getRequired(schoolsBySlug, schoolSlug, `school ${schoolSlug}`).id,
+        programId: fllProgram.id,
+        scopeKey: buildUserScopeRoleKey({
+          districtId,
+          schoolId: getRequired(schoolsBySlug, schoolSlug, `school ${schoolSlug}`).id,
+          programId: fllProgram.id,
+        }),
+      })),
+    ],
+  });
+
+  await prisma.teamMembership.createMany({
+    data: [
+      {
         userId: coach.id,
-        teamId: team.id,
+        teamId: workflowTeam.id,
         roleInTeam: "COACH",
       },
-    });
-
-    await prisma.teamMembership.upsert({
-      where: {
-        userId_teamId_roleInTeam: {
-          userId: user.id,
-          teamId: team.id,
-          roleInTeam: "STUDENT",
-        },
+      {
+        userId: parentMentor.id,
+        teamId: workflowTeam.id,
+        roleInTeam: "PARENT_MENTOR",
       },
-      update: {},
-      create: {
-        userId: user.id,
-        teamId: team.id,
-        roleInTeam: "STUDENT",
+    ],
+  });
+}
+
+async function seedWorkflowData(
+  prisma: PrismaClient,
+  districtId: string,
+  schoolsBySlug: Map<SchoolSlug, School>,
+  programsByCode: Map<ProgramCode, Program>,
+  teamsByShortCode: Map<TeamShortCode, Team>,
+  demoUsersByKey: Map<DemoUserKey, User>
+) {
+  const superAdmin = getRequired(demoUsersByKey, "super-admin", "super admin user");
+  const coach = getRequired(demoUsersByKey, "coach", "coach user");
+  const parentMentor = getRequired(demoUsersByKey, "parent-mentor", "parent mentor user");
+  const workflowTeam = getRequired(teamsByShortCode, SAMPLE_WORKFLOW_TEAM_SHORT_CODE, "workflow team");
+  const noviMiddle = getRequired(schoolsBySlug, "novi-middle-school", "Novi Middle School");
+  const ftcProgram = getRequired(programsByCode, "FTC", "FTC program");
+
+  const draftRequest = await prisma.reimbursementRequest.create({
+    data: {
+      title: "Robot Parts - Week 3",
+      description: "Aluminum extrusions and motor controllers from AndyMark",
+      teamId: workflowTeam.id,
+      createdById: parentMentor.id,
+      coachId: coach.id,
+      status: "DRAFT",
+      requestedTotal: new Prisma.Decimal("0.00"),
+    },
+  });
+
+  const submittedRequest = await prisma.reimbursementRequest.create({
+    data: {
+      title: "Field Trip Supplies",
+      description: "Snacks and water for competition travel",
+      teamId: workflowTeam.id,
+      createdById: parentMentor.id,
+      coachId: coach.id,
+      status: "SUBMITTED",
+      requestedTotal: new Prisma.Decimal("47.83"),
+      submittedAt: new Date(),
+    },
+  });
+
+  const approvedRequest = await prisma.reimbursementRequest.create({
+    data: {
+      title: "Safety Equipment",
+      description: "Safety glasses and gloves for the shop",
+      teamId: workflowTeam.id,
+      createdById: parentMentor.id,
+      coachId: coach.id,
+      status: "COACH_APPROVED",
+      requestedTotal: new Prisma.Decimal("89.95"),
+      submittedAt: new Date(Date.now() - 3 * 86_400_000),
+    },
+  });
+
+  const draftReceipt = await prisma.receiptFile.create({
+    data: {
+      requestId: draftRequest.id,
+      fileName: "andymark-order.pdf",
+      mimeType: "application/pdf",
+      storageUrl: "file:///seed/andymark-order.pdf",
+      parseStatus: "DONE",
+    },
+  });
+
+  const draftExtraction = await prisma.receiptExtraction.create({
+    data: {
+      receiptFileId: draftReceipt.id,
+      documentType: "INVOICE",
+      merchant: "AndyMark",
+      total: new Prisma.Decimal("156.40"),
+      tax: new Prisma.Decimal("11.40"),
+      subtotal: new Prisma.Decimal("145.00"),
+      currency: "USD",
+      confidence: 0.92,
+    },
+  });
+
+  await prisma.receiptLineItem.createMany({
+    data: [
+      {
+        receiptExtractionId: draftExtraction.id,
+        position: 0,
+        description: "Aluminum C-Channel (4-pack)",
+        quantity: new Prisma.Decimal("2"),
+        unitPrice: new Prisma.Decimal("35.00"),
+        lineTotal: new Prisma.Decimal("70.00"),
+        category: "Materials",
       },
-    });
-
-    // --- Sample reimbursement requests ---
-
-    const draftRequest = await prisma.reimbursementRequest.create({
-      data: {
-        title: "Robot Parts - Week 3",
-        description: "Aluminum extrusions and motor controllers from AndyMark",
-        teamId: team.id,
-        createdById: user.id,
-        coachId: coach.id,
-        status: "DRAFT",
-        requestedTotal: new Prisma.Decimal("0.00"),
+      {
+        receiptExtractionId: draftExtraction.id,
+        position: 1,
+        description: "NEO Motor Controller",
+        quantity: new Prisma.Decimal("1"),
+        unitPrice: new Prisma.Decimal("75.00"),
+        lineTotal: new Prisma.Decimal("75.00"),
+        category: "Electronics",
       },
-    });
+    ],
+  });
 
-    const submittedRequest = await prisma.reimbursementRequest.create({
-      data: {
-        title: "Field Trip Supplies",
-        description: "Snacks and water for competition travel",
-        teamId: team.id,
-        createdById: user.id,
-        coachId: coach.id,
-        status: "SUBMITTED",
-        requestedTotal: new Prisma.Decimal("47.83"),
-        submittedAt: new Date(),
+  const submittedReceipt = await prisma.receiptFile.create({
+    data: {
+      requestId: submittedRequest.id,
+      fileName: "walmart-receipt.jpg",
+      mimeType: "image/jpeg",
+      storageUrl: "file:///seed/walmart-receipt.jpg",
+      parseStatus: "DONE",
+    },
+  });
+
+  const submittedExtraction = await prisma.receiptExtraction.create({
+    data: {
+      receiptFileId: submittedReceipt.id,
+      documentType: "RECEIPT",
+      merchant: "Walmart",
+      total: new Prisma.Decimal("51.27"),
+      tax: new Prisma.Decimal("3.44"),
+      subtotal: new Prisma.Decimal("47.83"),
+      currency: "USD",
+      confidence: 0.97,
+    },
+  });
+
+  await prisma.receiptLineItem.createMany({
+    data: [
+      {
+        receiptExtractionId: submittedExtraction.id,
+        position: 0,
+        description: "Trail Mix (12-pack)",
+        quantity: new Prisma.Decimal("2"),
+        unitPrice: new Prisma.Decimal("8.97"),
+        lineTotal: new Prisma.Decimal("17.94"),
+        category: "Food",
       },
-    });
-
-    const approvedRequest = await prisma.reimbursementRequest.create({
-      data: {
-        title: "Safety Equipment",
-        description: "Safety glasses and gloves for the shop",
-        teamId: team.id,
-        createdById: user.id,
-        coachId: coach.id,
-        status: "COACH_APPROVED",
-        requestedTotal: new Prisma.Decimal("89.95"),
-        submittedAt: new Date(Date.now() - 3 * 86_400_000),
+      {
+        receiptExtractionId: submittedExtraction.id,
+        position: 1,
+        description: "Water Bottles (24-pack)",
+        quantity: new Prisma.Decimal("3"),
+        unitPrice: new Prisma.Decimal("4.98"),
+        lineTotal: new Prisma.Decimal("14.94"),
+        category: "Beverages",
       },
-    });
-
-    // --- Receipts + extractions for draft request ---
-
-    const draftReceipt = await prisma.receiptFile.create({
-      data: {
-        requestId: draftRequest.id,
-        fileName: "andymark-order.pdf",
-        mimeType: "application/pdf",
-        storageUrl: "file:///seed/andymark-order.pdf",
-        parseStatus: "DONE",
+      {
+        receiptExtractionId: submittedExtraction.id,
+        position: 2,
+        description: "Granola Bars (10-pack)",
+        quantity: new Prisma.Decimal("3"),
+        unitPrice: new Prisma.Decimal("4.98"),
+        lineTotal: new Prisma.Decimal("14.95"),
+        category: "Food",
       },
-    });
+    ],
+  });
 
-    const draftExtraction = await prisma.receiptExtraction.create({
-      data: {
-        receiptFileId: draftReceipt.id,
-        documentType: "INVOICE",
-        merchant: "AndyMark",
-        total: new Prisma.Decimal("156.40"),
-        tax: new Prisma.Decimal("11.40"),
-        subtotal: new Prisma.Decimal("145.00"),
-        currency: "USD",
-        confidence: 0.92,
-      },
-    });
-
-    await prisma.receiptLineItem.createMany({
-      data: [
-        { receiptExtractionId: draftExtraction.id, position: 0, description: "Aluminum C-Channel (4-pack)", quantity: new Prisma.Decimal("2"), unitPrice: new Prisma.Decimal("35.00"), lineTotal: new Prisma.Decimal("70.00"), category: "Materials" },
-        { receiptExtractionId: draftExtraction.id, position: 1, description: "NEO Motor Controller", quantity: new Prisma.Decimal("1"), unitPrice: new Prisma.Decimal("75.00"), lineTotal: new Prisma.Decimal("75.00"), category: "Electronics" },
-      ],
-    });
-
-    // --- Receipts + extractions for submitted request ---
-
-    const submittedReceipt = await prisma.receiptFile.create({
-      data: {
+  await prisma.approvalAction.createMany({
+    data: [
+      {
         requestId: submittedRequest.id,
-        fileName: "walmart-receipt.jpg",
-        mimeType: "image/jpeg",
-        storageUrl: "file:///seed/walmart-receipt.jpg",
-        parseStatus: "DONE",
-      },
-    });
-
-    const submittedExtraction = await prisma.receiptExtraction.create({
-      data: {
-        receiptFileId: submittedReceipt.id,
-        documentType: "RECEIPT",
-        merchant: "Walmart",
-        total: new Prisma.Decimal("51.27"),
-        tax: new Prisma.Decimal("3.44"),
-        subtotal: new Prisma.Decimal("47.83"),
-        currency: "USD",
-        confidence: 0.97,
-      },
-    });
-
-    await prisma.receiptLineItem.createMany({
-      data: [
-        { receiptExtractionId: submittedExtraction.id, position: 0, description: "Trail Mix (12-pack)", quantity: new Prisma.Decimal("2"), unitPrice: new Prisma.Decimal("8.97"), lineTotal: new Prisma.Decimal("17.94"), category: "Food" },
-        { receiptExtractionId: submittedExtraction.id, position: 1, description: "Water Bottles (24-pack)", quantity: new Prisma.Decimal("3"), unitPrice: new Prisma.Decimal("4.98"), lineTotal: new Prisma.Decimal("14.94"), category: "Beverages" },
-        { receiptExtractionId: submittedExtraction.id, position: 2, description: "Granola Bars (10-pack)", quantity: new Prisma.Decimal("3"), unitPrice: new Prisma.Decimal("4.98"), lineTotal: new Prisma.Decimal("14.95"), category: "Food" },
-      ],
-    });
-
-    // --- Approval for coach-approved request ---
-
-    await prisma.approvalAction.create({
-      data: {
-        requestId: submittedRequest.id,
-        actorId: user.id,
+        actorId: parentMentor.id,
         action: "SUBMIT",
         comment: "Submitted for review",
       },
-    });
-
-    await prisma.approvalAction.create({
-      data: {
+      {
         requestId: approvedRequest.id,
-        actorId: user.id,
+        actorId: parentMentor.id,
         action: "SUBMIT",
       },
-    });
-
-    await prisma.approvalAction.create({
-      data: {
+      {
         requestId: approvedRequest.id,
         actorId: coach.id,
         action: "APPROVE",
         comment: "Looks good, safety first!",
       },
-    });
+    ],
+  });
 
-    // --- Pending team registration ---
+  await prisma.teamRegistrationRequest.create({
+    data: {
+      districtId,
+      schoolId: noviMiddle.id,
+      programId: ftcProgram.id,
+      teamName: "Novi Middle Circuit Crew",
+      shortCode: "24501",
+      notes: "Sample pending FTC registration request for a new Novi Middle School team.",
+      requestedById: parentMentor.id,
+    },
+  });
 
-    await prisma.teamRegistrationRequest.create({
-      data: {
-        teamName: "Iron Panthers 4180",
-        shortCode: "IP4180",
-        glAccount: "61-310-8100-045-612-0000",
-        notes: "New team from West High School. We have 15 members and a coach sponsor.",
-        requestedById: user.id,
-      },
-    });
+  await prisma.auditLog.create({
+    data: {
+      actorId: superAdmin.id,
+      eventType: "SEED_COMPLETE",
+      message:
+        "Seeded verified Novi district schools and FIRST teams, demo admin scopes, and reimbursement workflow samples.",
+    },
+  });
+}
 
-    // --- Audit log ---
+async function main() {
+  const prisma = await createSeedClient();
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: admin.id,
-        eventType: "SEED_COMPLETE",
-        message: "Seeded demo users, team, requests, receipts, and sample data",
-      },
-    });
+  try {
+    const programsByCode = await ensurePrograms(prisma);
+    const { district, schoolsBySlug } = await ensureDistrictAndSchools(prisma);
+    const demoUsersByKey = await ensureDemoUsers(prisma);
+
+    await cleanupLegacyTeamScopedRoles(prisma);
+    await resetSeedOwnedData(prisma, demoUsersByKey);
+
+    const teamsByShortCode = await createVerifiedTeams(prisma, schoolsBySlug, programsByCode);
+
+    await seedAccessAndMemberships(
+      prisma,
+      district.id,
+      schoolsBySlug,
+      programsByCode,
+      teamsByShortCode,
+      demoUsersByKey
+    );
+
+    await seedWorkflowData(
+      prisma,
+      district.id,
+      schoolsBySlug,
+      programsByCode,
+      teamsByShortCode,
+      demoUsersByKey
+    );
   } finally {
     await prisma.$disconnect();
   }
