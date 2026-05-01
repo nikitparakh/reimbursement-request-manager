@@ -1,10 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { Alert } from "@/components/ui/alert";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CalendarCheck } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { FieldGroup } from "@/components/ui/field-group";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const ZELLE_NONE = "__none__";
+
+const profileFormSchema = z
+  .object({
+    mailingAddressLine1: z.string().trim().max(120, "Must be at most 120 characters"),
+    mailingAddressLine2: z.string().trim().max(120, "Must be at most 120 characters"),
+    mailingCity: z.string().trim().max(80, "Must be at most 80 characters"),
+    mailingState: z.string().trim().max(40, "Must be at most 40 characters"),
+    mailingPostalCode: z.string().trim().max(20, "Must be at most 20 characters"),
+    zelleType: z.union([z.literal(""), z.enum(["email", "phone"])]),
+    zelleValue: z.string().trim().max(120, "Must be at most 120 characters"),
+  })
+  .superRefine((data, ctx) => {
+    const hasType = data.zelleType !== "";
+    const hasValue = data.zelleValue.trim().length > 0;
+    if (hasType && !hasValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Zelle destination is required when a type is selected",
+        path: ["zelleValue"],
+      });
+    } else if (!hasType && hasValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a Zelle type",
+        path: ["zelleType"],
+      });
+    }
+  });
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 type ProfileFormProps = {
   initialProfile: {
@@ -20,144 +70,211 @@ type ProfileFormProps = {
   };
 };
 
-export function ProfileForm({ initialProfile }: ProfileFormProps) {
-  const [form, setForm] = useState({
-    mailingAddressLine1: initialProfile.mailingAddressLine1 ?? "",
-    mailingAddressLine2: initialProfile.mailingAddressLine2 ?? "",
-    mailingCity: initialProfile.mailingCity ?? "",
-    mailingState: initialProfile.mailingState ?? "",
-    mailingPostalCode: initialProfile.mailingPostalCode ?? "",
-    zelleType: initialProfile.zelleType ?? "",
-    zelleValue: initialProfile.zelleValue ?? "",
-  });
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  function setField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
-    setForm((current) => ({ ...current, [field]: value }));
+function normalizeForApi(values: ProfileFormValues) {
+  const trimField = (s: string) => {
+    const t = s.trim();
+    return t.length > 0 ? t : undefined;
+  };
+  const body: Record<string, unknown> = {
+    mailingAddressLine1: trimField(values.mailingAddressLine1),
+    mailingAddressLine2: trimField(values.mailingAddressLine2),
+    mailingCity: trimField(values.mailingCity),
+    mailingState: trimField(values.mailingState),
+    mailingPostalCode: trimField(values.mailingPostalCode),
+  };
+  if (values.zelleType) {
+    body.zelleType = values.zelleType;
+    body.zelleValue = trimField(values.zelleValue) ?? null;
+  } else {
+    body.zelleType = null;
+    body.zelleValue = null;
   }
+  return body;
+}
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setMessage("");
+function readPatchError(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "Unable to save profile.";
+  const err = (payload as { error?: unknown }).error;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object" && Array.isArray((err as { formErrors?: unknown }).formErrors)) {
+    const fe = (err as { formErrors: string[] }).formErrors;
+    if (typeof fe[0] === "string") return fe[0];
+  }
+  return "Unable to save profile.";
+}
 
+export function ProfileForm({ initialProfile }: ProfileFormProps) {
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      mailingAddressLine1: initialProfile.mailingAddressLine1 ?? "",
+      mailingAddressLine2: initialProfile.mailingAddressLine2 ?? "",
+      mailingCity: initialProfile.mailingCity ?? "",
+      mailingState: initialProfile.mailingState ?? "",
+      mailingPostalCode: initialProfile.mailingPostalCode ?? "",
+      zelleType:
+        initialProfile.zelleType === "email" || initialProfile.zelleType === "phone"
+          ? initialProfile.zelleType
+          : "",
+      zelleValue: initialProfile.zelleValue ?? "",
+    },
+  });
+
+  async function onSubmit(values: ProfileFormValues) {
     try {
       const response = await fetch("/api/me/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(normalizeForApi(values)),
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as {
-          error?: string | { formErrors?: string[] };
-        };
-        const errorText =
-          typeof payload.error === "string"
-            ? payload.error
-            : payload.error?.formErrors?.[0] ?? "Unable to save profile.";
-        setMessage(errorText);
-        setIsError(true);
-        setSaving(false);
+        const payload = await response.json().catch(() => ({}));
+        toast.error(readPatchError(payload));
         return;
       }
 
-      setMessage("Profile updated.");
-      setIsError(false);
+      toast.success("Profile updated.");
     } catch {
-      setMessage("Unable to save profile.");
-      setIsError(true);
-    } finally {
-      setSaving(false);
+      toast.error("Unable to save profile.");
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {message ? <Alert variant={isError ? "destructive" : "success"}>{message}</Alert> : null}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <FieldGroup label="Address line 1" htmlFor="mailingAddressLine1">
-          <Input
-            id="mailingAddressLine1"
-            value={form.mailingAddressLine1}
-            onChange={(event) => setField("mailingAddressLine1", event.target.value)}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="mailingAddressLine1"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address line 1</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
 
-        <FieldGroup label="Address line 2" htmlFor="mailingAddressLine2">
-          <Input
-            id="mailingAddressLine2"
-            value={form.mailingAddressLine2}
-            onChange={(event) => setField("mailingAddressLine2", event.target.value)}
+          <FormField
+            control={form.control}
+            name="mailingAddressLine2"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address line 2</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
 
-        <FieldGroup label="City" htmlFor="mailingCity">
-          <Input
-            id="mailingCity"
-            value={form.mailingCity}
-            onChange={(event) => setField("mailingCity", event.target.value)}
+          <FormField
+            control={form.control}
+            name="mailingCity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
 
-        <FieldGroup label="State / Province" htmlFor="mailingState">
-          <Input
-            id="mailingState"
-            value={form.mailingState}
-            onChange={(event) => setField("mailingState", event.target.value)}
+          <FormField
+            control={form.control}
+            name="mailingState"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State / Province</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
 
-        <FieldGroup label="Postal code" htmlFor="mailingPostalCode">
-          <Input
-            id="mailingPostalCode"
-            value={form.mailingPostalCode}
-            onChange={(event) => setField("mailingPostalCode", event.target.value)}
+          <FormField
+            control={form.control}
+            name="mailingPostalCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Postal code</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
-      </div>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <FieldGroup label="Zelle type" htmlFor="zelleType">
-          <select
-            id="zelleType"
-            value={form.zelleType}
-            onChange={(event) => setField("zelleType", event.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="">Select one</option>
-            <option value="email">Email</option>
-            <option value="phone">Phone</option>
-          </select>
-        </FieldGroup>
-
-        <FieldGroup
-          label="Zelle destination"
-          htmlFor="zelleValue"
-          hint="Provide the email address or phone number that should receive reimbursement."
-        >
-          <Input
-            id="zelleValue"
-            value={form.zelleValue}
-            onChange={(event) => setField("zelleValue", event.target.value)}
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="zelleType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Zelle type</FormLabel>
+                <Select
+                  value={field.value === "" ? ZELLE_NONE : field.value}
+                  onValueChange={(v) => field.onChange(v === ZELLE_NONE ? "" : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Zelle type" className="w-full">
+                      <SelectValue placeholder="Select one" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value={ZELLE_NONE}>Select one</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </FieldGroup>
-      </div>
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        Policy accepted{" "}
-        {initialProfile.policyAcceptedAt
-          ? `on ${initialProfile.policyAcceptedAt.toLocaleDateString()}`
-          : "during registration"}
-        {initialProfile.policyVersion ? ` · version ${initialProfile.policyVersion}` : ""}
-      </div>
+          <FormField
+            control={form.control}
+            name="zelleValue"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Zelle destination</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormDescription>
+                  Provide the email address or phone number that should receive reimbursement.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-      <Button type="submit" loading={saving}>
-        Save profile
-      </Button>
-    </form>
+        <div className="flex gap-3 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          <CalendarCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span>
+            Policy accepted{" "}
+            {initialProfile.policyAcceptedAt
+              ? `on ${initialProfile.policyAcceptedAt.toLocaleDateString()}`
+              : "during registration"}
+            {initialProfile.policyVersion ? ` · version ${initialProfile.policyVersion}` : ""}
+          </span>
+        </div>
+
+        <Button type="submit" loading={form.formState.isSubmitting}>
+          Save profile
+        </Button>
+      </form>
+    </Form>
   );
 }
