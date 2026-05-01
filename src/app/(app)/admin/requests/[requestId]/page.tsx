@@ -6,11 +6,11 @@ import { ApprovalDecision } from "@/components/reimbursements/approval-decision"
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
 import { ExtractionReview } from "@/components/reimbursements/extraction-review";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
+import { RequestProgress } from "@/components/reimbursements/request-progress";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { StatusTimeline } from "@/components/ui/status-timeline";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 
@@ -84,7 +84,7 @@ export default async function AdminRequestDetailPage({
         },
       },
       approvals: {
-        include: { actor: { select: { email: true } } },
+        select: { id: true, action: true, comment: true, createdAt: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -207,24 +207,14 @@ export default async function AdminRequestDetailPage({
         </Card>
       ) : null}
 
-      {request.approvals.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Approval history</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatusTimeline
-              items={request.approvals.map((approval) => ({
-                id: approval.id,
-                action: approval.action,
-                actor: approval.actor.email,
-                comment: approval.comment,
-                createdAt: approval.createdAt,
-              }))}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Workflow progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RequestProgress status={status} approvals={request.approvals} />
+        </CardContent>
+      </Card>
       </div>
     </LiveTotalProvider>
   );

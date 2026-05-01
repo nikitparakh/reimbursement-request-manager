@@ -6,12 +6,13 @@ import { EditableLineItems } from "@/components/reimbursements/editable-line-ite
 import { ExtractionReview } from "@/components/reimbursements/extraction-review";
 import { ReceiptPollingWrapper } from "@/components/reimbursements/receipt-polling-wrapper";
 import { RequestActions } from "@/components/reimbursements/request-actions";
+import { RequestProgress } from "@/components/reimbursements/request-progress";
 import { serializeReceipts } from "@/lib/reimbursements/serialize-receipts";
 import { EditableRequestHeader } from "@/components/reimbursements/editable-request-header";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { StatusTimeline } from "@/components/ui/status-timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursements/live-total-context";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
@@ -87,7 +88,10 @@ export default async function UserRequestDetailPage({
           },
         },
       },
-      approvals: { include: { actor: true }, orderBy: { createdAt: "asc" } },
+      approvals: {
+        select: { id: true, action: true, comment: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -228,17 +232,24 @@ export default async function UserRequestDetailPage({
             <CardTitle>Receipts</CardTitle>
           </CardHeader>
           <CardContent>
-            <ReceiptPollingWrapper
-              requestId={requestRecord.id}
-              hasProcessing={requestRecord.receiptFiles.some(
-                (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
-              )}
-            >
-              <ExtractionReview
-                receipts={receiptsWithExtractions}
-                parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+            {requestRecord.receiptFiles.length === 0 ? (
+              <EmptyState
+                title="No receipts uploaded"
+                description="No receipts were attached to this request."
               />
-            </ReceiptPollingWrapper>
+            ) : (
+              <ReceiptPollingWrapper
+                requestId={requestRecord.id}
+                hasProcessing={requestRecord.receiptFiles.some(
+                  (f) => f.parseStatus === "QUEUED" || f.parseStatus === "PROCESSING"
+                )}
+              >
+                <ExtractionReview
+                  receipts={receiptsWithExtractions}
+                  parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+                />
+              </ReceiptPollingWrapper>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -259,24 +270,14 @@ export default async function UserRequestDetailPage({
         </Card>
       ) : null}
 
-      {requestRecord.approvals.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Approval history</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatusTimeline
-              items={requestRecord.approvals.map((approval) => ({
-                id: approval.id,
-                action: approval.action,
-                actor: approval.actor.email,
-                comment: approval.comment,
-                createdAt: approval.createdAt,
-              }))}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle>Workflow progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RequestProgress status={status} approvals={requestRecord.approvals} />
+        </CardContent>
+      </Card>
     </div>
     </LiveTotalProvider>
   );
