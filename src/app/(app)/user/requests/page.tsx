@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import { redirect, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -8,6 +10,8 @@ import {
 } from "@/components/reimbursements/team-reimbursements-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function UserRequestsPage() {
   const session = await auth();
@@ -41,6 +45,14 @@ export default async function UserRequestsPage() {
       <PageHeader
         title="My Requests"
         description="View all your reimbursement requests and their statuses."
+        action={
+          <Link href="/user/requests/new">
+            <Button>
+              <Plus className="size-4" />
+              New request
+            </Button>
+          </Link>
+        }
       />
 
       {rows.length === 0 ? (
@@ -49,7 +61,11 @@ export default async function UserRequestsPage() {
           description="You haven't submitted any reimbursement requests."
         />
       ) : (
-        <TeamReimbursementsTable data={rows} showRequester={false} />
+        <Card>
+          <CardContent>
+            <TeamReimbursementsTable data={rows} showRequester={false} />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

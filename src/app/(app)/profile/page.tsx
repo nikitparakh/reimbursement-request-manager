@@ -2,7 +2,7 @@ import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { ProfileForm } from "@/components/profile/profile-form";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function ProfilePage() {
@@ -34,6 +34,10 @@ export default async function ProfilePage() {
       />
 
       <Card>
+        <CardHeader>
+          <CardTitle>Contact details</CardTitle>
+          <CardDescription>Mailing address and Zelle information used for reimbursement.</CardDescription>
+        </CardHeader>
         <CardContent>
           <ProfileForm initialProfile={profile} />
         </CardContent>

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function TeamPage() {
@@ -109,10 +110,10 @@ export default async function TeamPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-slate-900">{team.name}</h2>
+                    <h2 className="text-lg font-semibold text-foreground">{team.name}</h2>
                     {team.shortCode ? <StatusBadge status={team.shortCode} /> : null}
                     {team.glAccount ? (
-                      <span className="text-sm text-slate-500">GL: {team.glAccount}</span>
+                      <span className="text-sm text-muted-foreground">GL: {team.glAccount}</span>
                     ) : null}
                   </div>
                   <div className="flex items-center gap-2">
@@ -124,25 +125,25 @@ export default async function TeamPage() {
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
-                  <div className="mb-3 text-sm text-slate-500">
+                  <div className="mb-3 text-sm text-muted-foreground">
                     {team.districtName} · {team.schoolName} · {team.programName}
                     {team.fllDivision ? ` · FLL ${team.fllDivision}` : ""}
                   </div>
-                  <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-2">
+                  <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                     Coaches
                   </h3>
                   {team.coaches.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic">No coach assigned</p>
+                    <p className="text-sm italic text-muted-foreground">No coach assigned</p>
                   ) : (
                     <ul className="space-y-1">
                       {team.coaches.map((m) => (
-                        <li key={m.id} className="text-sm text-slate-700">
+                        <li key={m.id} className="text-sm text-foreground">
                           {m.name ?? m.email}
                           {m.name ? (
-                            <span className="text-slate-400 ml-1">{m.email}</span>
+                            <span className="ml-1 text-muted-foreground">{m.email}</span>
                           ) : null}
                           {m.id === session.user.id ? (
-                            <span className="text-slate-400 ml-1">(You)</span>
+                            <span className="ml-1 text-muted-foreground">(You)</span>
                           ) : null}
                         </li>
                       ))}
@@ -150,22 +151,24 @@ export default async function TeamPage() {
                   )}
                 </div>
 
-                <div className="border-t border-slate-100 pt-4">
-                  <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-2">
+                <Separator />
+
+                <div className="pt-4">
+                  <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                     Parents/Mentors
                   </h3>
                   {team.parents.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic">No parents/mentors yet</p>
+                    <p className="text-sm italic text-muted-foreground">No parents/mentors yet</p>
                   ) : (
                     <ul className="space-y-1">
                       {team.parents.map((m) => (
-                        <li key={m.id} className="text-sm text-slate-700">
+                        <li key={m.id} className="text-sm text-foreground">
                           {m.name ?? m.email}
                           {m.name ? (
-                            <span className="text-slate-400 ml-1">{m.email}</span>
+                            <span className="ml-1 text-muted-foreground">{m.email}</span>
                           ) : null}
                           {m.id === session.user.id ? (
-                            <span className="text-slate-400 ml-1">(You)</span>
+                            <span className="ml-1 text-muted-foreground">(You)</span>
                           ) : null}
                         </li>
                       ))}
