@@ -1,3 +1,4 @@
+import type { RequestStatus } from "@prisma/client";
 import { unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -12,13 +13,41 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/format";
+import {
+  getPendingReviewStatuses,
+  PENDING_REVIEW_FILTER,
+} from "@/lib/reimbursements/pending";
 import { getTeamReimbursementsDescription } from "@/lib/ui-copy";
 
-export default async function TeamReimbursementsPage() {
+const VALID_REQUEST_STATUSES: ReadonlySet<string> = new Set<RequestStatus>([
+  "DRAFT",
+  "SUBMITTED",
+  "COACH_APPROVED",
+  "COACH_REJECTED",
+  "ADMIN_APPROVED",
+  "ADMIN_REJECTED",
+  "PAID",
+]);
+
+function normalizeStatusParam(raw: string | string[] | undefined): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return "";
+  if (value === PENDING_REVIEW_FILTER) return PENDING_REVIEW_FILTER;
+  return VALID_REQUEST_STATUSES.has(value) ? value : "";
+}
+
+export default async function TeamReimbursementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string | string[] }>;
+}) {
   const session = await auth();
   if (!session?.user) unauthorized();
   const access = await getCachedAccessContext(session.user.id);
   if (!access.isCoach && !access.canManageReimbursements) unauthorized();
+
+  const { status: rawStatus } = await searchParams;
+  const initialStatus = normalizeStatusParam(rawStatus);
 
   const managedTeamIds = access.canManageReimbursements
     ? await db.team.findMany({
@@ -35,20 +64,22 @@ export default async function TeamReimbursementsPage() {
       ...managedTeamIds.map((team) => team.id),
     ])
   );
-  const teamFilter = { teamId: { in: teamIds } };
+  const pendingStatuses = getPendingReviewStatuses(access);
 
   const [requests, pendingCount] = await Promise.all([
     db.reimbursementRequest.findMany({
-      where: teamFilter,
+      where: { teamId: { in: teamIds } },
       include: {
         createdBy: { select: { email: true } },
         team: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
-    db.reimbursementRequest.count({
-      where: { teamId: { in: teamIds }, status: "SUBMITTED" },
-    }),
+    pendingStatuses.length > 0
+      ? db.reimbursementRequest.count({
+          where: { teamId: { in: teamIds }, status: { in: pendingStatuses } },
+        })
+      : Promise.resolve(0),
   ]);
 
   const rows: ReimbursementRow[] = requests.map((r) => ({
@@ -86,7 +117,11 @@ export default async function TeamReimbursementsPage() {
             </h2>
           </CardHeader>
           <CardContent className="pt-0">
-            <TeamReimbursementsTable data={rows} />
+            <TeamReimbursementsTable
+              data={rows}
+              pendingStatuses={pendingStatuses}
+              initialStatus={initialStatus}
+            />
           </CardContent>
         </Card>
       )}

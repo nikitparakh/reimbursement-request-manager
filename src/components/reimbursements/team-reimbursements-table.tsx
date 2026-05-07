@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PENDING_REVIEW_FILTER } from "@/lib/reimbursements/pending";
 
 export type ReimbursementRow = {
   id: string;
@@ -144,7 +145,7 @@ type Filters = {
   dateTo: string;
 };
 
-const INITIAL_FILTERS: Filters = {
+const EMPTY_FILTERS: Filters = {
   search: "",
   status: "",
   requester: "",
@@ -155,12 +156,27 @@ const INITIAL_FILTERS: Filters = {
 export function TeamReimbursementsTable({
   data,
   showRequester = true,
+  pendingStatuses,
+  initialStatus,
 }: {
   data: ReimbursementRow[];
   showRequester?: boolean;
+  pendingStatuses?: string[];
+  initialStatus?: string;
 }) {
   const router = useRouter();
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+  const pendingFilterAvailable = (pendingStatuses?.length ?? 0) > 0;
+  const initialFilters = useMemo<Filters>(
+    () => ({
+      ...EMPTY_FILTERS,
+      status:
+        initialStatus === PENDING_REVIEW_FILTER && pendingFilterAvailable
+          ? PENDING_REVIEW_FILTER
+          : initialStatus ?? "",
+    }),
+    [initialStatus, pendingFilterAvailable],
+  );
+  const [filters, setFilters] = useState<Filters>(initialFilters);
   const [reopeningId, setReopeningId] = useState<string | null>(null);
 
   const handleReopen = useCallback(async (id: string) => {
@@ -215,7 +231,10 @@ export function TeamReimbursementsTable({
       );
     }
 
-    if (filters.status) {
+    if (filters.status === PENDING_REVIEW_FILTER) {
+      const allowed = new Set(pendingStatuses);
+      rows = rows.filter((r) => allowed.has(r.status));
+    } else if (filters.status) {
       rows = rows.filter((r) => r.status === filters.status);
     }
 
@@ -234,7 +253,7 @@ export function TeamReimbursementsTable({
     }
 
     return rows;
-  }, [data, filters]);
+  }, [data, filters, pendingStatuses]);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -267,6 +286,9 @@ export function TeamReimbursementsTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              {pendingFilterAvailable ? (
+                <SelectItem value={PENDING_REVIEW_FILTER}>Pending review</SelectItem>
+              ) : null}
               {STATUS_OPTIONS.map((s) => (
                 <SelectItem key={s} value={s}>
                   {s.replace(/_/g, " ")}
@@ -325,7 +347,7 @@ export function TeamReimbursementsTable({
         </div>
 
         {hasActiveFilters && (
-          <Button type="button" variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setFilters(INITIAL_FILTERS)}>
+          <Button type="button" variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setFilters(EMPTY_FILTERS)}>
             Clear
           </Button>
         )}

@@ -1,5 +1,4 @@
 import { unauthorized } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import { BanknoteArrowUp, Clock, FileText } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -9,11 +8,15 @@ import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { StatTile } from "@/components/ui/stat-tile";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CoachTeamRequestsTable } from "@/components/coach/coach-team-requests-table";
 import { CoachTeamMembersTable } from "@/components/coach/coach-team-members-table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import {
+  getPendingReviewStatuses,
+  PENDING_REVIEW_FILTER,
+} from "@/lib/reimbursements/pending";
 import { getTeamOverviewDescription } from "@/lib/ui-copy";
 
 export default async function CoachTeamOverviewPage() {
@@ -94,8 +97,9 @@ export default async function CoachTeamOverviewPage() {
         const paidAmount = team.requests
           .filter((r) => r.status === "PAID")
           .reduce((sum, r) => sum + Number(r.requestedTotal), 0);
-        const pendingCount = team.requests.filter(
-          (r) => r.status === "SUBMITTED" || r.status === "COACH_APPROVED",
+        const pendingStatuses = getPendingReviewStatuses(access);
+        const pendingCount = team.requests.filter((r) =>
+          pendingStatuses.includes(r.status),
         ).length;
 
         const requestRows = team.requests.map((r) => ({
@@ -158,12 +162,14 @@ export default async function CoachTeamOverviewPage() {
               />
             )}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatTile
                 label="Requests"
                 value={String(team.requests.length)}
                 subtitle="Submitted (non-draft)"
                 icon={FileText}
+                href="/coach/team-reimbursements"
+                ariaLabel={`View all ${team.requests.length} requests`}
               />
               <StatTile
                 label="Paid Out"
@@ -171,6 +177,8 @@ export default async function CoachTeamOverviewPage() {
                 subtitle="Marked paid totals"
                 icon={BanknoteArrowUp}
                 iconClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                href="/coach/team-reimbursements?status=PAID"
+                ariaLabel="View paid requests"
               />
               <StatTile
                 label="Pending Review"
@@ -178,6 +186,8 @@ export default async function CoachTeamOverviewPage() {
                 subtitle="Awaiting approval"
                 icon={Clock}
                 iconClassName="bg-amber-100 text-amber-800 dark:bg-amber-950/55 dark:text-amber-400"
+                href={`/coach/team-reimbursements?status=${PENDING_REVIEW_FILTER}`}
+                ariaLabel={`View ${pendingCount} pending review requests`}
               />
             </div>
 
@@ -227,36 +237,3 @@ export default async function CoachTeamOverviewPage() {
   );
 }
 
-function StatTile({
-  label,
-  value,
-  subtitle,
-  icon: Icon,
-  iconClassName,
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-  icon: LucideIcon;
-  iconClassName?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="relative pt-11 pb-4">
-        <div
-          className={cn(
-            "absolute top-4 right-4 flex size-9 shrink-0 items-center justify-center rounded-md",
-            iconClassName ?? "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="size-[1.125rem]" aria-hidden />
-        </div>
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 pr-11 text-2xl font-bold text-foreground tabular-nums">{value}</p>
-        {subtitle ? (
-          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}

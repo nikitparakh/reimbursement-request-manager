@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, BanknoteArrowUp, Clock, FileText } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -9,13 +8,13 @@ import { canManageTeams, getCachedAccessContext } from "@/lib/access";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { StatTile } from "@/components/ui/stat-tile";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TeamActiveToggle } from "@/components/admin/team-active-toggle";
 import { EditTeamForm } from "@/components/admin/edit-team-form";
 import { TeamRequestsTable } from "@/components/admin/team-requests-table";
 import { TeamMembersTable } from "@/components/admin/team-members-table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export default async function AdminTeamDetailPage({
   params,
@@ -74,8 +73,10 @@ export default async function AdminTeamDetailPage({
   const paidAmount = team.requests
     .filter((r) => r.status === "PAID")
     .reduce((sum, r) => sum + Number(r.requestedTotal), 0);
+  // Admin team detail only loads non-DRAFT requests post coach review,
+  // so this naturally narrows to admin-actionable items.
   const pendingCount = team.requests.filter(
-    (r) => r.status === "SUBMITTED" || r.status === "COACH_APPROVED",
+    (r) => r.status === "COACH_APPROVED",
   ).length;
 
   const requestRows = team.requests.map((r) => ({
@@ -150,7 +151,7 @@ export default async function AdminTeamDetailPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile
           label="Requests"
           value={String(team.requests.length)}
@@ -214,36 +215,3 @@ export default async function AdminTeamDetailPage({
   );
 }
 
-function StatTile({
-  label,
-  value,
-  subtitle,
-  icon: Icon,
-  iconClassName,
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-  icon: LucideIcon;
-  iconClassName?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="relative pt-11 pb-4">
-        <div
-          className={cn(
-            "absolute top-4 right-4 flex size-9 shrink-0 items-center justify-center rounded-md",
-            iconClassName ?? "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="size-[1.125rem]" aria-hidden />
-        </div>
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 pr-11 text-2xl font-bold text-foreground tabular-nums">{value}</p>
-        {subtitle ? (
-          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
