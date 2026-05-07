@@ -68,7 +68,6 @@ describe("navigation helpers", () => {
       { href: "/admin/teams", label: "Manage Teams", prefetch: false },
       { href: "/admin/team-requests", label: "Team Registrations", prefetch: false },
       { href: "/admin/users", label: "Manage Users", prefetch: false },
-      { href: "/profile", label: "Profile" },
     ]);
     expect(getRequestDetailHref(context, "req-1")).toBe("/admin/requests/req-1");
   });
@@ -87,9 +86,32 @@ describe("navigation helpers", () => {
       { href: "/admin/requests", label: "Reimbursements", prefetch: false },
       { href: "/admin/teams", label: "Manage Teams", prefetch: false },
       { href: "/admin/team-requests", label: "Team Registrations", prefetch: false },
-      { href: "/profile", label: "Profile" },
     ]);
     expect(getRequestDetailHref(context, "req-1")).toBe("/admin/requests/req-1");
+  });
+
+  it("does not show Profile for pure admins who never get reimbursed", () => {
+    const superAdmin = accessContext("SUPER_ADMIN", []);
+    expect(getNavigationLinks(superAdmin).some((link) => link.href === "/profile")).toBe(false);
+
+    const programAdmin = accessContext("USER", [
+      scopedRole("PROGRAM_ADMIN", {
+        districtId: "district-1",
+        schoolId: "school-1",
+        programId: "program-1",
+      }),
+    ]);
+    expect(getNavigationLinks(programAdmin).some((link) => link.href === "/profile")).toBe(false);
+  });
+
+  it("shows Profile for an admin who is also a parent/mentor on a team", () => {
+    const context = accessContext(
+      "USER",
+      [scopedRole("SCHOOL_ADMIN", { districtId: "district-1", schoolId: "school-1" })],
+      [membership("PARENT_MENTOR", { teamId: "team-1" })],
+    );
+
+    expect(getNavigationLinks(context).some((link) => link.href === "/profile")).toBe(true);
   });
 
   it("deduplicates coach and parent links while keeping member navigation", () => {

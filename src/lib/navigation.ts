@@ -83,7 +83,12 @@ export function getNavigationLinks(
     addLink("/user/requests", "My Requests");
   }
 
-  addLink("/profile", "Profile");
+  // Profile holds mailing address + Zelle payout details. Only users who can
+  // actually be reimbursed (coaches and parent/mentors who submit requests)
+  // need it — pure admins never get paid out.
+  if (context.isCoach || context.isParentMentor) {
+    addLink("/profile", "Profile");
+  }
 
   return Array.from(links.values());
 }

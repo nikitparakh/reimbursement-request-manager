@@ -382,30 +382,46 @@ async function seedAccessAndMemberships(
   const workflowTeam = getRequired(teamsByShortCode, SAMPLE_WORKFLOW_TEAM_SHORT_CODE, "workflow team");
   const fllProgram = getRequired(programsByCode, "FLL", "FLL program");
 
+  // Scope rules:
+  // - SCHOOL_ADMIN is restricted to a single school but oversees every program
+  //   inside it. Novi High has both FLL and FRC, so it makes for a good demo.
+  // - PROGRAM_ADMIN is restricted to a single school + single program pair.
+  //   Novi Meadows + FLL is the canonical example.
+  const schoolAdminSchool = getRequired(
+    schoolsBySlug,
+    "novi-high-school",
+    "school novi-high-school",
+  );
+  const programAdminSchool = getRequired(
+    schoolsBySlug,
+    "novi-meadows-elementary-school",
+    "school novi-meadows-elementary-school",
+  );
+
   await prisma.userScopeRole.createMany({
     data: [
-      ...Array.from(schoolsBySlug.values()).map((school) => ({
+      {
         userId: schoolAdmin.id,
-        role: "SCHOOL_ADMIN" as const,
+        role: "SCHOOL_ADMIN",
         districtId,
-        schoolId: school.id,
+        schoolId: schoolAdminSchool.id,
         scopeKey: buildUserScopeRoleKey({
           districtId,
-          schoolId: school.id,
+          schoolId: schoolAdminSchool.id,
         }),
-      })),
-      ...(["novi-meadows-elementary-school", "parkview-elementary-school"] as const).map((schoolSlug) => ({
+      },
+      {
         userId: programAdmin.id,
-        role: "PROGRAM_ADMIN" as const,
+        role: "PROGRAM_ADMIN",
         districtId,
-        schoolId: getRequired(schoolsBySlug, schoolSlug, `school ${schoolSlug}`).id,
+        schoolId: programAdminSchool.id,
         programId: fllProgram.id,
         scopeKey: buildUserScopeRoleKey({
           districtId,
-          schoolId: getRequired(schoolsBySlug, schoolSlug, `school ${schoolSlug}`).id,
+          schoolId: programAdminSchool.id,
           programId: fllProgram.id,
         }),
-      })),
+      },
     ],
   });
 
