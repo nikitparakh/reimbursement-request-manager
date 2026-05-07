@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci --no-audit --no-fund"
+  "installCommand": "npm ci --no-audit --no-fund --ignore-scripts"
 }
