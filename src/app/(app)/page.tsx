@@ -1,13 +1,16 @@
-import type { ReactNode } from "react";
+import type { ComponentType, SVGProps } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  ArrowRight,
   BookOpen,
-  ClipboardList,
+  ClipboardCheck,
   Compass,
   FilePlus,
   LayoutDashboard,
+  Receipt,
   School,
+  ShieldCheck,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -16,24 +19,48 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { DashboardSection } from "@/components/dashboard/dashboard-section";
+import { DashboardTile } from "@/components/dashboard/dashboard-tile";
 import { getDashboardTeamRegistrationsDescription } from "@/lib/ui-copy";
-import { cn } from "@/lib/utils";
 
-function TileIcon({ children }: { children: ReactNode }) {
+type LucideIcon = ComponentType<SVGProps<SVGSVGElement>>;
+
+const LANDING_FEATURES: Array<{
+  icon: LucideIcon;
+  title: string;
+  body: string;
+}> = [
+  {
+    icon: Receipt,
+    title: "For parents & mentors",
+    body: "Upload receipts, itemize spending, and track each request from draft to payout.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "For coaches",
+    body: "Review your team's submissions in one inbox — no more chasing receipts over email.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "For administrators",
+    body: "Approve, audit, and pay out reimbursements across districts, schools, and programs.",
+  },
+];
+
+function tileFooter(text: string) {
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-      {children}
-    </div>
+    <>
+      <span>{text}</span>
+      <ArrowRight
+        className="size-4 text-muted-foreground transition-transform group-hover/tile:translate-x-0.5"
+        aria-hidden
+      />
+    </>
   );
-}
-
-function dashboardGridClass(tileCount: number) {
-  if (tileCount <= 1) return "grid grid-cols-1 gap-4";
-  if (tileCount === 2) return "grid grid-cols-1 gap-4 sm:grid-cols-2";
-  return "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
 }
 
 export default async function HomePage() {
@@ -41,32 +68,63 @@ export default async function HomePage() {
 
   if (!session?.user) {
     return (
-      <div className="space-y-8 py-8 sm:py-12">
-        <PageHeader
-          title="Reimbursement Request Manager"
-          description="Manage robotics reimbursements across districts, schools, programs, and teams."
-        />
-        <div className="flex justify-center">
-          <Card className={cn("w-full max-w-lg border-border")}>
-            <CardContent className="flex flex-col items-center gap-6 px-6 py-10 text-center">
-              <Image
-                src="/novi-logo.png"
-                alt="Novi Community School District"
-                width={131}
-                height={40}
-                className="h-14 w-auto"
-              />
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <Button asChild>
-                  <Link href="/sign-in">Sign In</Link>
-                </Button>
-                <Button variant="secondary" asChild>
-                  <Link href="/sign-up">Create Account</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="space-y-12 pb-12">
+        <section className="mx-auto flex max-w-3xl flex-col items-center gap-6 pt-10 text-center sm:pt-16">
+          <Image
+            src="/novi-logo.png"
+            alt="Novi Community School District"
+            width={262}
+            height={80}
+            className="h-14 w-auto sm:h-16"
+            priority
+          />
+          <div className="space-y-3">
+            <h1 className="text-balance font-heading text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+              Reimbursement Request Manager
+            </h1>
+            <p className="mx-auto max-w-xl text-balance text-base text-muted-foreground sm:text-lg">
+              Submit, review, and pay out robotics reimbursements across districts, schools,
+              programs, and teams — all in one place.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button asChild>
+              <Link href="/sign-up">Create account</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/sign-in">Sign in</Link>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Reviewing the program first?{" "}
+            <Link
+              href="/policy"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Read the reimbursement policy
+            </Link>
+          </p>
+        </section>
+
+        <section className="mx-auto max-w-5xl">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {LANDING_FEATURES.map((feature) => (
+              <Card key={feature.title} className="border-border">
+                <CardContent className="flex h-full flex-col gap-3 pt-6">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <feature.icon className="size-5 text-muted-foreground" aria-hidden />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-heading text-base font-semibold text-foreground">
+                      {feature.title}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{feature.body}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
@@ -161,15 +219,19 @@ export default async function HomePage() {
     });
   }
 
-  const cardHover = "transition-colors hover:border-primary/40";
+  const showAdminSection = access.isSuperAdmin || access.canManageTeamRequests;
+  const showSetupSection = !user?.onboardingDone && !access.isSuperAdmin;
 
-  const dashboardTileCount =
-    (access.isSuperAdmin ? 1 : 0) +
-    adminPrograms.length +
+  const visibleSectionCount =
+    (adminPrograms.length > 0 ? 1 : 0) +
+    (showAdminSection ? 1 : 0) +
     (access.isCoach ? 1 : 0) +
-    (access.canManageTeamRequests ? 1 : 0) +
-    (access.isParentMentor ? 3 : 0) +
-    (!user?.onboardingDone && !access.isSuperAdmin ? 1 : 0);
+    (access.isParentMentor ? 1 : 0) +
+    (showSetupSection ? 1 : 0);
+
+  // Hide the section label when only one section is visible — it would just be
+  // visual noise (e.g. a single SETUP label above a single Onboarding tile).
+  const hideSectionTitles = visibleSectionCount <= 1;
 
   return (
     <div className="space-y-6">
@@ -178,179 +240,118 @@ export default async function HomePage() {
         description={`Welcome back, ${session.user.name ?? session.user.email}`}
       />
 
-      <div className={cn(dashboardGridClass(dashboardTileCount))}>
-        {access.isSuperAdmin ? (
-          <Link href="/admin/teams" prefetch={false} className="block">
-            <Card className={cn("border-border", cardHover)}>
-              <CardContent className="pt-6">
-                <div className="flex gap-4">
-                  <TileIcon>
-                    <LayoutDashboard className="size-5 text-muted-foreground" aria-hidden />
-                  </TileIcon>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-muted-foreground">Platform</div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">All Districts</div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Manage all schools, programs, teams, and requests.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+      <div className="space-y-8">
+        {adminPrograms.length > 0 ? (
+          <DashboardSection
+            title="Programs"
+            description="Schools and programs you manage."
+            hideTitle={hideSectionTitles}
+          >
+            {adminPrograms.map((program) => (
+              <DashboardTile
+                key={program.id}
+                href={program.href}
+                prefetch={false}
+                icon={School}
+                title={program.schoolName}
+                badge={
+                  <Badge variant="secondary" className="font-mono tracking-wide">
+                    {program.code}
+                  </Badge>
+                }
+                meta={[
+                  { label: "District", value: program.districtName },
+                  { label: "Program", value: program.name },
+                  {
+                    label: "Grades",
+                    value:
+                      [program.gradeRangeLabel, program.ageRangeLabel]
+                        .filter(Boolean)
+                        .join(" · ") || "—",
+                  },
+                ]}
+                footer={tileFooter(
+                  `${program.teamCount} active team${program.teamCount === 1 ? "" : "s"}`,
+                )}
+              />
+            ))}
+          </DashboardSection>
         ) : null}
 
-        {adminPrograms.map((program) => (
-          <Link key={program.id} href={program.href} prefetch={false} className="block">
-            <Card className={cn("border-border", cardHover)}>
-              <CardContent className="pt-6">
-                <div className="flex gap-4">
-                  <TileIcon>
-                    <School className="size-5 text-muted-foreground" aria-hidden />
-                  </TileIcon>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-muted-foreground">
-                      {program.districtName} · {program.schoolName}
-                    </div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">{program.name}</div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {program.gradeRangeLabel}{" "}
-                      {program.ageRangeLabel ? `| ${program.ageRangeLabel}` : ""}
-                    </p>
-                    <p className="mt-3 text-sm text-foreground">
-                      {program.teamCount} active team{program.teamCount === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        {showAdminSection ? (
+          <DashboardSection title="Admin" hideTitle={hideSectionTitles}>
+            {access.isSuperAdmin ? (
+              <DashboardTile
+                href="/admin/teams"
+                prefetch={false}
+                icon={LayoutDashboard}
+                title="All Districts"
+                description="Manage all schools, programs, teams, and requests."
+                footer={tileFooter("Open admin")}
+              />
+            ) : null}
+            {access.canManageTeamRequests ? (
+              <DashboardTile
+                href="/admin/team-requests"
+                prefetch={false}
+                icon={UserPlus}
+                title="Team Registrations"
+                description={getDashboardTeamRegistrationsDescription(access.isSuperAdmin)}
+                footer={tileFooter("Review registrations")}
+              />
+            ) : null}
+          </DashboardSection>
+        ) : null}
 
         {access.isCoach ? (
-          <Link href="/coach/team-reimbursements" prefetch={false} className="block">
-            <Card className={cn("border-border", cardHover)}>
-              <CardContent className="pt-6">
-                <div className="flex gap-4">
-                  <TileIcon>
-                    <ClipboardList className="size-5 text-muted-foreground" aria-hidden />
-                  </TileIcon>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-muted-foreground">Coach</div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">My Team Queue</div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Review reimbursements and manage your assigned team workspace.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ) : null}
-
-        {access.canManageTeamRequests ? (
-          <Link href="/admin/team-requests" prefetch={false} className="block">
-            <Card className={cn("border-border", cardHover)}>
-              <CardContent className="pt-6">
-                <div className="flex gap-4">
-                  <TileIcon>
-                    <UserPlus className="size-5 text-muted-foreground" aria-hidden />
-                  </TileIcon>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-muted-foreground">Admin</div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">
-                      Team Registrations
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {getDashboardTeamRegistrationsDescription(access.isSuperAdmin)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <DashboardSection title="Coach" hideTitle={hideSectionTitles}>
+            <DashboardTile
+              href="/coach/team-reimbursements"
+              prefetch={false}
+              icon={ClipboardCheck}
+              title="My Team Queue"
+              description="Review reimbursements and manage your assigned team workspace."
+              footer={tileFooter("Open queue")}
+            />
+          </DashboardSection>
         ) : null}
 
         {access.isParentMentor ? (
-          <>
-            <Link href="/team" className="block">
-              <Card className={cn("border-border", cardHover)}>
-                <CardContent className="pt-6">
-                  <div className="flex gap-4">
-                    <TileIcon>
-                      <Users className="size-5 text-muted-foreground" aria-hidden />
-                    </TileIcon>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-muted-foreground">Team</div>
-                      <div className="mt-1 text-lg font-semibold text-foreground">My Team</div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        See your team roster, coach assignments, and school/program details.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/user/requests/new" className="block">
-              <Card className={cn("border-border", cardHover)}>
-                <CardContent className="pt-6">
-                  <div className="flex gap-4">
-                    <TileIcon>
-                      <FilePlus className="size-5 text-muted-foreground" aria-hidden />
-                    </TileIcon>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-muted-foreground">Quick Action</div>
-                      <div className="mt-1 text-lg font-semibold text-foreground">New Request</div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Create a new reimbursement request for your team.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/policy" className="block">
-              <Card className={cn("border-border", cardHover)}>
-                <CardContent className="pt-6">
-                  <div className="flex gap-4">
-                    <TileIcon>
-                      <BookOpen className="size-5 text-muted-foreground" aria-hidden />
-                    </TileIcon>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-muted-foreground">Resources</div>
-                      <div className="mt-1 text-lg font-semibold text-foreground">
-                        Reimbursement Policy
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Read the policy and submission guidelines.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </>
+          <DashboardSection title="My team" hideTitle={hideSectionTitles}>
+            <DashboardTile
+              href="/team"
+              icon={Users}
+              title="My Team"
+              description="See your team roster, coach assignments, and school/program details."
+              footer={tileFooter("Open team")}
+            />
+            <DashboardTile
+              href="/user/requests/new"
+              icon={FilePlus}
+              title="New Request"
+              description="Create a new reimbursement request for your team."
+              footer={tileFooter("Start request")}
+            />
+            <DashboardTile
+              href="/policy"
+              icon={BookOpen}
+              title="Reimbursement Policy"
+              description="Read the policy and submission guidelines."
+              footer={tileFooter("Read policy")}
+            />
+          </DashboardSection>
         ) : null}
 
-        {!user?.onboardingDone && !access.isSuperAdmin ? (
-          <Link href="/onboarding" className="block">
-            <Card className={cn("border-border", cardHover)}>
-              <CardContent className="pt-6">
-                <div className="flex gap-4">
-                  <TileIcon>
-                    <Compass className="size-5 text-muted-foreground" aria-hidden />
-                  </TileIcon>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-muted-foreground">Setup</div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">Onboarding</div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Join the right district, school, program, and team.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+        {showSetupSection ? (
+          <DashboardSection title="Setup" hideTitle={hideSectionTitles}>
+            <DashboardTile
+              href="/onboarding"
+              icon={Compass}
+              title="Onboarding"
+              description="Join the right district, school, program, and team."
+              footer={tileFooter("Continue onboarding")}
+            />
+          </DashboardSection>
         ) : null}
       </div>
     </div>
