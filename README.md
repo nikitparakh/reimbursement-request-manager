@@ -202,15 +202,14 @@ scripts/
 
 ## Testing
 
-Tests live under `tests/` with shared helpers and fixtures:
+Tests live under `tests/` with shared helpers:
 
 ```
 tests/
 ├── unit/           # Pure logic tests (parsing, workflow, RBAC, storage, etc.)
 ├── integration/    # API route tests with a real test database
 ├── e2e/            # Playwright browser tests (sign-up, user/coach/admin flows)
-├── helpers/        # Shared setup, factories, and utilities
-└── fixtures/       # Sample receipt files
+└── helpers/        # Shared setup, factories, and utilities
 ```
 
 Run the full suite:
