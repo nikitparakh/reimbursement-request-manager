@@ -2,6 +2,11 @@
 
 _Generated: 2026-05-31 · Repo: `reimbursement-request-manager`_
 
+> **Status:** Cleanup batches 1–6 (all confirmed-dead items) were executed on the
+> `cloudflare-migration` branch — each as a separate `cleanup(batch N)` commit, gated
+> on tsc + eslint + tests (238 passing). The four **Needs a Decision** items (§3) and the
+> ~30 shadcn sub-exports were intentionally left for human judgment.
+
 This audit catalogs verified dead, stale, and orphaned code. Every "safe to delete"
 item below was confirmed with adversarial ripgrep checks (no importers, no dynamic/string
 refs, no barrel re-exports, not a framework-convention entrypoint). Items needing human
