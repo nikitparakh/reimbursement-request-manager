@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { schools, teamMemberships, userScopeRoles } from "@/db/schema";
-import { cleanupLegacyTeamScopedRoles } from "../../prisma/seed-cleanup";
+import { cleanupLegacyTeamScopedRoles } from "../../scripts/seed-cleanup";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createMembership,

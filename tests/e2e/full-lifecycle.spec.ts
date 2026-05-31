@@ -20,7 +20,7 @@ import {
 } from "./helpers";
 
 const client = createClient({
-  url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+  url: process.env.DATABASE_URL ?? "file:./local.db",
 });
 const db = drizzle(client, { schema });
 

@@ -9,10 +9,11 @@ dist
 *.tsbuildinfo
 .DS_Store
 
-prisma/dev.db
-prisma/dev.db-journal
-prisma/test.db
-prisma/test.db-journal
+# Local SQLite (seed script / scratch)
+local.db
+local.db-journal
+*.db
+*.db-journal
 
 data/
 

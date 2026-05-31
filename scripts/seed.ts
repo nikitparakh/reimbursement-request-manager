@@ -183,7 +183,7 @@ function createSeedClient() {
         authToken: process.env.TURSO_AUTH_TOKEN,
       })
     : createClient({
-        url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+        url: process.env.DATABASE_URL ?? "file:./local.db",
       });
 
   const db: DB = drizzle(client, { schema });

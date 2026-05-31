@@ -98,7 +98,7 @@ database and storage from **Cloudflare bindings** and its secrets from
 | `GOOGLE_AI_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
 | `APP_URL` | No | `http://localhost:3000` | Application base URL |
 | `LOCAL_STORAGE_DIR` | No | `data/uploads` | Local receipt storage (dev/test; prod uses R2) |
-| `DATABASE_URL` | No | `file:./prisma/dev.db` | Local SQLite for the seed script + tests only |
+| `DATABASE_URL` | No | `file:./local.db` | Local SQLite for the seed script + tests only |
 | `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | No | — | Target a remote libSQL/Turso DB when running the seed script |
 
 Clerk also reads optional routing vars (`NEXT_PUBLIC_CLERK_SIGN_IN_URL`, etc.) —
@@ -176,8 +176,9 @@ src/
 workers/
 └── receipt-consumer/           # Cloudflare Queue consumer Worker (receipt parsing)
 
-prisma/
-└── seed.ts                     # Standalone Drizzle seed script (libSQL/Turso target)
+scripts/
+├── seed.ts                     # Standalone Drizzle seed script (libSQL/Turso target)
+└── seed-cleanup.ts             # Legacy scoped-role cleanup helper
 ```
 
 ## Scripts
