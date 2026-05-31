@@ -32,7 +32,7 @@ Because of that:
 
 - Visitor, base user, parent/mentor, and coach findings include direct browser evidence.
 - Program admin, school admin, and super admin findings include a mix of prior browser evidence, source inspection, and component-level review.
-- The reported UI issues are still actionable because they map to visible UI components and implemented route surfaces, but a final verification pass should run against one clean local server with matching `APP_URL` and `NEXTAUTH_URL`.
+- The reported UI issues are still actionable because they map to visible UI components and implemented route surfaces, but a final verification pass should run against one clean local server with a matching `APP_URL`. (Auth is now handled by Clerk; the historical `NEXTAUTH_URL` issues noted above no longer apply.)
 
 ## Executive Summary
 
@@ -462,7 +462,7 @@ Before making another browser audit pass:
 
 - Stop competing dev servers.
 - Start one VelTest dev server on a known port.
-- Set `APP_URL` and `NEXTAUTH_URL` to that exact origin.
+- Set `APP_URL` to that exact origin (authentication is handled by Clerk).
 - Use `127.0.0.1` or `localhost` consistently.
 - Confirm sign-in works once for each seeded account.
 

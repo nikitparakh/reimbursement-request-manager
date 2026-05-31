@@ -1,5 +1,7 @@
 # Cloudflare Migration Plan — Vercel + Turso + Vercel Blob + NextAuth → Cloudflare Workers + D1 + R2 + Clerk
 
+> **Status (implemented):** Phases 0–4 are implemented on the `cloudflare-migration` branch — Clerk auth, Prisma→Drizzle on D1, R2 storage, Queues-based parsing, and the GitHub Actions deploy config. tsc + lint clean, 238 tests passing. **Remaining is infra/verification only:** provision real Cloudflare resources (paste the D1 `database_id`), add Clerk/Gemini keys, run the `npm run preview` workerd gate, rework the e2e tests off NextAuth, then deploy + cut over DNS.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan phase-by-phase. Each phase ends in a shippable state — do not skip the `opennextjs-cloudflare preview` (workerd) verification gates.
 
 **Goal:** Move the entire reimbursement app onto a fully Cloudflare-native, **Free-plan** stack: **Cloudflare Workers** (via `@opennextjs/cloudflare`) for hosting, **Cloudflare D1** for the database (via **Drizzle ORM**), **Cloudflare R2** for receipt storage, **Cloudflare Queues** for background receipt parsing, and **Clerk** (free tier) for authentication.
