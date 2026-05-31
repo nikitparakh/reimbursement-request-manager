@@ -10,8 +10,10 @@ const isPublicRoute = createRouteMatcher([
   "/admin-sign-up(.*)",
 ]);
 
-// Clerk runs on the Edge runtime, which OpenNext supports (unlike Next's Node
-// middleware). This is the minimal gate; route/layout guards (requireUser,
+// Must be `middleware.ts` (Edge runtime), NOT Next 16's `proxy.ts`: proxy.ts
+// defaults to the Node.js runtime, which @opennextjs/cloudflare does not support
+// (build errors "Node.js middleware is not currently supported"). clerkMiddleware
+// runs on Edge. This is the minimal gate; route/layout guards (requireUser,
 // requireRole) remain the authoritative enforcement.
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
