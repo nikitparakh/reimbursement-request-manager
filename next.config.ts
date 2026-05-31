@@ -8,3 +8,8 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// Enables the OpenNext Cloudflare adapter during `next dev` so that
+// `getCloudflareContext()` (D1, R2, Queue bindings) is available locally.
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+initOpenNextCloudflareForDev();

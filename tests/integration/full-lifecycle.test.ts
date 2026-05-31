@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
-import { POST as register } from "@/app/api/auth/register/route";
 import { POST as onboard } from "@/app/api/onboarding/complete/route";
 import { POST as createRequestRoute } from "@/app/api/requests/route";
 import { POST as submitRoute } from "@/app/api/requests/[requestId]/submit/route";
@@ -29,17 +28,15 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
   });
 
   it("happy path: register → onboard → create → submit → coach approve → admin approve → paid", async () => {
-    // 1. Register user
-    const { data: regData } = await callRouteJSON(register, {
-      method: "POST",
-      body: {
-        name: "Alice User",
-        email: "alice@test.com",
-        password: "Password1",
-        policyAccepted: true,
-      },
+    // 1. Create user (registration is now handled by Clerk; provision the
+    //    app-side User row directly the way lazy provisioning would).
+    const alice = await createUser({
+      name: "Alice User",
+      email: "alice@test.com",
+      role: "USER",
+      onboardingDone: false,
     });
-    const userId = (regData as any).user.id;
+    const userId = alice.id;
 
     // Create team and coach
     const team = await createTeam({ name: "Test Team" });

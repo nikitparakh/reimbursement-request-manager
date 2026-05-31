@@ -20,3 +20,9 @@ data/
 .playwright-mcp/
 test-results/
 .vercel
+
+# Cloudflare / OpenNext
+.open-next
+.wrangler
+.dev.vars
+cloudflare-env.d.ts

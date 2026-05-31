@@ -1,45 +1,29 @@
-import { getToken } from "next-auth/jwt";
-import { NextResponse, type NextRequest } from "next/server";
-import { buildGetTokenOptions } from "@/lib/auth-cookies";
-import { env } from "@/lib/env";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { POLICY_PATH } from "@/lib/policy";
 
-export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+// Public routes that do not require an authenticated session.
+const isPublicRoute = createRouteMatcher([
+  "/",
+  POLICY_PATH,
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/admin-sign-up(.*)",
+]);
 
-  const isPublic =
-    pathname === "/" ||
-    pathname === POLICY_PATH ||
-    pathname.startsWith("/sign-in") ||
-    pathname.startsWith("/sign-up") ||
-    pathname.startsWith("/admin-sign-up") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/_next") ||
-    pathname.includes(".");
-
-  if (isPublic) {
-    return NextResponse.next();
+// Clerk runs on the Edge runtime, which OpenNext supports (unlike Next's Node
+// middleware). This is the minimal gate; route/layout guards (requireUser,
+// requireRole, requireAccessContext) remain the authoritative enforcement.
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect();
   }
+});
 
-  const token = await getToken({
-    req: request,
-    ...buildGetTokenOptions(env.AUTH_SECRET),
-  });
-
-  if (!token) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  return NextResponse.next();
-}
-
-export const proxyConfig = {
+export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|novi-logo\\.png).*)",
+    // Skip Next.js internals and static files unless found in search params.
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for API routes.
+    "/(api|trpc)(.*)",
   ],
 };
