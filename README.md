@@ -7,10 +7,11 @@ A multi-tenant reimbursement workflow app for school robotics teams. Parents and
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router, React 19, Turbopack)
-- **Database:** SQLite (local) / Turso (production) via Prisma ORM
-- **File Storage:** Local filesystem (local) / Vercel Blob (production)
-- **Hosting:** Vercel
-- **Auth:** NextAuth.js v4 (credentials provider, bcryptjs)
+- **Hosting:** Cloudflare Workers via `@opennextjs/cloudflare` (local: `next dev`)
+- **Database:** Cloudflare D1 (local: SQLite file) via Drizzle ORM
+- **File Storage:** Cloudflare R2 (local: filesystem)
+- **Background jobs:** Cloudflare Queues (receipt parsing consumer Worker)
+- **Auth:** Clerk
 - **AI Parsing:** Google Gemini API for receipt/invoice extraction
 - **PDF Generation:** pdfkit + pdf-lib
 - **Validation:** Zod v4
@@ -228,47 +229,58 @@ npx playwright install
 
 ## Deployment
 
-The app is designed to run locally with zero cloud dependencies, but can be deployed to Vercel with Turso and Vercel Blob for free.
+The app runs locally with zero cloud dependencies and deploys to **Cloudflare** (Workers + D1 + R2 + Queues) with **Clerk** auth — all on free tiers.
 
 ### Production Stack
 
 | Concern | Local Dev | Production |
 |---------|-----------|------------|
-| Database | SQLite file | Turso (libSQL) |
-| File storage | Local filesystem | Vercel Blob |
-| Hosting | `next dev` | Vercel |
+| Hosting | `next dev` | Cloudflare Workers (`@opennextjs/cloudflare`) |
+| Database | SQLite file (Drizzle) | Cloudflare D1 (Drizzle) |
+| File storage | Local filesystem | Cloudflare R2 |
+| Receipt parsing | inline | Cloudflare Queues (consumer Worker) |
+| Auth | Clerk (test instance) | Clerk (production instance) |
 
-### Deploy to Vercel
+### One-time setup
 
-1. **Create a Turso database:**
+1. **Create the Cloudflare resources** (Workers Free plan is sufficient):
    ```bash
-   turso db create reimbursement-manager
-   turso db show reimbursement-manager --url
-   turso db tokens create reimbursement-manager
+   npx wrangler login
+   npx wrangler d1 create reimbursement-manager      # paste database_id into wrangler.jsonc + wrangler.consumer.jsonc
+   npx wrangler r2 bucket create receipts
+   npx wrangler queues create receipt-parse
+   npx wrangler queues create receipt-parse-dlq
    ```
 
-2. **Push the schema to Turso:**
+2. **Create a Clerk application** (https://dashboard.clerk.com) and grab the publishable key, secret key, and PEM public key.
+
+3. **Set Worker secrets** (app Worker + consumer Worker):
    ```bash
-   npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script | turso db shell reimbursement-manager
+   npx wrangler secret put CLERK_SECRET_KEY
+   npx wrangler secret put CLERK_JWT_KEY
+   npx wrangler secret put GOOGLE_AI_API_KEY
+   npx wrangler secret put GOOGLE_AI_API_KEY --config wrangler.consumer.jsonc
+   ```
+   Set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a build-time var (CI variable / build env).
+
+4. **Apply migrations and seed:**
+   ```bash
+   npx wrangler d1 migrations apply reimbursement-manager --remote
+   # optional: seed a libSQL/Turso copy, then import, or run the seed against a local D1
    ```
 
-3. **Seed the database (optional):**
-   ```bash
-   TURSO_DATABASE_URL="libsql://..." TURSO_AUTH_TOKEN="..." DATABASE_URL="file:./dev.db" npx tsx prisma/seed.ts
-   ```
+### Deploy
 
-4. **Connect your GitHub repo to Vercel** and add a Blob store (Vercel Dashboard > Storage > Create Blob Store).
+```bash
+npm run deploy            # OpenNext build + deploy the app Worker (queue producer)
+npm run deploy:consumer   # deploy the receipt-parse Queue consumer Worker
+```
 
-5. **Set environment variables** in Vercel project settings:
-   - `DATABASE_URL` = `file:./dev.db`
-   - `TURSO_DATABASE_URL` = your Turso URL
-   - `TURSO_AUTH_TOKEN` = your Turso token
-   - `AUTH_SECRET` = generate with `openssl rand -base64 32`
-   - `APP_URL` / `NEXTAUTH_URL` = your Vercel deployment URL
-   - `GOOGLE_AI_API_KEY` = your Gemini API key
-   - `BLOB_READ_WRITE_TOKEN` is set automatically when linking the Blob store
+CI (`.github/workflows/ci.yml`) runs lint + tests on every PR and auto-deploys both Workers on push to `main` (requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo secrets and the `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` repo variable).
 
-6. **Deploy** — Vercel auto-deploys on push to `main`.
+### Local Cloudflare runtime
+
+`npm run preview` builds with OpenNext and serves the app on the real `workerd` runtime (catches Workers-only issues that `next dev` misses). Put Clerk/Gemini values in `.dev.vars`.
 
 ## License
 
