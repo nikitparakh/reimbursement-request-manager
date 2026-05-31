@@ -1,22 +1,38 @@
-import { hash } from "bcryptjs";
-import { Prisma } from "@prisma/client";
-import type {
-  GlobalRole,
-  ProgramCode,
-  RequestStatus,
-  ParseStatus,
-  DocumentType,
-  TeamMembershipRole,
-  ScopedRole,
-  FllDivision,
-} from "@prisma/client";
-import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { getDb } from "@/lib/db";
+import {
+  districts,
+  programs,
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+  schools,
+  teamMemberships,
+  teamRegistrationRequests,
+  teams,
+  userScopeRoles,
+  users,
+  type DocumentType,
+  type FllDivision,
+  type GlobalRole,
+  type ParseStatus,
+  type ProgramCode,
+  type RequestStatus,
+  type ScopedRole,
+  type TeamMembershipRole,
+} from "@/db/schema";
 import { buildUserScopeRoleKey } from "@/lib/user-scope-role";
 
 let counter = 0;
 
 function seq() {
   return ++counter;
+}
+
+async function insertOne<T>(promise: Promise<T[]>): Promise<T> {
+  const rows = await promise;
+  return rows[0];
 }
 
 function getProgramName(code: ProgramCode) {
@@ -42,27 +58,33 @@ export async function createUser(
   } = {}
 ) {
   const n = seq();
-  const passwordHash = await hash(overrides.password ?? "Password1", 4);
-  return db.user.create({
-    data: {
-      email: overrides.email ?? `user${n}@test.com`,
-      name: overrides.name ?? `User ${n}`,
-      role: overrides.role ?? "USER",
-      onboardingDone: overrides.onboardingDone ?? false,
-      passwordHash,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(users)
+      .values({
+        email: overrides.email ?? `user${n}@test.com`,
+        name: overrides.name ?? `User ${n}`,
+        role: overrides.role ?? "USER",
+        onboardingDone: overrides.onboardingDone ?? false,
+      })
+      .returning()
+  );
 }
 
-export async function createDistrict(overrides: { name?: string; slug?: string; active?: boolean } = {}) {
+export async function createDistrict(
+  overrides: { name?: string; slug?: string; active?: boolean } = {}
+) {
   const n = seq();
-  return db.district.create({
-    data: {
-      name: overrides.name ?? `District ${n}`,
-      slug: overrides.slug ?? `district-${n}`,
-      active: overrides.active ?? true,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(districts)
+      .values({
+        name: overrides.name ?? `District ${n}`,
+        slug: overrides.slug ?? `district-${n}`,
+        active: overrides.active ?? true,
+      })
+      .returning()
+  );
 }
 
 export async function createSchool(
@@ -70,14 +92,17 @@ export async function createSchool(
 ) {
   const districtId = overrides.districtId ?? (await createDistrict()).id;
   const n = seq();
-  return db.school.create({
-    data: {
-      districtId,
-      name: overrides.name ?? `School ${n}`,
-      slug: overrides.slug ?? `school-${n}`,
-      active: overrides.active ?? true,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(schools)
+      .values({
+        districtId,
+        name: overrides.name ?? `School ${n}`,
+        slug: overrides.slug ?? `school-${n}`,
+        active: overrides.active ?? true,
+      })
+      .returning()
+  );
 }
 
 export async function createProgram(
@@ -90,20 +115,25 @@ export async function createProgram(
 ) {
   const n = seq();
   const code = overrides.code ?? (n % 3 === 0 ? "FRC" : n % 2 === 0 ? "FTC" : "FLL");
-  return db.program.upsert({
-    where: { code },
-    update: {
-      name: overrides.name ?? getProgramName(code),
-      gradeRangeLabel: overrides.gradeRangeLabel,
-      ageRangeLabel: overrides.ageRangeLabel,
-    },
-    create: {
-      code,
-      name: overrides.name ?? getProgramName(code),
-      gradeRangeLabel: overrides.gradeRangeLabel,
-      ageRangeLabel: overrides.ageRangeLabel,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(programs)
+      .values({
+        code,
+        name: overrides.name ?? getProgramName(code),
+        gradeRangeLabel: overrides.gradeRangeLabel,
+        ageRangeLabel: overrides.ageRangeLabel,
+      })
+      .onConflictDoUpdate({
+        target: programs.code,
+        set: {
+          name: overrides.name ?? getProgramName(code),
+          gradeRangeLabel: overrides.gradeRangeLabel,
+          ageRangeLabel: overrides.ageRangeLabel,
+        },
+      })
+      .returning()
+  );
 }
 
 export async function createTeam(
@@ -120,17 +150,20 @@ export async function createTeam(
   const schoolId = overrides.schoolId ?? (await createSchool()).id;
   const programId = overrides.programId ?? (await createProgram()).id;
   const n = seq();
-  return db.team.create({
-    data: {
-      schoolId,
-      programId,
-      name: overrides.name ?? `Team ${n}`,
-      shortCode: overrides.shortCode ?? `T${n}`,
-      glAccount: overrides.glAccount,
-      active: overrides.active ?? true,
-      fllDivision: overrides.fllDivision,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(teams)
+      .values({
+        schoolId,
+        programId,
+        name: overrides.name ?? `Team ${n}`,
+        shortCode: overrides.shortCode ?? `T${n}`,
+        glAccount: overrides.glAccount,
+        active: overrides.active ?? true,
+        fllDivision: overrides.fllDivision,
+      })
+      .returning()
+  );
 }
 
 export async function createScopedRole(input: {
@@ -141,12 +174,15 @@ export async function createScopedRole(input: {
   programId?: string;
   teamId?: string;
 }) {
-  return db.userScopeRole.create({
-    data: {
-      ...input,
-      scopeKey: buildUserScopeRoleKey(input),
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(userScopeRoles)
+      .values({
+        ...input,
+        scopeKey: buildUserScopeRoleKey(input),
+      })
+      .returning()
+  );
 }
 
 export async function createScopedRoleForTeam(input: {
@@ -154,12 +190,11 @@ export async function createScopedRoleForTeam(input: {
   teamId: string;
   role: ScopedRole;
 }) {
-  const team = await db.team.findUniqueOrThrow({
-    where: { id: input.teamId },
-    include: {
-      school: true,
-    },
+  const team = await getDb().query.teams.findFirst({
+    where: eq(teams.id, input.teamId),
+    with: { school: true },
   });
+  if (!team) throw new Error("Team not found");
 
   return createScopedRole({
     userId: input.userId,
@@ -177,14 +212,17 @@ export async function createMembership(input: {
   roleInTeam: TeamMembershipRole;
   approved?: boolean;
 }) {
-  return db.teamMembership.create({
-    data: {
-      userId: input.userId,
-      teamId: input.teamId,
-      roleInTeam: input.roleInTeam,
-      approved: input.approved ?? true,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(teamMemberships)
+      .values({
+        userId: input.userId,
+        teamId: input.teamId,
+        roleInTeam: input.roleInTeam,
+        approved: input.approved ?? true,
+      })
+      .returning()
+  );
 }
 
 export async function createRequest(input: {
@@ -197,17 +235,20 @@ export async function createRequest(input: {
   description?: string;
 }) {
   const n = seq();
-  return db.reimbursementRequest.create({
-    data: {
-      title: input.title ?? `Request ${n}`,
-      description: input.description,
-      teamId: input.teamId,
-      createdById: input.createdById,
-      coachId: input.coachId,
-      status: input.status ?? "DRAFT",
-      requestedTotal: new Prisma.Decimal(input.requestedTotal ?? 0),
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(reimbursementRequests)
+      .values({
+        title: input.title ?? `Request ${n}`,
+        description: input.description,
+        teamId: input.teamId,
+        createdById: input.createdById,
+        coachId: input.coachId,
+        status: input.status ?? "DRAFT",
+        requestedTotal: input.requestedTotal ?? 0,
+      })
+      .returning()
+  );
 }
 
 export async function createReceipt(input: {
@@ -216,15 +257,18 @@ export async function createReceipt(input: {
   fileName?: string;
 }) {
   const n = seq();
-  return db.receiptFile.create({
-    data: {
-      requestId: input.requestId,
-      fileName: input.fileName ?? `receipt-${n}.pdf`,
-      mimeType: "application/pdf",
-      storageUrl: `file:///fake/path/receipt-${n}.pdf`,
-      parseStatus: input.parseStatus ?? "DONE",
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(receiptFiles)
+      .values({
+        requestId: input.requestId,
+        fileName: input.fileName ?? `receipt-${n}.pdf`,
+        mimeType: "application/pdf",
+        storageUrl: `file:///fake/path/receipt-${n}.pdf`,
+        parseStatus: input.parseStatus ?? "DONE",
+      })
+      .returning()
+  );
 }
 
 export async function createExtraction(input: {
@@ -233,15 +277,18 @@ export async function createExtraction(input: {
   merchant?: string;
   total?: number;
 }) {
-  return db.receiptExtraction.create({
-    data: {
-      receiptFileId: input.receiptFileId,
-      documentType: input.documentType ?? "RECEIPT",
-      merchant: input.merchant ?? "Test Store",
-      total: input.total != null ? new Prisma.Decimal(input.total) : null,
-      confidence: 0.95,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(receiptExtractions)
+      .values({
+        receiptFileId: input.receiptFileId,
+        documentType: input.documentType ?? "RECEIPT",
+        merchant: input.merchant ?? "Test Store",
+        total: input.total ?? null,
+        confidence: 0.95,
+      })
+      .returning()
+  );
 }
 
 export async function createLineItem(input: {
@@ -254,17 +301,20 @@ export async function createLineItem(input: {
   category?: string;
 }) {
   const n = seq();
-  return db.receiptLineItem.create({
-    data: {
-      receiptExtractionId: input.receiptExtractionId,
-      description: input.description ?? `Item ${n}`,
-      lineTotal: input.lineTotal != null ? new Prisma.Decimal(input.lineTotal) : null,
-      position: input.position ?? 0,
-      quantity: input.quantity != null ? new Prisma.Decimal(input.quantity) : null,
-      unitPrice: input.unitPrice != null ? new Prisma.Decimal(input.unitPrice) : null,
-      category: input.category,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(receiptLineItems)
+      .values({
+        receiptExtractionId: input.receiptExtractionId,
+        description: input.description ?? `Item ${n}`,
+        lineTotal: input.lineTotal ?? null,
+        position: input.position ?? 0,
+        quantity: input.quantity ?? null,
+        unitPrice: input.unitPrice ?? null,
+        category: input.category,
+      })
+      .returning()
+  );
 }
 
 export async function createTeamRegistrationRequest(input: {
@@ -281,17 +331,20 @@ export async function createTeamRegistrationRequest(input: {
   const districtId = input.districtId ?? (await createDistrict()).id;
   const schoolId = input.schoolId ?? (await createSchool({ districtId })).id;
   const programId = input.programId ?? (await createProgram({ code: "FTC" })).id;
-  return db.teamRegistrationRequest.create({
-    data: {
-      districtId,
-      schoolId,
-      programId,
-      teamName: input.teamName,
-      requestedById: input.requestedById,
-      shortCode: input.shortCode,
-      glAccount: input.glAccount,
-      notes: input.notes,
-      fllDivision: input.fllDivision,
-    },
-  });
+  return insertOne(
+    getDb()
+      .insert(teamRegistrationRequests)
+      .values({
+        districtId,
+        schoolId,
+        programId,
+        teamName: input.teamName,
+        requestedById: input.requestedById,
+        shortCode: input.shortCode,
+        glAccount: input.glAccount,
+        notes: input.notes,
+        fllDivision: input.fllDivision,
+      })
+      .returning()
+  );
 }

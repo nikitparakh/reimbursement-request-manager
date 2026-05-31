@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import {
   createRequestDraft,
   getRequestWithDetails,
@@ -27,12 +29,12 @@ describe("reimbursements/repository", () => {
 
       expect(req.title).toBe("Test Draft");
       expect(req.status).toBe("DRAFT");
-      expect(Number(req.requestedTotal)).toBe(0);
+      expect(req.requestedTotal).toBe(0);
 
-      const fromDb = await db.reimbursementRequest.findUnique({
-        where: { id: req.id },
+      const fromDb = await db.query.reimbursementRequests.findFirst({
+        where: eq(reimbursementRequests.id, req.id),
       });
-      expect(fromDb).not.toBeNull();
+      expect(fromDb).not.toBeUndefined();
     });
 
     it("assigns coachId when provided", async () => {

@@ -1,6 +1,8 @@
 import { unauthorized } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { teamMemberships } from "@/db/schema";
 import { RequestForm } from "@/components/reimbursements/request-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,9 +12,12 @@ export default async function NewRequestPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
 
-  const memberships = await db.teamMembership.findMany({
-    where: { userId: session.user.id, approved: true },
-    include: { team: true },
+  const memberships = await db.query.teamMemberships.findMany({
+    where: and(
+      eq(teamMemberships.userId, session.user.id),
+      eq(teamMemberships.approved, true)
+    ),
+    with: { team: true },
   });
 
   const teams = memberships.map((membership) => ({

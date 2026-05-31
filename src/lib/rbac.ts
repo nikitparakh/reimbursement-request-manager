@@ -1,4 +1,4 @@
-import type { GlobalRole } from "@prisma/client";
+import type { GlobalRole } from "@/db/schema";
 import { auth } from "@/auth";
 
 export async function requireUser() {

@@ -17,6 +17,8 @@ import { LiveTotalProvider, LiveRequestedTotal } from "@/components/reimbursemen
 import { formatDate } from "@/lib/format";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { reimbursementRequests } from "@/db/schema";
 import {
   canManageReimbursements,
   getCachedAccessContext,
@@ -52,30 +54,32 @@ export default async function AdminRequestDetailPage({
   const backTarget = resolvedSearch.teamId
     ? { href: `/admin/teams/${resolvedSearch.teamId}`, label: "Back to team" }
     : BACK_LABELS[resolvedSearch.from ?? ""] ?? BACK_LABELS.inbox;
-  const request = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
-      createdBy: { select: { name: true, email: true } },
+  const request = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
+      createdBy: { columns: { name: true, email: true } },
       team: {
-        select: {
+        columns: {
           id: true,
           name: true,
           glAccount: true,
           schoolId: true,
           programId: true,
-          school: { select: { districtId: true } },
+        },
+        with: {
+          school: { columns: { districtId: true } },
         },
       },
       receiptFiles: {
-        include: {
+        with: {
           extraction: {
-            include: {
+            with: {
               lineItems: {
-                orderBy: { position: "asc" },
-                include: {
+                orderBy: (lineItem, { asc }) => asc(lineItem.position),
+                with: {
                   comments: {
-                    orderBy: { createdAt: "asc" },
-                    include: { author: { select: { email: true } } },
+                    orderBy: (comment, { asc }) => asc(comment.createdAt),
+                    with: { author: { columns: { email: true } } },
                   },
                 },
               },
@@ -84,8 +88,8 @@ export default async function AdminRequestDetailPage({
         },
       },
       approvals: {
-        select: { id: true, action: true, comment: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
+        columns: { id: true, action: true, comment: true, createdAt: true },
+        orderBy: (approval, { asc }) => asc(approval.createdAt),
       },
     },
   });

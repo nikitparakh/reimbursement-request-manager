@@ -1,6 +1,8 @@
 import { redirect, unauthorized } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { teamMemberships } from "@/db/schema";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -11,33 +13,46 @@ export default async function TeamPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
 
-  const hasMembership = await db.teamMembership.count({
-    where: { userId: session.user.id, approved: true },
-  });
+  const hasMembership = await db.$count(
+    teamMemberships,
+    and(eq(teamMemberships.userId, session.user.id), eq(teamMemberships.approved, true)),
+  );
   if (!hasMembership) redirect("/onboarding");
 
-  const myMemberships = await db.teamMembership.findMany({
-    where: { userId: session.user.id, approved: true },
-    select: {
+  const myMemberships = await db.query.teamMemberships.findMany({
+    where: and(
+      eq(teamMemberships.userId, session.user.id),
+      eq(teamMemberships.approved, true),
+    ),
+    columns: {
       roleInTeam: true,
+    },
+    with: {
       team: {
-        select: {
+        columns: {
           id: true,
           name: true,
           shortCode: true,
           glAccount: true,
           fllDivision: true,
-          school: { select: { name: true, district: { select: { name: true } } } },
-          program: { select: { name: true } },
+        },
+        with: {
+          school: {
+            columns: { name: true },
+            with: { district: { columns: { name: true } } },
+          },
+          program: { columns: { name: true } },
           memberships: {
-            where: { approved: true },
-            select: {
+            where: (m, { eq }) => eq(m.approved, true),
+            columns: {
               roleInTeam: true,
+            },
+            with: {
               user: {
-                select: { id: true, name: true, email: true },
+                columns: { id: true, name: true, email: true },
               },
             },
-            orderBy: { createdAt: "asc" },
+            orderBy: (m, { asc }) => asc(m.createdAt),
           },
         },
       },

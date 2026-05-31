@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { redirect, unauthorized } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
 import {
   TeamReimbursementsTable,
@@ -23,13 +25,13 @@ export default async function UserRequestsPage() {
   if (access.canManageReimbursements) redirect("/admin/requests");
   if (access.isCoach) redirect("/coach/team-reimbursements");
 
-  const requests = await db.reimbursementRequest.findMany({
-    where: { createdById: session.user.id },
-    include: {
-      createdBy: { select: { email: true } },
-      team: { select: { name: true } },
+  const requests = await db.query.reimbursementRequests.findMany({
+    where: eq(reimbursementRequests.createdById, session.user.id),
+    with: {
+      createdBy: { columns: { email: true } },
+      team: { columns: { name: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: (t, { desc }) => desc(t.createdAt),
   });
 
   const rows: ReimbursementRow[] = requests.map((r) => ({

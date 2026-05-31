@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { schools, teamMemberships, userScopeRoles } from "@/db/schema";
 import { cleanupLegacyTeamScopedRoles } from "../../prisma/seed-cleanup";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
@@ -17,9 +19,10 @@ describe("seed cleanup", () => {
 
   it("removes legacy team scoped roles while preserving memberships and admin scopes", async () => {
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({
-      where: { id: team.schoolId },
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
     });
+    if (!school) throw new Error("School not found");
 
     const parentMentor = await createUser();
     const coach = await createUser();
@@ -58,37 +61,41 @@ describe("seed cleanup", () => {
 
     expect(result.count).toBe(2);
     expect(
-      await db.userScopeRole.count({
-        where: { role: { in: ["COACH", "PARENT_MENTOR"] } },
-      }),
+      await db.$count(
+        userScopeRoles,
+        inArray(userScopeRoles.role, ["COACH", "PARENT_MENTOR"]),
+      ),
     ).toBe(0);
     expect(
-      await db.teamMembership.count({
-        where: {
-          userId: parentMentor.id,
-          teamId: team.id,
-          roleInTeam: "PARENT_MENTOR",
-          approved: true,
-        },
-      }),
+      await db.$count(
+        teamMemberships,
+        and(
+          eq(teamMemberships.userId, parentMentor.id),
+          eq(teamMemberships.teamId, team.id),
+          eq(teamMemberships.roleInTeam, "PARENT_MENTOR"),
+          eq(teamMemberships.approved, true),
+        ),
+      ),
     ).toBe(1);
     expect(
-      await db.teamMembership.count({
-        where: {
-          userId: coach.id,
-          teamId: team.id,
-          roleInTeam: "COACH",
-          approved: true,
-        },
-      }),
+      await db.$count(
+        teamMemberships,
+        and(
+          eq(teamMemberships.userId, coach.id),
+          eq(teamMemberships.teamId, team.id),
+          eq(teamMemberships.roleInTeam, "COACH"),
+          eq(teamMemberships.approved, true),
+        ),
+      ),
     ).toBe(1);
     expect(
-      await db.userScopeRole.count({
-        where: {
-          userId: programAdmin.id,
-          role: "PROGRAM_ADMIN",
-        },
-      }),
+      await db.$count(
+        userScopeRoles,
+        and(
+          eq(userScopeRoles.userId, programAdmin.id),
+          eq(userScopeRoles.role, "PROGRAM_ADMIN"),
+        ),
+      ),
     ).toBe(1);
   });
 });

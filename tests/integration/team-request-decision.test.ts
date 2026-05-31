@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
 import { POST } from "@/app/api/admin/team-requests/[id]/decision/route";
 import { db } from "@/lib/db";
+import { teams } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createUser,
@@ -118,8 +120,8 @@ describe("POST /api/admin/team-requests/[id]/decision", () => {
       { id: req.id }
     );
 
-    const team = await db.team.findUnique({
-      where: { id: (data as any).team.id },
+    const team = await db.query.teams.findFirst({
+      where: eq(teams.id, (data as any).team.id),
     });
     expect(team!.name).toBe("DB Check Team");
     expect(team!.shortCode).toBe("DBCT");

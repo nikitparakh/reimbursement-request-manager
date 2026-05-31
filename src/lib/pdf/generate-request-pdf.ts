@@ -1,19 +1,23 @@
 import PDFDocument from "pdfkit";
-import type { Prisma } from "@prisma/client";
+import type {
+  ApprovalActionRow,
+  ReceiptExtractionRow,
+  ReceiptFileRow,
+  ReceiptLineItemRow,
+  ReimbursementRequestRow,
+  TeamRow,
+  UserRow,
+} from "@/db/schema";
 import { formatCurrency, formatDate } from "@/lib/format";
 
-type FullRequest = Prisma.ReimbursementRequestGetPayload<{
-  include: {
-    team: true;
-    createdBy: true;
-    receiptFiles: {
-      include: {
-        extraction: { include: { lineItems: true } };
-      };
-    };
-    approvals: { include: { actor: true } };
-  };
-}>;
+type FullRequest = ReimbursementRequestRow & {
+  team: TeamRow;
+  createdBy: UserRow;
+  receiptFiles: (ReceiptFileRow & {
+    extraction: (ReceiptExtractionRow & { lineItems: ReceiptLineItemRow[] }) | null;
+  })[];
+  approvals: (ApprovalActionRow & { actor: UserRow })[];
+};
 
 const M = 50;
 const PAGE_W = 612;

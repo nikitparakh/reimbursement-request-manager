@@ -647,7 +647,10 @@ async function main() {
     const { district, schoolsBySlug } = await ensureDistrictAndSchools(prisma);
     const demoUsersByKey = await ensureDemoUsers(prisma);
 
-    await cleanupLegacyTeamScopedRoles(prisma);
+    // NOTE: seed.ts is still Prisma-based; full Drizzle port is the next step.
+    await cleanupLegacyTeamScopedRoles(
+      prisma as unknown as Parameters<typeof cleanupLegacyTeamScopedRoles>[0]
+    );
     await resetSeedOwnedData(prisma, demoUsersByKey);
 
     const teamsByShortCode = await createVerifiedTeams(prisma, schoolsBySlug, programsByCode);

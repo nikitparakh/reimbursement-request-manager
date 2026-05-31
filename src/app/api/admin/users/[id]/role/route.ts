@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 import { requireSuperAdmin } from "@/lib/rbac";
 
 const schema = z.object({
@@ -23,10 +25,11 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const user = await db.user.update({
-    where: { id },
-    data: { role: body.data.role },
-  });
+  const [user] = await db
+    .update(users)
+    .set({ role: body.data.role })
+    .where(eq(users.id, id))
+    .returning();
 
   return NextResponse.json({ id: user.id, role: user.role });
 }

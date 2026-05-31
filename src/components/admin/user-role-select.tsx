@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GlobalRole } from "@prisma/client";
+import type { GlobalRole } from "@/db/schema";
 import { toast } from "sonner";
 
 import {

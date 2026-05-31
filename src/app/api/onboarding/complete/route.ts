@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/rbac";
+import { teamMemberships, teams, users } from "@/db/schema";
 
 const schema = z.object({
   districtId: z.string().min(1),
@@ -26,18 +27,20 @@ export async function POST(request: Request) {
   }
 
   const [dbUser, team] = await Promise.all([
-    db.user.findUnique({
-      where: { id: userId },
-      select: { id: true, onboardingDone: true },
+    db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { id: true, onboardingDone: true },
     }),
-    db.team.findUnique({
-      where: { id: body.data.teamId },
-      select: {
+    db.query.teams.findFirst({
+      where: eq(teams.id, body.data.teamId),
+      columns: {
         id: true,
         active: true,
         schoolId: true,
         programId: true,
-        school: { select: { districtId: true } },
+      },
+      with: {
+        school: { columns: { districtId: true } },
       },
     }),
   ]);
@@ -71,37 +74,40 @@ export async function POST(request: Request) {
   const membershipRole = body.data.roleIntent === "COACH" ? "COACH" : "PARENT_MENTOR";
 
   try {
-    const membership = await db.$transaction(async (tx) => {
-      const membership = await tx.teamMembership.upsert({
-        where: {
-          userId_teamId_roleInTeam: {
-            userId,
-            teamId: body.data.teamId,
-            roleInTeam: membershipRole,
-          },
-        },
-        update: { approved: true },
-        create: {
+    // D1 has no interactive transactions: apply both writes atomically with
+    // db.batch(). The membership upsert returns the row.
+    const [membershipRows] = await db.batch([
+      db
+        .insert(teamMemberships)
+        .values({
           userId,
           teamId: body.data.teamId,
           roleInTeam: membershipRole,
           approved: true,
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: [
+            teamMemberships.userId,
+            teamMemberships.teamId,
+            teamMemberships.roleInTeam,
+          ],
+          set: { approved: true },
+        })
+        .returning(),
+      db
+        .update(users)
+        .set({ onboardingDone: true })
+        .where(eq(users.id, userId)),
+    ]);
 
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          onboardingDone: true,
-        },
-      });
-
-      return membership;
-    });
+    const membership = membershipRows[0];
 
     return NextResponse.json({ membership });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+    if (
+      error instanceof Error &&
+      /FOREIGN KEY constraint failed/i.test(error.message)
+    ) {
       return NextResponse.json(
         { error: "Unable to link user to the selected team. Please refresh and try again." },
         { status: 400 }

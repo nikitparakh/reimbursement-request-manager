@@ -1,5 +1,11 @@
-import { Prisma } from "@prisma/client";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import {
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+} from "@/db/schema";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { parseReceiptWithProvider } from "@/lib/parsing/provider";
 import { readStoredObject } from "@/lib/storage";
@@ -16,15 +22,17 @@ function parseDateOrNull(value: string | null) {
  * {@link recomputeRequestTotal} once after all receipts are processed.
  */
 export async function processReceipt(receiptFileId: string) {
-  const file = await db.receiptFile.findUnique({ where: { id: receiptFileId } });
+  const file = await db.query.receiptFiles.findFirst({
+    where: eq(receiptFiles.id, receiptFileId),
+  });
   if (!file) {
     throw new Error(`Receipt file not found: ${receiptFileId}`);
   }
 
-  await db.receiptFile.update({
-    where: { id: file.id },
-    data: { parseStatus: "PROCESSING" },
-  });
+  await db
+    .update(receiptFiles)
+    .set({ parseStatus: "PROCESSING" })
+    .where(eq(receiptFiles.id, file.id));
 
   try {
     const fileBytes = await readStoredObject(file.storageUrl);
@@ -40,14 +48,14 @@ export async function processReceipt(receiptFileId: string) {
       documentType: result.documentType,
       merchant: result.merchant,
       receiptDate,
-      subtotal: result.subtotal !== null ? new Prisma.Decimal(result.subtotal.toFixed(2)) : null,
-      tax: result.tax !== null ? new Prisma.Decimal(result.tax.toFixed(2)) : null,
-      total: result.total !== null ? new Prisma.Decimal(result.total.toFixed(2)) : null,
+      subtotal: result.subtotal !== null ? Number(result.subtotal.toFixed(2)) : null,
+      tax: result.tax !== null ? Number(result.tax.toFixed(2)) : null,
+      total: result.total !== null ? Number(result.total.toFixed(2)) : null,
       currency: result.currency,
       confidence: result.confidence,
-      flags: result.flags as Prisma.InputJsonValue,
-      rawJson: result.raw as Prisma.InputJsonValue,
-    } satisfies Omit<Prisma.ReceiptExtractionUncheckedCreateInput, "id" | "receiptFileId">;
+      flags: result.flags,
+      rawJson: result.raw,
+    };
 
     console.info("[parse][persist] Preparing extraction write", {
       receiptFileId: file.id,
@@ -60,40 +68,45 @@ export async function processReceipt(receiptFileId: string) {
     const lineItemRows = result.lineItems.map((item, position) => ({
       position,
       description: item.description,
-      quantity: item.quantity !== null ? new Prisma.Decimal(item.quantity) : null,
-      unitPrice: item.unitPrice !== null ? new Prisma.Decimal(item.unitPrice) : null,
-      lineTotal: item.lineTotal !== null ? new Prisma.Decimal(item.lineTotal) : null,
+      quantity: item.quantity !== null ? item.quantity : null,
+      unitPrice: item.unitPrice !== null ? item.unitPrice : null,
+      lineTotal: item.lineTotal !== null ? item.lineTotal : null,
       category: item.category,
     }));
 
-    await db.$transaction(async (tx) => {
-      const extraction = await tx.receiptExtraction.upsert({
-        where: { receiptFileId: file.id },
-        update: extractionData,
-        create: {
-          receiptFileId: file.id,
-          ...extractionData,
-        },
-      });
+    // D1 has no interactive transactions: upsert the extraction first (we need
+    // its id), then apply the dependent writes atomically with db.batch().
+    const [extraction] = await db
+      .insert(receiptExtractions)
+      .values({
+        receiptFileId: file.id,
+        ...extractionData,
+      })
+      .onConflictDoUpdate({
+        target: receiptExtractions.receiptFileId,
+        set: extractionData,
+      })
+      .returning();
 
-      await tx.receiptLineItem.deleteMany({
-        where: { receiptExtractionId: extraction.id },
-      });
-
-      if (lineItemRows.length > 0) {
-        await tx.receiptLineItem.createMany({
-          data: lineItemRows.map((item) => ({
-            receiptExtractionId: extraction.id,
-            ...item,
-          })),
-        });
-      }
-
-      await tx.receiptFile.update({
-        where: { id: file.id },
-        data: { parseStatus: "DONE" },
-      });
-    });
+    await db.batch([
+      db
+        .delete(receiptLineItems)
+        .where(eq(receiptLineItems.receiptExtractionId, extraction.id)),
+      ...(lineItemRows.length > 0
+        ? [
+            db.insert(receiptLineItems).values(
+              lineItemRows.map((item) => ({
+                receiptExtractionId: extraction.id,
+                ...item,
+              })),
+            ),
+          ]
+        : []),
+      db
+        .update(receiptFiles)
+        .set({ parseStatus: "DONE" })
+        .where(eq(receiptFiles.id, file.id)),
+    ]);
 
     console.info("[parse][persist] Extraction write complete", {
       receiptFileId: file.id,
@@ -102,10 +115,10 @@ export async function processReceipt(receiptFileId: string) {
       persistedLineItemCount: lineItemRows.length,
     });
   } catch (error) {
-    await db.receiptFile.update({
-      where: { id: file.id },
-      data: { parseStatus: "FAILED" },
-    });
+    await db
+      .update(receiptFiles)
+      .set({ parseStatus: "FAILED" })
+      .where(eq(receiptFiles.id, file.id));
     throw error;
   }
 }
@@ -115,12 +128,12 @@ export async function processReceipt(receiptFileId: string) {
  * extractions. Safe to call after one or many receipts have been processed.
  */
 export async function recomputeRequestTotal(requestId: string) {
-  const request = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
+  const request = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
       receiptFiles: {
-        include: {
-          extraction: { include: { lineItems: true } },
+        with: {
+          extraction: { with: { lineItems: true } },
         },
       },
     },
@@ -133,10 +146,10 @@ export async function recomputeRequestTotal(requestId: string) {
     .filter((e): e is NonNullable<typeof e> => Boolean(e));
   const total = aggregateReimbursableTotals(extractions);
 
-  await db.reimbursementRequest.update({
-    where: { id: requestId },
-    data: { requestedTotal: new Prisma.Decimal(total.toFixed(2)) },
-  });
+  await db
+    .update(reimbursementRequests)
+    .set({ requestedTotal: Number(total.toFixed(2)) })
+    .where(eq(reimbursementRequests.id, requestId));
 
   console.info("[parse][total] Request total recomputed", { requestId, total });
 }

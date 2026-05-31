@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { receiptFiles } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { uploadReceiptFile } from "@/lib/storage";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
@@ -45,15 +46,16 @@ export async function POST(
       body: bytes,
     });
 
-    const receipt = await db.receiptFile.create({
-      data: {
+    const [receipt] = await db
+      .insert(receiptFiles)
+      .values({
         requestId,
         fileName: file.name,
         mimeType: file.type || "application/octet-stream",
         storageUrl: stored.url,
         parseStatus: "QUEUED",
-      },
-    });
+      })
+      .returning();
     created.push(receipt);
   }
 

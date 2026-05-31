@@ -1,16 +1,20 @@
-import type {
-  GlobalRole,
-  ScopedRole,
-  TeamMembership,
-  TeamMembershipRole,
-  UserScopeRole,
-} from "@prisma/client";
+import { and, asc, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import {
+  teamMemberships as teamMembershipsTable,
+  userScopeRoles,
+  users,
+  type GlobalRole,
+  type ScopedRole,
+  type TeamMembershipRole,
+  type TeamMembershipRow,
+  type UserScopeRoleRow,
+} from "@/db/schema";
 import { assertUserScopeBoundary } from "@/lib/user-scope-role";
 
 export type ScopedRoleAssignment = Pick<
-  UserScopeRole,
+  UserScopeRoleRow,
   "role" | "districtId" | "schoolId" | "programId" | "teamId"
 >;
 
@@ -21,7 +25,7 @@ export type AccessTarget = {
   teamId?: string | null;
 };
 
-export type TeamMembershipAssignment = Pick<TeamMembership, "roleInTeam" | "teamId">;
+export type TeamMembershipAssignment = Pick<TeamMembershipRow, "roleInTeam" | "teamId">;
 
 export type AccessContext = {
   userId: string;
@@ -225,28 +229,34 @@ export function canAccessTeam(context: AccessContext, target: AccessTarget) {
 
 async function loadAccessContext(userId: string) {
   const [user, scopedRoles, teamMemberships] = await Promise.all([
-    db.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
+    db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { role: true },
     }),
-    db.userScopeRole.findMany({
-      where: { userId },
-      select: {
+    db.query.userScopeRoles.findMany({
+      where: eq(userScopeRoles.userId, userId),
+      columns: {
         role: true,
         districtId: true,
         schoolId: true,
         programId: true,
         teamId: true,
       },
-      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+      orderBy: [asc(userScopeRoles.role), asc(userScopeRoles.createdAt)],
     }),
-    db.teamMembership.findMany({
-      where: { userId, approved: true },
-      select: {
+    db.query.teamMemberships.findMany({
+      where: and(
+        eq(teamMembershipsTable.userId, userId),
+        eq(teamMembershipsTable.approved, true)
+      ),
+      columns: {
         roleInTeam: true,
         teamId: true,
       },
-      orderBy: [{ roleInTeam: "asc" }, { createdAt: "asc" }],
+      orderBy: [
+        asc(teamMembershipsTable.roleInTeam),
+        asc(teamMembershipsTable.createdAt),
+      ],
     }),
   ]);
 

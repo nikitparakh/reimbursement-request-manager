@@ -68,7 +68,7 @@ describe("POST /api/requests/[requestId]/receipts", () => {
     );
 
     expect(response.status).toBe(201);
-    const data = await response.json();
+    const data = await response.json() as any;
     expect(data.receipts).toHaveLength(1);
     expect(data.receipts[0].parseStatus).toBe("QUEUED");
     expect(data.receipts[0].fileName).toBe("receipt.pdf");

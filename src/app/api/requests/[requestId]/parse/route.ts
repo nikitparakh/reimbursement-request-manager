@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { and, eq, inArray } from "drizzle-orm";
 import { requireUser } from "@/lib/rbac";
 import { processReceipt, recomputeRequestTotal } from "@/lib/jobs/process-receipt";
 import { db } from "@/lib/db";
+import { receiptFiles } from "@/db/schema";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function POST(
@@ -28,8 +30,11 @@ export async function POST(
     );
   }
 
-  const receiptsToProcess = await db.receiptFile.findMany({
-    where: { requestId, parseStatus: { in: ["QUEUED", "FAILED"] } },
+  const receiptsToProcess = await db.query.receiptFiles.findMany({
+    where: and(
+      eq(receiptFiles.requestId, requestId),
+      inArray(receiptFiles.parseStatus, ["QUEUED", "FAILED"])
+    ),
   });
 
   if (receiptsToProcess.length === 0) {

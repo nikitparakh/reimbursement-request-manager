@@ -7,7 +7,9 @@ import {
 } from "@/app/api/teams/route";
 import { DELETE as deleteMembership } from "@/app/api/admin/teams/[teamId]/members/[membershipId]/route";
 import { POST as postRegistrationRequest } from "@/app/api/teams/registration-requests/route";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { programs, districts, teamMemberships, userScopeRoles } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createDistrict,
@@ -104,7 +106,7 @@ describe("POST /api/teams", () => {
     setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
     const school = await createSchool();
     const program = await createProgram({ code: "FTC" });
-    await db.program.update({ where: { id: program.id }, data: { name: `Program ${program.id}` } });
+    await db.update(programs).set({ name: `Program ${program.id}` }).where(eq(programs.id, program.id));
 
     const { status, data } = await callRouteJSON(postTeam, {
       method: "POST",
@@ -181,7 +183,8 @@ describe("POST /api/teams/registration-requests", () => {
     setMockUser({ id: user.id, email: user.email, role: "USER" });
     const school = await createSchool();
     const program = await createProgram({ code: "FTC" });
-    const district = await db.district.findUniqueOrThrow({ where: { id: school.districtId } });
+    const district = await db.query.districts.findFirst({ where: eq(districts.id, school.districtId) });
+    if (!district) throw new Error("District not found");
 
     const { status, data } = await callRouteJSON(postRegistrationRequest, {
       method: "POST",
@@ -269,10 +272,10 @@ describe("DELETE /api/admin/teams/[teamId]/members/[membershipId]", () => {
     expect(status).toBe(200);
     expect((data as any).ok).toBe(true);
     expect(
-      await db.teamMembership.findUnique({ where: { id: membership.id } })
-    ).toBeNull();
+      await db.query.teamMemberships.findFirst({ where: eq(teamMemberships.id, membership.id) })
+    ).toBeUndefined();
     expect(
-      await db.userScopeRole.findUnique({ where: { id: scopedRole.id } })
-    ).toBeNull();
+      await db.query.userScopeRoles.findFirst({ where: eq(userScopeRoles.id, scopedRole.id) })
+    ).toBeUndefined();
   });
 });

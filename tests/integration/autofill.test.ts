@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { POST } from "@/app/api/requests/[requestId]/autofill/route";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
@@ -43,8 +45,10 @@ describe("POST /api/requests/[requestId]/autofill", () => {
     expect((data as { requestedTotal: number }).requestedTotal).toBe(50.5);
     expect((data as { extractionCount: number }).extractionCount).toBe(1);
 
-    const updated = await db.reimbursementRequest.findUnique({ where: { id: req.id } });
-    expect(Number(updated!.requestedTotal)).toBe(50.5);
+    const updated = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, req.id),
+    });
+    expect(updated!.requestedTotal).toBe(50.5);
   });
 
   it("returns 409 when parsing still in progress", async () => {

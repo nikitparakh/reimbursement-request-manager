@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ProgramCode } from "@prisma/client";
+import type { ProgramCode } from "@/db/schema";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";

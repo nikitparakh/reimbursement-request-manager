@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { approvalActions, auditLogs } from "@/db/schema";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { cleanDatabase } from "../../helpers/db-clean";
 import {
@@ -54,8 +56,8 @@ describe("transitionRequestStatus", () => {
       comment: "Ready for review",
     });
 
-    const actions = await db.approvalAction.findMany({
-      where: { requestId: req.id },
+    const actions = await db.query.approvalActions.findMany({
+      where: eq(approvalActions.requestId, req.id),
     });
     expect(actions).toHaveLength(1);
     expect(actions[0].action).toBe("SUBMIT");
@@ -78,8 +80,8 @@ describe("transitionRequestStatus", () => {
       action: "SUBMIT",
     });
 
-    const logs = await db.auditLog.findMany({
-      where: { requestId: req.id },
+    const logs = await db.query.auditLogs.findMany({
+      where: eq(auditLogs.requestId, req.id),
     });
     expect(logs.length).toBeGreaterThanOrEqual(1);
     expect(logs.some((l) => l.eventType === "REQUEST_STATUS_UPDATED")).toBe(true);
@@ -113,7 +115,7 @@ describe("transitionRequestStatus", () => {
       action: "SUBMIT",
     });
 
-    expect(Number(updated.requestedTotal)).toBe(40.5);
+    expect(updated.requestedTotal).toBe(40.5);
   });
 
   it("rejects invalid transition", async () => {

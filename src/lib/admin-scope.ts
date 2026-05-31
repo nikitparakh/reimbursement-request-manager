@@ -1,5 +1,15 @@
-import type { Prisma } from "@prisma/client";
+import { and, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { db } from "@/lib/db";
+import {
+  reimbursementRequests,
+  schools,
+  teamRegistrationRequests,
+  teams,
+} from "@/db/schema";
 import type { AccessContext, ScopedRoleAssignment } from "@/lib/access";
+
+// A condition that matches no rows (deny-all for non-super-admins with no scope).
+const MATCH_NONE: SQL = sql`0 = 1`;
 
 function getAdminAssignments(context: AccessContext) {
   return context.scopedRoles.filter(
@@ -8,88 +18,79 @@ function getAdminAssignments(context: AccessContext) {
   );
 }
 
-function buildTeamCondition(assignment: ScopedRoleAssignment): Prisma.TeamWhereInput {
-  const condition: Prisma.TeamWhereInput = {};
+/** Drizzle condition on the `teams` table for a single admin assignment. */
+function buildTeamCondition(assignment: ScopedRoleAssignment): SQL | undefined {
+  const parts: (SQL | undefined)[] = [];
 
   if (assignment.teamId) {
-    condition.id = assignment.teamId;
+    parts.push(eq(teams.id, assignment.teamId));
   }
 
   if (assignment.schoolId) {
-    condition.schoolId = assignment.schoolId;
+    parts.push(eq(teams.schoolId, assignment.schoolId));
   } else if (assignment.districtId) {
-    condition.school = { districtId: assignment.districtId };
+    parts.push(
+      inArray(
+        teams.schoolId,
+        db
+          .select({ id: schools.id })
+          .from(schools)
+          .where(eq(schools.districtId, assignment.districtId))
+      )
+    );
   }
 
   if (assignment.programId) {
-    condition.programId = assignment.programId;
+    parts.push(eq(teams.programId, assignment.programId));
   }
 
-  return condition;
+  return and(...parts);
 }
 
-function buildRegistrationCondition(
-  assignment: ScopedRoleAssignment
-): Prisma.TeamRegistrationRequestWhereInput {
-  const condition: Prisma.TeamRegistrationRequestWhereInput = {};
+export function buildManagedTeamWhere(context: AccessContext): SQL | undefined {
+  if (context.isSuperAdmin) return undefined;
 
-  if (assignment.districtId) {
-    condition.districtId = assignment.districtId;
-  }
-  if (assignment.schoolId) {
-    condition.schoolId = assignment.schoolId;
-  }
-  if (assignment.programId) {
-    condition.programId = assignment.programId;
-  }
-
-  return condition;
-}
-
-function denyAllTeamWhere(): Prisma.TeamWhereInput {
-  return { id: { in: [] } };
-}
-
-function denyAllTeamRegistrationWhere(): Prisma.TeamRegistrationRequestWhereInput {
-  return { id: { in: [] } };
-}
-
-function denyAllReimbursementWhere(): Prisma.ReimbursementRequestWhereInput {
-  return { id: { in: [] } };
-}
-
-export function buildManagedTeamWhere(context: AccessContext): Prisma.TeamWhereInput {
-  if (context.isSuperAdmin) {
-    return {};
-  }
-
-  const conditions = getAdminAssignments(context).map(buildTeamCondition);
-  return conditions.length > 0 ? { OR: conditions } : denyAllTeamWhere();
+  const conditions = getAdminAssignments(context)
+    .map(buildTeamCondition)
+    .filter((c): c is SQL => Boolean(c));
+  return conditions.length > 0 ? or(...conditions) : MATCH_NONE;
 }
 
 export function buildManagedTeamRegistrationWhere(
   context: AccessContext
-): Prisma.TeamRegistrationRequestWhereInput {
-  if (context.isSuperAdmin) {
-    return {};
-  }
+): SQL | undefined {
+  if (context.isSuperAdmin) return undefined;
 
-  const conditions = getAdminAssignments(context).map(buildRegistrationCondition);
-  return conditions.length > 0 ? { OR: conditions } : denyAllTeamRegistrationWhere();
+  const conditions = getAdminAssignments(context)
+    .map((assignment) => {
+      const parts: (SQL | undefined)[] = [];
+      if (assignment.districtId) {
+        parts.push(eq(teamRegistrationRequests.districtId, assignment.districtId));
+      }
+      if (assignment.schoolId) {
+        parts.push(eq(teamRegistrationRequests.schoolId, assignment.schoolId));
+      }
+      if (assignment.programId) {
+        parts.push(eq(teamRegistrationRequests.programId, assignment.programId));
+      }
+      return and(...parts);
+    })
+    .filter((c): c is SQL => Boolean(c));
+  return conditions.length > 0 ? or(...conditions) : MATCH_NONE;
 }
 
 export function buildManagedReimbursementWhere(
   context: AccessContext
-): Prisma.ReimbursementRequestWhereInput {
-  if (context.isSuperAdmin) {
-    return {};
-  }
+): SQL | undefined {
+  if (context.isSuperAdmin) return undefined;
 
-  const conditions: Prisma.ReimbursementRequestWhereInput[] = getAdminAssignments(context).map(
-    (assignment) => ({
-    team: buildTeamCondition(assignment),
-    })
-  );
-
-  return conditions.length > 0 ? { OR: conditions } : denyAllReimbursementWhere();
+  const conditions = getAdminAssignments(context).map((assignment) => {
+    const teamCondition = buildTeamCondition(assignment);
+    const managedTeamIds = db.select({ id: teams.id }).from(teams);
+    return inArray(
+      reimbursementRequests.teamId,
+      teamCondition ? managedTeamIds.where(teamCondition) : managedTeamIds
+    );
+  });
+  return conditions.length > 0 ? or(...conditions) : MATCH_NONE;
 }

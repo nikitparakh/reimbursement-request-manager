@@ -13,14 +13,16 @@ vi.mock("@/auth", () => ({
 
 vi.mock("@/lib/db", () => ({
   db: {
-    user: {
-      findUnique: mocks.findUser,
-    },
-    userScopeRole: {
-      findMany: mocks.findScopedRoles,
-    },
-    teamMembership: {
-      findMany: mocks.findMemberships,
+    query: {
+      users: {
+        findFirst: mocks.findUser,
+      },
+      userScopeRoles: {
+        findMany: mocks.findScopedRoles,
+      },
+      teamMemberships: {
+        findMany: mocks.findMemberships,
+      },
     },
   },
 }));

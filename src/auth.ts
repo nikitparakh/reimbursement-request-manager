@@ -1,6 +1,8 @@
 import { auth as clerkAuth, currentUser } from "@clerk/nextjs/server";
-import type { GlobalRole } from "@prisma/client";
+import { eq } from "drizzle-orm";
+import type { GlobalRole } from "@/db/schema";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 
 export type AppSessionUser = {
   id: string;
@@ -40,7 +42,9 @@ export async function auth(): Promise<{ user: AppSessionUser } | null> {
  * by setting `clerkUserId`; otherwise create a fresh standard USER.
  */
 async function getOrProvisionAppUser(clerkUserId: string) {
-  const existing = await db.user.findUnique({ where: { clerkUserId } });
+  const existing = await db.query.users.findFirst({
+    where: eq(users.clerkUserId, clerkUserId),
+  });
   if (existing) return existing;
 
   const clerk = await currentUser();
@@ -52,9 +56,10 @@ async function getOrProvisionAppUser(clerkUserId: string) {
   const name =
     [clerk?.firstName, clerk?.lastName].filter(Boolean).join(" ") || null;
 
-  return db.user.upsert({
-    where: { email },
-    update: { clerkUserId },
-    create: { clerkUserId, email, name, role: "USER" },
-  });
+  const [user] = await db
+    .insert(users)
+    .values({ clerkUserId, email, name, role: "USER" })
+    .onConflictDoUpdate({ target: users.email, set: { clerkUserId } })
+    .returning();
+  return user;
 }

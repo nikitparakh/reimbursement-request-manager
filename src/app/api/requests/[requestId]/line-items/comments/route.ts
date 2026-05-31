@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { lineItemComments, receiptLineItems, users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
@@ -44,30 +46,33 @@ export async function POST(
     );
   }
 
-  const lineItem = await db.receiptLineItem.findUnique({
-    where: { id: body.data.lineItemId },
-    include: { receiptExtraction: { include: { receiptFile: true } } },
+  const lineItem = await db.query.receiptLineItems.findFirst({
+    where: eq(receiptLineItems.id, body.data.lineItemId),
+    with: { receiptExtraction: { with: { receiptFile: true } } },
   });
   if (!lineItem || lineItem.receiptExtraction.receiptFile.requestId !== requestId) {
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
-  const comment = await db.lineItemComment.create({
-    data: {
+  const [comment] = await db
+    .insert(lineItemComments)
+    .values({
       lineItemId: body.data.lineItemId,
       authorId: actorId,
       text: body.data.text,
-    },
-    include: {
-      author: { select: { email: true } },
-    },
+    })
+    .returning();
+
+  const author = await db.query.users.findFirst({
+    where: eq(users.id, comment.authorId),
+    columns: { email: true },
   });
 
   return NextResponse.json(
     {
       id: comment.id,
       authorId: comment.authorId,
-      authorEmail: comment.author.email,
+      authorEmail: author?.email,
       text: comment.text,
       createdAt: comment.createdAt.toISOString(),
     },

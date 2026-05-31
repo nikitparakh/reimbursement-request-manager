@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { and, eq, desc } from "drizzle-orm";
 import { getAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
+import { notifications } from "@/db/schema";
 import { getRequestDetailHref } from "@/lib/navigation";
 import { requireUser } from "@/lib/rbac";
 
@@ -12,23 +14,27 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [access, notifications, unreadCount] = await Promise.all([
+  const [access, notificationRows, unreadCount] = await Promise.all([
     getAccessContext(userId),
-    db.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: {
+    db.query.notifications.findMany({
+      where: eq(notifications.userId, userId),
+      orderBy: desc(notifications.createdAt),
+      limit: 20,
+      with: {
         request: {
-          select: {
+          columns: {
             id: true,
             teamId: true,
+          },
+          with: {
             team: {
-              select: {
+              columns: {
                 schoolId: true,
                 programId: true,
+              },
+              with: {
                 school: {
-                  select: {
+                  columns: {
                     districtId: true,
                   },
                 },
@@ -38,13 +44,11 @@ export async function GET() {
         },
       },
     }),
-    db.notification.count({
-      where: { userId, read: false },
-    }),
+    db.$count(notifications, and(eq(notifications.userId, userId), eq(notifications.read, false))),
   ]);
 
   return NextResponse.json({
-    notifications: notifications.map(({ request, ...notification }) => ({
+    notifications: notificationRows.map(({ request, ...notification }) => ({
       ...notification,
       requestHref:
         request && notification.requestId

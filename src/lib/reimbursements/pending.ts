@@ -1,4 +1,4 @@
-import type { RequestStatus } from "@prisma/client";
+import type { RequestStatus } from "@/db/schema";
 
 import type { AccessContext } from "@/lib/access";
 

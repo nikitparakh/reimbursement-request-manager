@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { unauthorized } from "next/navigation";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
@@ -12,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DownloadPdfLink } from "@/components/reimbursements/download-pdf-link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
 
@@ -35,27 +37,43 @@ export default async function AdminInboxPage({
   const { cursor } = await searchParams;
   const scopedWhere = buildManagedReimbursementWhere(access);
 
+  const baseWhere = and(
+    scopedWhere,
+    inArray(reimbursementRequests.status, [...INBOX_STATUSES])
+  );
+
+  // D1 has no Prisma-style row cursor: resolve the cursor row's updatedAt and
+  // page on `updatedAt < cursor.updatedAt` to mirror `orderBy updatedAt desc`.
+  let cursorWhere = baseWhere;
+  if (cursor) {
+    const cursorRow = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, cursor),
+      columns: { updatedAt: true },
+    });
+    if (cursorRow) {
+      cursorWhere = and(
+        baseWhere,
+        lt(reimbursementRequests.updatedAt, cursorRow.updatedAt)
+      );
+    }
+  }
+
   const [requests, totalCount] = await Promise.all([
-    db.reimbursementRequest.findMany({
-      where: {
-        AND: [
-          scopedWhere,
-          { status: { in: [...INBOX_STATUSES] } },
-        ],
-      },
-      include: {
+    db.query.reimbursementRequests.findMany({
+      where: cursorWhere,
+      with: {
         createdBy: true,
         team: true,
         receiptFiles: {
-          include: {
+          with: {
             extraction: {
-              include: {
+              with: {
                 lineItems: {
-                  orderBy: { position: "asc" },
-                  include: {
+                  orderBy: (t, { asc }) => asc(t.position),
+                  with: {
                     comments: {
-                      orderBy: { createdAt: "asc" },
-                      include: { author: { select: { email: true } } },
+                      orderBy: (t, { asc }) => asc(t.createdAt),
+                      with: { author: { columns: { email: true } } },
                     },
                   },
                 },
@@ -64,18 +82,10 @@ export default async function AdminInboxPage({
           },
         },
       },
-      orderBy: { updatedAt: "desc" },
-      take: PAGE_SIZE + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: desc(reimbursementRequests.updatedAt),
+      limit: PAGE_SIZE + 1,
     }),
-    db.reimbursementRequest.count({
-      where: {
-        AND: [
-          scopedWhere,
-          { status: { in: [...INBOX_STATUSES] } },
-        ],
-      },
-    }),
+    db.$count(reimbursementRequests, baseWhere),
   ]);
 
   const hasMore = requests.length > PAGE_SIZE;
