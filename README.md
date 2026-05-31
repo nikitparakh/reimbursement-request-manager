@@ -2,8 +2,6 @@
 
 A multi-tenant reimbursement workflow app for school robotics teams. Parents and mentors submit receipt-backed reimbursement requests, coaches handle team-level review, and scoped reimbursement admins or super admins complete approval and payment.
 
-**Live demo:** [reimbursement-request-manager.vercel.app](https://reimbursement-request-manager.vercel.app)
-
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router, React 19, Turbopack)
