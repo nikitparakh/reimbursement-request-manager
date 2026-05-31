@@ -1,3 +1,4 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { env } from "@/lib/env";
 
 export type StoredObject = {
@@ -5,10 +6,21 @@ export type StoredObject = {
   url: string;
 };
 
-const isVercelBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+/**
+ * Resolve the R2 bucket binding when running on Workers (or `next dev` with the
+ * OpenNext dev bindings). Returns undefined in plain Node contexts (e.g. tests),
+ * which fall back to local filesystem storage.
+ */
+function getReceiptsBucket(): R2Bucket | undefined {
+  try {
+    return getCloudflareContext().env.RECEIPTS_BUCKET;
+  } catch {
+    return undefined;
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Local filesystem helpers (only loaded when NOT using Vercel Blob)
+// Local filesystem helpers (dev/test fallback when no R2 binding is present)
 // ---------------------------------------------------------------------------
 
 function getUploadRoot() {
@@ -46,22 +58,20 @@ export async function uploadReceiptFile(input: {
   mimeType: string;
   body: Uint8Array;
 }): Promise<StoredObject> {
-  if (isVercelBlob) {
-    const { put } = await import("@vercel/blob");
-    const blob = await put(`receipts/${input.fileName}`, Buffer.from(input.body), {
-      access: "public",
-      contentType: input.mimeType,
-      addRandomSuffix: true,
+  const bucket = getReceiptsBucket();
+  if (bucket) {
+    const key = `receipts/${crypto.randomUUID()}${safeExtension(input.fileName)}`;
+    await bucket.put(key, input.body, {
+      httpMetadata: { contentType: input.mimeType },
     });
-    return { key: blob.pathname, url: blob.url };
+    return { key, url: `r2://${key}` };
   }
 
   const path = await import("node:path");
   const { mkdir, writeFile } = await import("node:fs/promises");
-  const { randomUUID } = await import("node:crypto");
   const { pathToFileURL } = await import("node:url");
 
-  const key = path.join("receipts", `${randomUUID()}${safeExtension(input.fileName)}`);
+  const key = path.join("receipts", `${crypto.randomUUID()}${safeExtension(input.fileName)}`);
   const absolutePath = toAbsoluteUploadPath(key);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, Buffer.from(input.body));
@@ -73,7 +83,21 @@ export async function uploadReceiptFile(input: {
 // ---------------------------------------------------------------------------
 
 export async function readStoredObject(storageUrl: string): Promise<Uint8Array> {
-  // HTTP(S) URLs — works for both Vercel Blob and any remote URL
+  // R2-backed objects (private bucket; served through the auth-gated proxy)
+  if (storageUrl.startsWith("r2://")) {
+    const bucket = getReceiptsBucket();
+    if (!bucket) {
+      throw new Error("R2 bucket binding unavailable");
+    }
+    const key = storageUrl.slice("r2://".length);
+    const object = await bucket.get(key);
+    if (!object) {
+      throw new Error(`Stored receipt not found in R2: ${key}`);
+    }
+    return new Uint8Array(await object.arrayBuffer());
+  }
+
+  // HTTP(S) URLs — any remote URL
   if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
     const response = await fetch(storageUrl);
     if (!response.ok) {
@@ -82,7 +106,7 @@ export async function readStoredObject(storageUrl: string): Promise<Uint8Array> 
     return new Uint8Array(await response.arrayBuffer());
   }
 
-  // Local file:// URLs
+  // Local file:// URLs (dev/test)
   if (storageUrl.startsWith("file://")) {
     const { readFile } = await import("node:fs/promises");
     const { fileURLToPath } = await import("node:url");
@@ -106,12 +130,16 @@ export async function readStoredObject(storageUrl: string): Promise<Uint8Array> 
 // ---------------------------------------------------------------------------
 
 export async function deleteStoredObject(storageUrl: string): Promise<void> {
-  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
-    if (isVercelBlob) {
-      const { del } = await import("@vercel/blob");
-      await del(storageUrl);
+  if (storageUrl.startsWith("r2://")) {
+    const bucket = getReceiptsBucket();
+    if (bucket) {
+      await bucket.delete(storageUrl.slice("r2://".length));
     }
-    // Non-blob HTTP URLs: nothing to clean up
+    return;
+  }
+
+  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
+    // Remote URLs are not owned by this app; nothing to clean up.
     return;
   }
 
