@@ -1,11 +1,11 @@
-export type UserScopeBoundaryInput = {
+type UserScopeBoundaryInput = {
   districtId?: string | null;
   schoolId?: string | null;
   programId?: string | null;
   teamId?: string | null;
 };
 
-export function hasUserScopeBoundary(input: UserScopeBoundaryInput) {
+function hasUserScopeBoundary(input: UserScopeBoundaryInput) {
   return Boolean(
     input.districtId || input.schoolId || input.programId || input.teamId
   );

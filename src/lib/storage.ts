@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { env } from "@/lib/env";
 
-export type StoredObject = {
+type StoredObject = {
   key: string;
   url: string;
 };

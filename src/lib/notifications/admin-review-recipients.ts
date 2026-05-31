@@ -8,7 +8,7 @@ type AdminReviewTarget = {
   programId: string;
 };
 
-export function buildAdminReviewRecipientWhere(target: AdminReviewTarget): SQL {
+function buildAdminReviewRecipientWhere(target: AdminReviewTarget): SQL {
   // Correlated EXISTS subqueries replace Prisma's `scopedRoles.some` relation
   // filters: a user matches if they are a SUPER_ADMIN, or have a matching
   // SCHOOL_ADMIN / PROGRAM_ADMIN scoped role for the target scope.

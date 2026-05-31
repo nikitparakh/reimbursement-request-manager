@@ -1,4 +1,4 @@
-export type RoleFilterOption = {
+type RoleFilterOption = {
   value: string;
   label: string;
 };

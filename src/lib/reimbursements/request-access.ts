@@ -3,7 +3,7 @@ import { canManageReimbursements, getAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
 import { reimbursementRequests } from "@/db/schema";
 
-export type RequestAccess = {
+type RequestAccess = {
   userId: string;
   request: {
     id: string;

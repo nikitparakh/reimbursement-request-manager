@@ -4,7 +4,7 @@ import {
   type AccessTarget,
 } from "@/lib/access";
 
-export type NavLink = {
+type NavLink = {
   href: string;
   label: string;
   prefetch?: boolean;

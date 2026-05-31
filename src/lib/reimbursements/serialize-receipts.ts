@@ -18,7 +18,7 @@ export type SerializedLineItem = {
   comments: SerializedLineItemComment[];
 };
 
-export type SerializedExtraction = {
+type SerializedExtraction = {
   id: string;
   documentType: string;
   merchant: string | null;

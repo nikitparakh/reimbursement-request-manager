@@ -12,7 +12,7 @@ const isPublicRoute = createRouteMatcher([
 
 // Clerk runs on the Edge runtime, which OpenNext supports (unlike Next's Node
 // middleware). This is the minimal gate; route/layout guards (requireUser,
-// requireRole, requireAccessContext) remain the authoritative enforcement.
+// requireRole) remain the authoritative enforcement.
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();

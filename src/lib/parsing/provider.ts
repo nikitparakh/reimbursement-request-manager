@@ -2,7 +2,7 @@ import { env } from "@/lib/env";
 import { normalizeGeminiPayload } from "@/lib/parsing/gemini-normalize";
 import type { NormalizedReceipt } from "@/lib/parsing/parse-types";
 
-export type ParseProviderInput = {
+type ParseProviderInput = {
   fileName: string;
   mimeType: string;
   bytes: Uint8Array;

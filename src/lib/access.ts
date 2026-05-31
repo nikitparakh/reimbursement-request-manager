@@ -1,5 +1,4 @@
 import { and, asc, eq } from "drizzle-orm";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
   teamMemberships as teamMembershipsTable,
@@ -25,7 +24,7 @@ export type AccessTarget = {
   teamId?: string | null;
 };
 
-export type TeamMembershipAssignment = Pick<TeamMembershipRow, "roleInTeam" | "teamId">;
+type TeamMembershipAssignment = Pick<TeamMembershipRow, "roleInTeam" | "teamId">;
 
 export type AccessContext = {
   userId: string;
@@ -161,7 +160,7 @@ export function buildAccessContext({
   };
 }
 
-export function hasScopedRole(
+function hasScopedRole(
   context: AccessContext,
   roles: ScopedRole[],
   target?: AccessTarget
@@ -204,16 +203,6 @@ export function canManageReimbursements(
   target?: AccessTarget
 ) {
   return canManageTeams(context, target);
-}
-
-export function canReviewReimbursements(
-  context: AccessContext,
-  target?: AccessTarget
-) {
-  return (
-    canManageReimbursements(context, target) ||
-    hasApprovedTeamMembershipRole(context.teamMemberships, ["COACH"], target)
-  );
 }
 
 export function canAccessTeam(context: AccessContext, target: AccessTarget) {
@@ -288,13 +277,4 @@ export function getCachedAccessContext(userId: string) {
 
   inflightAccessContextLoads.set(userId, loadPromise);
   return loadPromise;
-}
-
-export async function requireAccessContext() {
-  const session = await auth();
-  if (!session?.user) {
-    throw new Error("UNAUTHORIZED");
-  }
-
-  return getAccessContext(session.user.id);
 }
