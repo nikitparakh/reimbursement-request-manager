@@ -5,6 +5,7 @@ import { processReceipt, recomputeRequestTotal } from "@/lib/jobs/process-receip
 import { db } from "@/lib/db";
 import { receiptFiles } from "@/db/schema";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
+import { getReceiptQueue } from "@/lib/queue";
 
 export async function POST(
   _request: Request,
@@ -41,6 +42,22 @@ export async function POST(
     return NextResponse.json({ queued: 0 });
   }
 
+  // On Workers, hand off to the Cloudflare Queue consumer (decoupled from the
+  // client connection). The frontend polls receiptFile.parseStatus.
+  const queue = getReceiptQueue();
+  if (queue) {
+    await queue.sendBatch(
+      receiptsToProcess.map((receipt) => ({
+        body: { receiptFileId: receipt.id, requestId },
+      }))
+    );
+    return NextResponse.json(
+      { queued: receiptsToProcess.length, async: true },
+      { status: 202 }
+    );
+  }
+
+  // Fallback (tests / local dev without a queue binding): process inline.
   const results = await Promise.allSettled(
     receiptsToProcess.map((receipt) => processReceipt(receipt.id))
   );

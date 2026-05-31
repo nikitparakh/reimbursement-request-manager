@@ -82,10 +82,13 @@ export async function uploadReceiptFile(input: {
 // Read
 // ---------------------------------------------------------------------------
 
-export async function readStoredObject(storageUrl: string): Promise<Uint8Array> {
+export async function readStoredObject(
+  storageUrl: string,
+  bucketOverride?: R2Bucket
+): Promise<Uint8Array> {
   // R2-backed objects (private bucket; served through the auth-gated proxy)
   if (storageUrl.startsWith("r2://")) {
-    const bucket = getReceiptsBucket();
+    const bucket = bucketOverride ?? getReceiptsBucket();
     if (!bucket) {
       throw new Error("R2 bucket binding unavailable");
     }

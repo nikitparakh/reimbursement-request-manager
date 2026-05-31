@@ -23,6 +23,14 @@
       "bucket_name": "receipts"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "RECEIPT_QUEUE",
+        "queue": "receipt-parse"
+      }
+    ]
+  },
   "observability": {
     "enabled": true
   }

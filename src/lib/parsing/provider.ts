@@ -82,13 +82,16 @@ function sleep(ms: number) {
 }
 
 export async function parseReceiptWithProvider(
-  input: ParseProviderInput
+  input: ParseProviderInput,
+  opts?: { apiKey?: string; model?: string }
 ): Promise<NormalizedReceipt> {
-  if (!env.GOOGLE_AI_API_KEY) {
+  const apiKey = opts?.apiKey ?? env.GOOGLE_AI_API_KEY;
+  const model = opts?.model ?? env.GOOGLE_AI_MODEL;
+  if (!apiKey) {
     throw new Error("GOOGLE_AI_API_KEY is not configured");
   }
 
-  const url = `${GEMINI_API_BASE}/models/${encodeURIComponent(env.GOOGLE_AI_MODEL)}:generateContent?key=${encodeURIComponent(env.GOOGLE_AI_API_KEY)}`;
+  const url = `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const requestBody = JSON.stringify({
     contents: [
       {
@@ -185,11 +188,11 @@ export async function parseReceiptWithProvider(
         string,
         unknown
       >;
-      const normalized = normalizeGeminiPayload(json, env.GOOGLE_AI_MODEL);
+      const normalized = normalizeGeminiPayload(json, model);
 
       console.info("[parse][gemini] Extraction complete", {
         fileName: input.fileName,
-        model: env.GOOGLE_AI_MODEL,
+        model,
         documentType: normalized.documentType,
         merchant: normalized.merchant,
         lineItemCount: normalized.lineItems.length,

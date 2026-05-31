@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db as defaultDb, type DB } from "@/lib/db";
 import {
   receiptExtractions,
   receiptFiles,
@@ -9,6 +9,19 @@ import {
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { parseReceiptWithProvider } from "@/lib/parsing/provider";
 import { readStoredObject } from "@/lib/storage";
+
+/**
+ * Optional execution context so the receipt job can run both inside the Next
+ * app (OpenNext request context — defaults pulled from bindings) and inside a
+ * standalone Cloudflare Queue consumer Worker (which must inject db/bucket/AI
+ * config explicitly, since getCloudflareContext() is unavailable there).
+ */
+export type ReceiptJobContext = {
+  db?: DB;
+  bucket?: R2Bucket;
+  aiApiKey?: string;
+  aiModel?: string;
+};
 
 function parseDateOrNull(value: string | null) {
   if (!value) return null;
@@ -21,7 +34,11 @@ function parseDateOrNull(value: string | null) {
  * Does NOT recompute the parent request total — call
  * {@link recomputeRequestTotal} once after all receipts are processed.
  */
-export async function processReceipt(receiptFileId: string) {
+export async function processReceipt(
+  receiptFileId: string,
+  ctx?: ReceiptJobContext
+) {
+  const db = ctx?.db ?? defaultDb;
   const file = await db.query.receiptFiles.findFirst({
     where: eq(receiptFiles.id, receiptFileId),
   });
@@ -35,13 +52,16 @@ export async function processReceipt(receiptFileId: string) {
     .where(eq(receiptFiles.id, file.id));
 
   try {
-    const fileBytes = await readStoredObject(file.storageUrl);
+    const fileBytes = await readStoredObject(file.storageUrl, ctx?.bucket);
 
-    const result = await parseReceiptWithProvider({
-      fileName: file.fileName,
-      mimeType: file.mimeType,
-      bytes: fileBytes,
-    });
+    const result = await parseReceiptWithProvider(
+      {
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        bytes: fileBytes,
+      },
+      { apiKey: ctx?.aiApiKey, model: ctx?.aiModel }
+    );
 
     const receiptDate = parseDateOrNull(result.receiptDate);
     const extractionData = {
@@ -127,7 +147,11 @@ export async function processReceipt(receiptFileId: string) {
  * Recomputes the reimbursable total for a request from its current
  * extractions. Safe to call after one or many receipts have been processed.
  */
-export async function recomputeRequestTotal(requestId: string) {
+export async function recomputeRequestTotal(
+  requestId: string,
+  ctx?: ReceiptJobContext
+) {
+  const db = ctx?.db ?? defaultDb;
   const request = await db.query.reimbursementRequests.findFirst({
     where: eq(reimbursementRequests.id, requestId),
     with: {
