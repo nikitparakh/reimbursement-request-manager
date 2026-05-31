@@ -4,6 +4,7 @@
   "description": "School robotics reimbursement workflow app",
   "private": true,
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
@@ -59,6 +60,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
+    "patch-package": "^8.0.1",
     "shadcn": "^4.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
