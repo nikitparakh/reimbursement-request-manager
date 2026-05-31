@@ -3,7 +3,7 @@ import type {
   GlobalRole,
   ScopedRole,
   TeamMembershipRole,
-} from "@prisma/client";
+} from "@/db/schema";
 import { buildAccessContext } from "@/lib/access";
 import {
   getNavigationLinks,

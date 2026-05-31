@@ -1,17 +1,35 @@
+import { createClient } from "@libsql/client";
+import { inArray } from "drizzle-orm";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import {
-  Prisma,
-  PrismaClient,
+  approvalActions,
+  auditLogs,
+  districts,
+  notifications,
+  programs,
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+  schools,
+  teamMemberships,
+  teamRegistrationRequests,
+  teams,
+  userScopeRoles,
+  users,
   type FllDivision,
   type GlobalRole,
-  type Program,
-  type School,
-  type Team,
-  type User,
-} from "@prisma/client";
-import { hash } from "bcryptjs";
+  type ProgramRow,
+  type SchoolRow,
+  type TeamRow,
+  type UserRow,
+} from "@/db/schema";
+import * as schema from "@/db/schema";
 import { CURRENT_POLICY_VERSION } from "../src/lib/policy";
 import { buildUserScopeRoleKey } from "../src/lib/user-scope-role";
 import { cleanupLegacyTeamScopedRoles } from "./seed-cleanup";
+
+type DB = LibSQLDatabase<typeof schema>;
 
 const PROGRAM_SEEDS = [
   {
@@ -117,7 +135,6 @@ type DemoUserAccount = {
   key: string;
   email: string;
   name: string;
-  password: string;
   globalRole: GlobalRole;
 };
 
@@ -126,35 +143,30 @@ const DEMO_USER_ACCOUNTS: readonly DemoUserAccount[] = [
     key: "super-admin",
     email: "admin@school.org",
     name: "District Super Admin",
-    password: "Admin1234",
     globalRole: "SUPER_ADMIN",
   },
   {
     key: "school-admin",
     email: "schooladmin@school.org",
     name: "Novi School Admin",
-    password: "SchoolAdmin1234",
     globalRole: "USER",
   },
   {
     key: "program-admin",
     email: "programadmin@school.org",
     name: "Novi FLL Program Admin",
-    password: "ProgramAdmin1234",
     globalRole: "USER",
   },
   {
     key: "coach",
     email: "coach@team.org",
     name: "Frog Force Coach",
-    password: "Coach1234",
     globalRole: "USER",
   },
   {
     key: "parent-mentor",
     email: "user@team.org",
     name: "Frog Force Parent Mentor",
-    password: "User1234",
     globalRole: "USER",
   },
 ] as const;
@@ -164,18 +176,18 @@ type DemoUserKey = (typeof DEMO_USER_ACCOUNTS)[number]["key"];
 type SchoolSlug = (typeof VERIFIED_NOVI_SCHOOLS)[number]["slug"];
 type TeamShortCode = (typeof VERIFIED_NOVI_TEAMS)[number]["shortCode"];
 
-async function createSeedClient(): Promise<PrismaClient> {
-  if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
-    const { PrismaLibSql } = await import("@prisma/adapter-libsql");
+function createSeedClient() {
+  const client = process.env.TURSO_DATABASE_URL
+    ? createClient({
+        url: process.env.TURSO_DATABASE_URL,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      })
+    : createClient({
+        url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+      });
 
-    const adapter = new PrismaLibSql({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    });
-    return new PrismaClient({ adapter });
-  }
-
-  return new PrismaClient();
+  const db: DB = drizzle(client, { schema });
+  return { db, client };
 }
 
 function getRequired<K, V>(map: Map<K, V>, key: K, label: string) {
@@ -188,192 +200,201 @@ function getRequired<K, V>(map: Map<K, V>, key: K, label: string) {
   return value;
 }
 
-async function ensurePrograms(prisma: PrismaClient) {
-  const programs = await Promise.all(
-    PROGRAM_SEEDS.map((program) =>
-      prisma.program.upsert({
-        where: { code: program.code },
-        update: {
-          name: program.name,
-          description: program.description,
-          gradeRangeLabel: program.gradeRangeLabel,
-          ageRangeLabel: program.ageRangeLabel,
-          active: true,
-        },
-        create: {
+async function ensurePrograms(db: DB) {
+  const seeded = await Promise.all(
+    PROGRAM_SEEDS.map(async (program) => {
+      const [row] = await db
+        .insert(programs)
+        .values({
           code: program.code,
           name: program.name,
           description: program.description,
           gradeRangeLabel: program.gradeRangeLabel,
           ageRangeLabel: program.ageRangeLabel,
           active: true,
-        },
-      })
-    )
+        })
+        .onConflictDoUpdate({
+          target: programs.code,
+          set: {
+            name: program.name,
+            description: program.description,
+            gradeRangeLabel: program.gradeRangeLabel,
+            ageRangeLabel: program.ageRangeLabel,
+            active: true,
+          },
+        })
+        .returning();
+      return row;
+    })
   );
 
-  return new Map(programs.map((program) => [program.code, program])) as Map<ProgramCode, Program>;
+  return new Map(seeded.map((program) => [program.code, program])) as Map<
+    ProgramCode,
+    ProgramRow
+  >;
 }
 
-async function ensureDistrictAndSchools(prisma: PrismaClient) {
-  const district = await prisma.district.upsert({
-    where: { slug: VERIFIED_NOVI_DISTRICT.slug },
-    update: { name: VERIFIED_NOVI_DISTRICT.name, active: true },
-    create: {
+async function ensureDistrictAndSchools(db: DB) {
+  const [district] = await db
+    .insert(districts)
+    .values({
       name: VERIFIED_NOVI_DISTRICT.name,
       slug: VERIFIED_NOVI_DISTRICT.slug,
       active: true,
-    },
-  });
+    })
+    .onConflictDoUpdate({
+      target: districts.slug,
+      set: { name: VERIFIED_NOVI_DISTRICT.name, active: true },
+    })
+    .returning();
 
-  const schools = await Promise.all(
-    VERIFIED_NOVI_SCHOOLS.map((school) =>
-      prisma.school.upsert({
-        where: {
-          districtId_slug: {
-            districtId: district.id,
-            slug: school.slug,
-          },
-        },
-        update: {
-          name: school.name,
-          active: true,
-        },
-        create: {
+  const seededSchools = await Promise.all(
+    VERIFIED_NOVI_SCHOOLS.map(async (school) => {
+      const [row] = await db
+        .insert(schools)
+        .values({
           districtId: district.id,
           name: school.name,
           slug: school.slug,
           active: true,
-        },
-      })
-    )
+        })
+        .onConflictDoUpdate({
+          target: [schools.districtId, schools.slug],
+          set: {
+            name: school.name,
+            active: true,
+          },
+        })
+        .returning();
+      return row;
+    })
   );
 
   return {
     district,
-    schoolsBySlug: new Map(schools.map((school) => [school.slug, school])) as Map<SchoolSlug, School>,
+    schoolsBySlug: new Map(
+      seededSchools.map((school) => [school.slug, school])
+    ) as Map<SchoolSlug, SchoolRow>,
   };
 }
 
-async function ensureDemoUsers(prisma: PrismaClient) {
-  const users = await Promise.all(
+async function ensureDemoUsers(db: DB) {
+  const seeded = await Promise.all(
     DEMO_USER_ACCOUNTS.map(async (account) => {
-      const passwordHash = await hash(account.password, 12);
       const policyAcceptedAt = new Date();
 
-      const user = await prisma.user.upsert({
-        where: { email: account.email },
-        update: {
-          name: account.name,
-          role: account.globalRole,
-          onboardingDone: true,
-          passwordHash,
-          policyAcceptedAt,
-          policyVersion: CURRENT_POLICY_VERSION,
-        },
-        create: {
+      const [user] = await db
+        .insert(users)
+        .values({
           email: account.email,
           name: account.name,
           role: account.globalRole,
           onboardingDone: true,
-          passwordHash,
           policyAcceptedAt,
           policyVersion: CURRENT_POLICY_VERSION,
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: users.email,
+          set: {
+            name: account.name,
+            role: account.globalRole,
+            onboardingDone: true,
+            policyAcceptedAt,
+            policyVersion: CURRENT_POLICY_VERSION,
+          },
+        })
+        .returning();
 
       return [account.key, user] as const;
     })
   );
 
-  return new Map(users) as Map<DemoUserKey, User>;
+  return new Map(seeded) as Map<DemoUserKey, UserRow>;
 }
 
 async function resetSeedOwnedData(
-  prisma: PrismaClient,
-  demoUsersByKey: Map<DemoUserKey, User>
+  db: DB,
+  demoUsersByKey: Map<DemoUserKey, UserRow>
 ) {
   const demoUserIds = Array.from(demoUsersByKey.values()).map((user) => user.id);
 
-  await prisma.notification.deleteMany({
-    where: {
-      userId: { in: demoUserIds },
-    },
-  });
+  await db
+    .delete(notifications)
+    .where(inArray(notifications.userId, demoUserIds));
 
-  await prisma.auditLog.deleteMany({
-    where: {
-      actorId: { in: demoUserIds },
-    },
-  });
+  await db.delete(auditLogs).where(inArray(auditLogs.actorId, demoUserIds));
 
-  await prisma.teamRegistrationRequest.deleteMany({
-    where: {
-      requestedById: { in: demoUserIds },
-    },
-  });
+  await db
+    .delete(teamRegistrationRequests)
+    .where(inArray(teamRegistrationRequests.requestedById, demoUserIds));
 
-  await prisma.reimbursementRequest.deleteMany({
-    where: {
-      createdById: { in: demoUserIds },
-    },
-  });
+  await db
+    .delete(reimbursementRequests)
+    .where(inArray(reimbursementRequests.createdById, demoUserIds));
 
-  await prisma.teamMembership.deleteMany({
-    where: {
-      userId: { in: demoUserIds },
-    },
-  });
+  await db
+    .delete(teamMemberships)
+    .where(inArray(teamMemberships.userId, demoUserIds));
 
-  await prisma.userScopeRole.deleteMany({
-    where: {
-      userId: { in: demoUserIds },
-    },
-  });
+  await db
+    .delete(userScopeRoles)
+    .where(inArray(userScopeRoles.userId, demoUserIds));
 }
 
 async function createVerifiedTeams(
-  prisma: PrismaClient,
-  schoolsBySlug: Map<SchoolSlug, School>,
-  programsByCode: Map<ProgramCode, Program>
+  db: DB,
+  schoolsBySlug: Map<SchoolSlug, SchoolRow>,
+  programsByCode: Map<ProgramCode, ProgramRow>
 ) {
-  const teams = await Promise.all(
-    VERIFIED_NOVI_TEAMS.map((team) =>
-      prisma.team.upsert({
-        where: {
-          schoolId_programId_name: {
-            schoolId: getRequired(schoolsBySlug, team.schoolSlug, `school ${team.schoolSlug}`).id,
-            programId: getRequired(programsByCode, team.programCode, `program ${team.programCode}`).id,
-            name: team.name,
-          },
-        },
-        update: {
-          shortCode: team.shortCode,
-          fllDivision: team.fllDivision ?? null,
-          active: true,
-        },
-        create: {
-          schoolId: getRequired(schoolsBySlug, team.schoolSlug, `school ${team.schoolSlug}`).id,
-          programId: getRequired(programsByCode, team.programCode, `program ${team.programCode}`).id,
+  const seeded = await Promise.all(
+    VERIFIED_NOVI_TEAMS.map(async (team) => {
+      const schoolId = getRequired(
+        schoolsBySlug,
+        team.schoolSlug,
+        `school ${team.schoolSlug}`
+      ).id;
+      const programId = getRequired(
+        programsByCode,
+        team.programCode,
+        `program ${team.programCode}`
+      ).id;
+
+      const [row] = await db
+        .insert(teams)
+        .values({
+          schoolId,
+          programId,
           name: team.name,
           shortCode: team.shortCode,
           fllDivision: team.fllDivision,
           active: true,
-        },
-      })
-    )
+        })
+        .onConflictDoUpdate({
+          target: [teams.schoolId, teams.programId, teams.name],
+          set: {
+            shortCode: team.shortCode,
+            fllDivision: team.fllDivision ?? null,
+            active: true,
+          },
+        })
+        .returning();
+      return row;
+    })
   );
 
-  return new Map(teams.map((team) => [team.shortCode, team])) as Map<TeamShortCode, Team>;
+  return new Map(seeded.map((team) => [team.shortCode, team])) as Map<
+    TeamShortCode,
+    TeamRow
+  >;
 }
 
 async function seedAccessAndMemberships(
-  prisma: PrismaClient,
+  db: DB,
   districtId: string,
-  schoolsBySlug: Map<SchoolSlug, School>,
-  programsByCode: Map<ProgramCode, Program>,
-  teamsByShortCode: Map<TeamShortCode, Team>,
-  demoUsersByKey: Map<DemoUserKey, User>
+  schoolsBySlug: Map<SchoolSlug, SchoolRow>,
+  programsByCode: Map<ProgramCode, ProgramRow>,
+  teamsByShortCode: Map<TeamShortCode, TeamRow>,
+  demoUsersByKey: Map<DemoUserKey, UserRow>
 ) {
   const schoolAdmin = getRequired(demoUsersByKey, "school-admin", "school admin user");
   const programAdmin = getRequired(demoUsersByKey, "program-admin", "program admin user");
@@ -398,56 +419,52 @@ async function seedAccessAndMemberships(
     "school novi-meadows-elementary-school",
   );
 
-  await prisma.userScopeRole.createMany({
-    data: [
-      {
-        userId: schoolAdmin.id,
-        role: "SCHOOL_ADMIN",
+  await db.insert(userScopeRoles).values([
+    {
+      userId: schoolAdmin.id,
+      role: "SCHOOL_ADMIN",
+      districtId,
+      schoolId: schoolAdminSchool.id,
+      scopeKey: buildUserScopeRoleKey({
         districtId,
         schoolId: schoolAdminSchool.id,
-        scopeKey: buildUserScopeRoleKey({
-          districtId,
-          schoolId: schoolAdminSchool.id,
-        }),
-      },
-      {
-        userId: programAdmin.id,
-        role: "PROGRAM_ADMIN",
+      }),
+    },
+    {
+      userId: programAdmin.id,
+      role: "PROGRAM_ADMIN",
+      districtId,
+      schoolId: programAdminSchool.id,
+      programId: fllProgram.id,
+      scopeKey: buildUserScopeRoleKey({
         districtId,
         schoolId: programAdminSchool.id,
         programId: fllProgram.id,
-        scopeKey: buildUserScopeRoleKey({
-          districtId,
-          schoolId: programAdminSchool.id,
-          programId: fllProgram.id,
-        }),
-      },
-    ],
-  });
+      }),
+    },
+  ]);
 
-  await prisma.teamMembership.createMany({
-    data: [
-      {
-        userId: coach.id,
-        teamId: workflowTeam.id,
-        roleInTeam: "COACH",
-      },
-      {
-        userId: parentMentor.id,
-        teamId: workflowTeam.id,
-        roleInTeam: "PARENT_MENTOR",
-      },
-    ],
-  });
+  await db.insert(teamMemberships).values([
+    {
+      userId: coach.id,
+      teamId: workflowTeam.id,
+      roleInTeam: "COACH",
+    },
+    {
+      userId: parentMentor.id,
+      teamId: workflowTeam.id,
+      roleInTeam: "PARENT_MENTOR",
+    },
+  ]);
 }
 
 async function seedWorkflowData(
-  prisma: PrismaClient,
+  db: DB,
   districtId: string,
-  schoolsBySlug: Map<SchoolSlug, School>,
-  programsByCode: Map<ProgramCode, Program>,
-  teamsByShortCode: Map<TeamShortCode, Team>,
-  demoUsersByKey: Map<DemoUserKey, User>
+  schoolsBySlug: Map<SchoolSlug, SchoolRow>,
+  programsByCode: Map<ProgramCode, ProgramRow>,
+  teamsByShortCode: Map<TeamShortCode, TeamRow>,
+  demoUsersByKey: Map<DemoUserKey, UserRow>
 ) {
   const superAdmin = getRequired(demoUsersByKey, "super-admin", "super admin user");
   const coach = getRequired(demoUsersByKey, "coach", "coach user");
@@ -456,207 +473,203 @@ async function seedWorkflowData(
   const noviMiddle = getRequired(schoolsBySlug, "novi-middle-school", "Novi Middle School");
   const ftcProgram = getRequired(programsByCode, "FTC", "FTC program");
 
-  const draftRequest = await prisma.reimbursementRequest.create({
-    data: {
+  const [draftRequest] = await db
+    .insert(reimbursementRequests)
+    .values({
       title: "Robot Parts - Week 3",
       description: "Aluminum extrusions and motor controllers from AndyMark",
       teamId: workflowTeam.id,
       createdById: parentMentor.id,
       coachId: coach.id,
       status: "DRAFT",
-      requestedTotal: new Prisma.Decimal("0.00"),
-    },
-  });
+      requestedTotal: 0,
+    })
+    .returning();
 
-  const submittedRequest = await prisma.reimbursementRequest.create({
-    data: {
+  const [submittedRequest] = await db
+    .insert(reimbursementRequests)
+    .values({
       title: "Field Trip Supplies",
       description: "Snacks and water for competition travel",
       teamId: workflowTeam.id,
       createdById: parentMentor.id,
       coachId: coach.id,
       status: "SUBMITTED",
-      requestedTotal: new Prisma.Decimal("47.83"),
+      requestedTotal: 47.83,
       submittedAt: new Date(),
-    },
-  });
+    })
+    .returning();
 
-  const approvedRequest = await prisma.reimbursementRequest.create({
-    data: {
+  const [approvedRequest] = await db
+    .insert(reimbursementRequests)
+    .values({
       title: "Safety Equipment",
       description: "Safety glasses and gloves for the shop",
       teamId: workflowTeam.id,
       createdById: parentMentor.id,
       coachId: coach.id,
       status: "COACH_APPROVED",
-      requestedTotal: new Prisma.Decimal("89.95"),
+      requestedTotal: 89.95,
       submittedAt: new Date(Date.now() - 3 * 86_400_000),
-    },
-  });
+    })
+    .returning();
 
-  const draftReceipt = await prisma.receiptFile.create({
-    data: {
+  const [draftReceipt] = await db
+    .insert(receiptFiles)
+    .values({
       requestId: draftRequest.id,
       fileName: "andymark-order.pdf",
       mimeType: "application/pdf",
       storageUrl: "file:///seed/andymark-order.pdf",
       parseStatus: "DONE",
-    },
-  });
+    })
+    .returning();
 
-  const draftExtraction = await prisma.receiptExtraction.create({
-    data: {
+  const [draftExtraction] = await db
+    .insert(receiptExtractions)
+    .values({
       receiptFileId: draftReceipt.id,
       documentType: "INVOICE",
       merchant: "AndyMark",
-      total: new Prisma.Decimal("156.40"),
-      tax: new Prisma.Decimal("11.40"),
-      subtotal: new Prisma.Decimal("145.00"),
+      total: 156.4,
+      tax: 11.4,
+      subtotal: 145.0,
       currency: "USD",
       confidence: 0.92,
+    })
+    .returning();
+
+  await db.insert(receiptLineItems).values([
+    {
+      receiptExtractionId: draftExtraction.id,
+      position: 0,
+      description: "Aluminum C-Channel (4-pack)",
+      quantity: 2,
+      unitPrice: 35.0,
+      lineTotal: 70.0,
+      category: "Materials",
     },
-  });
+    {
+      receiptExtractionId: draftExtraction.id,
+      position: 1,
+      description: "NEO Motor Controller",
+      quantity: 1,
+      unitPrice: 75.0,
+      lineTotal: 75.0,
+      category: "Electronics",
+    },
+  ]);
 
-  await prisma.receiptLineItem.createMany({
-    data: [
-      {
-        receiptExtractionId: draftExtraction.id,
-        position: 0,
-        description: "Aluminum C-Channel (4-pack)",
-        quantity: new Prisma.Decimal("2"),
-        unitPrice: new Prisma.Decimal("35.00"),
-        lineTotal: new Prisma.Decimal("70.00"),
-        category: "Materials",
-      },
-      {
-        receiptExtractionId: draftExtraction.id,
-        position: 1,
-        description: "NEO Motor Controller",
-        quantity: new Prisma.Decimal("1"),
-        unitPrice: new Prisma.Decimal("75.00"),
-        lineTotal: new Prisma.Decimal("75.00"),
-        category: "Electronics",
-      },
-    ],
-  });
-
-  const submittedReceipt = await prisma.receiptFile.create({
-    data: {
+  const [submittedReceipt] = await db
+    .insert(receiptFiles)
+    .values({
       requestId: submittedRequest.id,
       fileName: "walmart-receipt.jpg",
       mimeType: "image/jpeg",
       storageUrl: "file:///seed/walmart-receipt.jpg",
       parseStatus: "DONE",
-    },
-  });
+    })
+    .returning();
 
-  const submittedExtraction = await prisma.receiptExtraction.create({
-    data: {
+  const [submittedExtraction] = await db
+    .insert(receiptExtractions)
+    .values({
       receiptFileId: submittedReceipt.id,
       documentType: "RECEIPT",
       merchant: "Walmart",
-      total: new Prisma.Decimal("51.27"),
-      tax: new Prisma.Decimal("3.44"),
-      subtotal: new Prisma.Decimal("47.83"),
+      total: 51.27,
+      tax: 3.44,
+      subtotal: 47.83,
       currency: "USD",
       confidence: 0.97,
+    })
+    .returning();
+
+  await db.insert(receiptLineItems).values([
+    {
+      receiptExtractionId: submittedExtraction.id,
+      position: 0,
+      description: "Trail Mix (12-pack)",
+      quantity: 2,
+      unitPrice: 8.97,
+      lineTotal: 17.94,
+      category: "Food",
     },
-  });
-
-  await prisma.receiptLineItem.createMany({
-    data: [
-      {
-        receiptExtractionId: submittedExtraction.id,
-        position: 0,
-        description: "Trail Mix (12-pack)",
-        quantity: new Prisma.Decimal("2"),
-        unitPrice: new Prisma.Decimal("8.97"),
-        lineTotal: new Prisma.Decimal("17.94"),
-        category: "Food",
-      },
-      {
-        receiptExtractionId: submittedExtraction.id,
-        position: 1,
-        description: "Water Bottles (24-pack)",
-        quantity: new Prisma.Decimal("3"),
-        unitPrice: new Prisma.Decimal("4.98"),
-        lineTotal: new Prisma.Decimal("14.94"),
-        category: "Beverages",
-      },
-      {
-        receiptExtractionId: submittedExtraction.id,
-        position: 2,
-        description: "Granola Bars (10-pack)",
-        quantity: new Prisma.Decimal("3"),
-        unitPrice: new Prisma.Decimal("4.98"),
-        lineTotal: new Prisma.Decimal("14.95"),
-        category: "Food",
-      },
-    ],
-  });
-
-  await prisma.approvalAction.createMany({
-    data: [
-      {
-        requestId: submittedRequest.id,
-        actorId: parentMentor.id,
-        action: "SUBMIT",
-        comment: "Submitted for review",
-      },
-      {
-        requestId: approvedRequest.id,
-        actorId: parentMentor.id,
-        action: "SUBMIT",
-      },
-      {
-        requestId: approvedRequest.id,
-        actorId: coach.id,
-        action: "APPROVE",
-        comment: "Looks good, safety first!",
-      },
-    ],
-  });
-
-  await prisma.teamRegistrationRequest.create({
-    data: {
-      districtId,
-      schoolId: noviMiddle.id,
-      programId: ftcProgram.id,
-      teamName: "Novi Middle Circuit Crew",
-      shortCode: "24501",
-      notes: "Sample pending FTC registration request for a new Novi Middle School team.",
-      requestedById: parentMentor.id,
+    {
+      receiptExtractionId: submittedExtraction.id,
+      position: 1,
+      description: "Water Bottles (24-pack)",
+      quantity: 3,
+      unitPrice: 4.98,
+      lineTotal: 14.94,
+      category: "Beverages",
     },
+    {
+      receiptExtractionId: submittedExtraction.id,
+      position: 2,
+      description: "Granola Bars (10-pack)",
+      quantity: 3,
+      unitPrice: 4.98,
+      lineTotal: 14.95,
+      category: "Food",
+    },
+  ]);
+
+  await db.insert(approvalActions).values([
+    {
+      requestId: submittedRequest.id,
+      actorId: parentMentor.id,
+      action: "SUBMIT",
+      comment: "Submitted for review",
+    },
+    {
+      requestId: approvedRequest.id,
+      actorId: parentMentor.id,
+      action: "SUBMIT",
+    },
+    {
+      requestId: approvedRequest.id,
+      actorId: coach.id,
+      action: "APPROVE",
+      comment: "Looks good, safety first!",
+    },
+  ]);
+
+  await db.insert(teamRegistrationRequests).values({
+    districtId,
+    schoolId: noviMiddle.id,
+    programId: ftcProgram.id,
+    teamName: "Novi Middle Circuit Crew",
+    shortCode: "24501",
+    notes: "Sample pending FTC registration request for a new Novi Middle School team.",
+    requestedById: parentMentor.id,
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: superAdmin.id,
-      eventType: "SEED_COMPLETE",
-      message:
-        "Seeded verified Novi district schools and FIRST teams, demo admin scopes, and reimbursement workflow samples.",
-    },
+  await db.insert(auditLogs).values({
+    actorId: superAdmin.id,
+    eventType: "SEED_COMPLETE",
+    message:
+      "Seeded verified Novi district schools and FIRST teams, demo admin scopes, and reimbursement workflow samples.",
   });
 }
 
 async function main() {
-  const prisma = await createSeedClient();
+  const { db, client } = createSeedClient();
 
   try {
-    const programsByCode = await ensurePrograms(prisma);
-    const { district, schoolsBySlug } = await ensureDistrictAndSchools(prisma);
-    const demoUsersByKey = await ensureDemoUsers(prisma);
+    const programsByCode = await ensurePrograms(db);
+    const { district, schoolsBySlug } = await ensureDistrictAndSchools(db);
+    const demoUsersByKey = await ensureDemoUsers(db);
 
-    // NOTE: seed.ts is still Prisma-based; full Drizzle port is the next step.
     await cleanupLegacyTeamScopedRoles(
-      prisma as unknown as Parameters<typeof cleanupLegacyTeamScopedRoles>[0]
+      db as unknown as Parameters<typeof cleanupLegacyTeamScopedRoles>[0]
     );
-    await resetSeedOwnedData(prisma, demoUsersByKey);
+    await resetSeedOwnedData(db, demoUsersByKey);
 
-    const teamsByShortCode = await createVerifiedTeams(prisma, schoolsBySlug, programsByCode);
+    const teamsByShortCode = await createVerifiedTeams(db, schoolsBySlug, programsByCode);
 
     await seedAccessAndMemberships(
-      prisma,
+      db,
       district.id,
       schoolsBySlug,
       programsByCode,
@@ -665,7 +678,7 @@ async function main() {
     );
 
     await seedWorkflowData(
-      prisma,
+      db,
       district.id,
       schoolsBySlug,
       programsByCode,
@@ -673,7 +686,7 @@ async function main() {
       demoUsersByKey
     );
   } finally {
-    await prisma.$disconnect();
+    client.close();
   }
 }
 
