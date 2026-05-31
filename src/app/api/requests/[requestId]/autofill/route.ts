@@ -48,23 +48,6 @@ export async function POST(
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
   const total = aggregateReimbursableTotals(extractions);
 
-  console.info("[autofill] Aggregated request total from extractions", {
-    requestId,
-    receiptCount: requestRecord.receiptFiles.length,
-    extractionCount: extractions.length,
-    extractionSummaries: extractions.map((item) => ({
-      documentType: item.documentType,
-      total: item.total ? Number(item.total) : 0,
-      confidence: item.confidence,
-      lineItemCount: item.lineItems.length,
-      lineItemTotal: item.lineItems.reduce(
-        (sum, lineItem) => sum + (lineItem.lineTotal ? Number(lineItem.lineTotal) : 0),
-        0
-      ),
-    })),
-    computedTotal: total,
-  });
-
   const [updated] = await db
     .update(reimbursementRequests)
     .set({ requestedTotal: Number(total.toFixed(2)) })

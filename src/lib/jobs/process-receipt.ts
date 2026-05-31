@@ -77,14 +77,6 @@ export async function processReceipt(
       rawJson: result.raw,
     };
 
-    console.info("[parse][persist] Preparing extraction write", {
-      receiptFileId: file.id,
-      requestId: file.requestId,
-      parseStatus: file.parseStatus,
-      extractionData,
-      lineItemCount: result.lineItems.length,
-    });
-
     const lineItemRows = result.lineItems.map((item, position) => ({
       position,
       description: item.description,
@@ -127,13 +119,6 @@ export async function processReceipt(
         .set({ parseStatus: "DONE" })
         .where(eq(receiptFiles.id, file.id)),
     ]);
-
-    console.info("[parse][persist] Extraction write complete", {
-      receiptFileId: file.id,
-      requestId: file.requestId,
-      finalParseStatus: "DONE",
-      persistedLineItemCount: lineItemRows.length,
-    });
   } catch (error) {
     await db
       .update(receiptFiles)
@@ -174,6 +159,4 @@ export async function recomputeRequestTotal(
     .update(reimbursementRequests)
     .set({ requestedTotal: Number(total.toFixed(2)) })
     .where(eq(reimbursementRequests.id, requestId));
-
-  console.info("[parse][total] Request total recomputed", { requestId, total });
 }
