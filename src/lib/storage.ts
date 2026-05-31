@@ -100,15 +100,6 @@ export async function readStoredObject(
     return new Uint8Array(await object.arrayBuffer());
   }
 
-  // HTTP(S) URLs — any remote URL
-  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
-    const response = await fetch(storageUrl);
-    if (!response.ok) {
-      throw new Error(`Unable to fetch stored receipt file: ${response.status}`);
-    }
-    return new Uint8Array(await response.arrayBuffer());
-  }
-
   // Local file:// URLs (dev/test)
   if (storageUrl.startsWith("file://")) {
     const { readFile } = await import("node:fs/promises");
@@ -138,11 +129,6 @@ export async function deleteStoredObject(storageUrl: string): Promise<void> {
     if (bucket) {
       await bucket.delete(storageUrl.slice("r2://".length));
     }
-    return;
-  }
-
-  if (storageUrl.startsWith("http://") || storageUrl.startsWith("https://")) {
-    // Remote URLs are not owned by this app; nothing to clean up.
     return;
   }
 
