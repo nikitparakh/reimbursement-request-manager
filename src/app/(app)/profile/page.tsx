@@ -6,6 +6,7 @@ import { users } from "@/db/schema";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { BackLink } from "@/components/ui/back-link";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -30,6 +31,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      <BackLink href="/" label="Back to dashboard" />
       <PageHeader
         title="Profile"
         description="Keep your reimbursement contact details current."

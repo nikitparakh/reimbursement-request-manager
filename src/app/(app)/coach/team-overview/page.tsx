@@ -1,4 +1,4 @@
-import { unauthorized } from "next/navigation";
+import { forbidden, unauthorized } from "next/navigation";
 import { BanknoteArrowUp, Clock, FileText } from "lucide-react";
 import { inArray, ne } from "drizzle-orm";
 
@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { teams } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
+import { getRequestDetailHref } from "@/lib/navigation";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,7 +26,7 @@ export default async function CoachTeamOverviewPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
   const access = await getCachedAccessContext(session.user.id);
-  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
+  if (!access.isCoach && !access.canManageReimbursements) forbidden();
 
   const managedTeams = access.canManageReimbursements
     ? await db.query.teams.findMany({
@@ -111,6 +112,12 @@ export default async function CoachTeamOverviewPage() {
           status: r.status,
           date: formatDate(r.createdAt),
           dateMs: r.createdAt.getTime(),
+          detailHref: getRequestDetailHref(access, r.id, {
+            teamId: team.id,
+            schoolId: team.schoolId,
+            programId: team.programId,
+            districtId: team.school.districtId,
+          }),
         }));
 
         const memberRows = team.memberships.map((m) => ({

@@ -1,4 +1,5 @@
 import { unauthorized } from "next/navigation";
+import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -7,6 +8,7 @@ import { RequestForm } from "@/components/reimbursements/request-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { BackLink } from "@/components/ui/back-link";
 
 export default async function NewRequestPage() {
   const session = await auth();
@@ -27,13 +29,18 @@ export default async function NewRequestPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink href="/user/requests" label="Back to my requests" />
       <PageHeader
         title="New Reimbursement Request"
         description="Create a draft request, then upload receipts and submit for approval."
       />
       {teams.length === 0 ? (
         <Alert variant="warning">
-          Complete onboarding and team membership before creating requests.
+          You need to join a team before creating requests.{" "}
+          <Link href="/onboarding" className="font-medium underline underline-offset-4">
+            Continue onboarding
+          </Link>
+          .
         </Alert>
       ) : (
         <Card>

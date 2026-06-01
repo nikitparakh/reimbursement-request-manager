@@ -1,8 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -36,7 +35,7 @@ type TeamOption = { id: string; name: string };
 type RequestFormValues = z.infer<typeof formSchema>;
 
 export function RequestForm({ teams }: { teams: TeamOption[] }) {
-  const [requestId, setRequestId] = useState("");
+  const router = useRouter();
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -66,10 +65,13 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
         return;
       }
       if (payload.id) {
-        setRequestId(payload.id);
         toast.success("Draft created", {
-          description: "Upload receipts from the request page.",
+          description: "Upload receipts and add line items below.",
         });
+        // Navigate to the draft so the user can upload receipts. This also
+        // unmounts the form, preventing a second submit from creating a
+        // duplicate draft.
+        router.push(`/user/requests/${payload.id}`);
       }
     } catch {
       toast.error("Failed to create request");
@@ -146,17 +148,6 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
         <Button type="submit" loading={form.formState.isSubmitting}>
           Create Draft
         </Button>
-
-        {requestId ? (
-          <p className="text-sm text-muted-foreground">
-            <Link
-              href={`/user/requests/${requestId}`}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Open request to upload receipts
-            </Link>
-          </p>
-        ) : null}
       </form>
     </Form>
   );

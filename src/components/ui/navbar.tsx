@@ -18,7 +18,13 @@ import {
 export async function NavBar() {
   const session = await auth();
   const access = session?.user ? await getCachedAccessContext(session.user.id) : null;
-  const links = access ? getNavigationLinks(access) : [];
+  const computedLinks = access ? getNavigationLinks(access) : [];
+  // A signed-in user with no role/team yields an empty link list (e.g. before
+  // onboarding). Never render an empty navbar — always offer a way forward.
+  const links =
+    session?.user && computedLinks.length === 0
+      ? [{ href: "/onboarding", label: "Get started", prefetch: false }]
+      : computedLinks;
 
   return (
     <nav className="bg-background sticky top-0 z-50 border-b shadow-sm">

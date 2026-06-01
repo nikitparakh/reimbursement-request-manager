@@ -144,6 +144,14 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
     }
 
     toast.success("Onboarding complete. Your team workspace is ready.");
+    // Move the user off /onboarding into their workspace. router.refresh()
+    // re-renders the server NavBar/layout so the now-populated access flags
+    // (team membership just created) repopulate the nav instead of leaving the
+    // user stranded on an empty-nav onboarding page.
+    const destination =
+      data.roleIntent === "COACH" ? "/coach/team-overview" : "/team";
+    router.replace(destination);
+    router.refresh();
   }
 
   return (

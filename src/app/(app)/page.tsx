@@ -17,6 +17,8 @@ import {
 
 import { and, eq } from "drizzle-orm";
 
+import { redirect } from "next/navigation";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { districts, programs, schools, teams, users } from "@/db/schema";
@@ -139,6 +141,18 @@ export default async function HomePage() {
     }),
     getCachedAccessContext(session.user.id),
   ]);
+
+  // Onboarding gate: a user with no admin scope, no team membership, and no
+  // completed onboarding has nothing to do on the dashboard (and an empty
+  // navbar). Send them to /onboarding instead of stranding them here.
+  const needsOnboarding =
+    !user?.onboardingDone &&
+    !access.isAdmin &&
+    !access.isCoach &&
+    !access.isParentMentor;
+  if (needsOnboarding) {
+    redirect("/onboarding");
+  }
 
   let adminPrograms: Array<{
     id: string;

@@ -15,6 +15,8 @@ export type RequestRow = {
   status: string;
   date: string;
   dateMs: number;
+  // Role-correct detail route resolved server-side (admin vs user route).
+  detailHref: string;
 };
 
 const columns: ColumnDef<RequestRow>[] = [
@@ -27,7 +29,7 @@ const columns: ColumnDef<RequestRow>[] = [
     ),
     cell: ({ row }) => (
       <Link
-        href={`/user/requests/${row.original.id}`}
+        href={row.original.detailHref}
         className="font-medium text-primary underline-offset-4 hover:underline"
         onClick={(e) => e.stopPropagation()}
       >

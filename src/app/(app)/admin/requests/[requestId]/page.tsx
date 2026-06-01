@@ -53,7 +53,7 @@ export default async function AdminRequestDetailPage({
 
   const backTarget = resolvedSearch.teamId
     ? { href: `/admin/teams/${resolvedSearch.teamId}`, label: "Back to team" }
-    : BACK_LABELS[resolvedSearch.from ?? ""] ?? BACK_LABELS.inbox;
+    : BACK_LABELS[resolvedSearch.from ?? ""] ?? BACK_LABELS.requests;
   const request = await db.query.reimbursementRequests.findFirst({
     where: eq(reimbursementRequests.id, requestId),
     with: {

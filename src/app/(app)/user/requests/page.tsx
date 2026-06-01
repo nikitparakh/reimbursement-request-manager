@@ -42,6 +42,9 @@ export default async function UserRequestsPage() {
     status: r.status,
     date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
+    // This page only renders for a pure parent/mentor (admins and coaches are
+    // redirected above), so every row is the user's own request on the user route.
+    detailHref: `/user/requests/${r.id}`,
   }));
 
   return (

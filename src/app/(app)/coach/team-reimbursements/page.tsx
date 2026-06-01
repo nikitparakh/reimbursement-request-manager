@@ -1,10 +1,11 @@
 import { and, desc, inArray } from "drizzle-orm";
-import { unauthorized } from "next/navigation";
+import { forbidden, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
 import type { RequestStatus } from "@/db/schema";
 import { reimbursementRequests, teams } from "@/db/schema";
 import { db } from "@/lib/db";
 import { getCachedAccessContext } from "@/lib/access";
+import { getRequestDetailHref } from "@/lib/navigation";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import {
   TeamReimbursementsTable,
@@ -46,7 +47,7 @@ export default async function TeamReimbursementsPage({
   const session = await auth();
   if (!session?.user) unauthorized();
   const access = await getCachedAccessContext(session.user.id);
-  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
+  if (!access.isCoach && !access.canManageReimbursements) forbidden();
 
   const { status: rawStatus } = await searchParams;
   const initialStatus = normalizeStatusParam(rawStatus);
@@ -73,7 +74,10 @@ export default async function TeamReimbursementsPage({
       where: inArray(reimbursementRequests.teamId, teamIds),
       with: {
         createdBy: { columns: { email: true } },
-        team: { columns: { name: true } },
+        team: {
+          columns: { name: true, schoolId: true, programId: true },
+          with: { school: { columns: { districtId: true } } },
+        },
       },
       orderBy: desc(reimbursementRequests.createdAt),
     }),
@@ -96,6 +100,12 @@ export default async function TeamReimbursementsPage({
     status: r.status,
     date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
+    detailHref: getRequestDetailHref(access, r.id, {
+      teamId: r.teamId,
+      schoolId: r.team.schoolId,
+      programId: r.team.programId,
+      districtId: r.team.school.districtId,
+    }),
   }));
 
   return (

@@ -1,4 +1,6 @@
 import { notFound, unauthorized } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -129,6 +131,19 @@ export default async function UserRequestDetailPage({
   return (
     <LiveTotalProvider initialTotal={Number(requestRecord.requestedTotal)}>
     <div className="space-y-6">
+      <Link
+        href={
+          requestAccess.isReimbursementAdmin
+            ? "/admin/requests"
+            : requestAccess.isCoach
+              ? "/coach/team-reimbursements"
+              : "/user/requests"
+        }
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Back to requests
+      </Link>
       {draftUi.showEditableDraftSections ? (
         <EditableRequestHeader
           requestId={requestRecord.id}
