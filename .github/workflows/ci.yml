@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Never run two deploys against the same branch at once; let an in-flight
+# deploy finish rather than cancelling it mid-rollout.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Lint + Test
@@ -28,14 +34,25 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # Public Clerk key is baked into the client bundle at build time.
+      # NEXT_PUBLIC_* are baked into the client bundle at build time (.env is
+      # gitignored, so they must be supplied here). The publishable key is
+      # environment-specific -> repo variable. The sign-in/up routes are static
+      # so the app uses its own auth pages instead of Clerk's hosted pages.
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+      NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: "/"
+      NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/"
+      # The OpenNext + webpack server build is memory-heavy; give Node headroom
+      # on the CI runner so the build doesn't OOM.
+      NODE_OPTIONS: "--max-old-space-size=6144"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      # Runs the patch-package postinstall (Next instrumentation-hook fix).
       - run: npm ci
 
       # Apply any pending D1 migrations before deploying the new code.
