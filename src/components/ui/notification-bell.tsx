@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CheckCircle2, MessageSquare, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, CircleDollarSign, FileText, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { formatRelativeTime } from "@/lib/format";
@@ -71,14 +71,21 @@ function formatDayGroup(iso: string, nowMs: number): DayGroup {
   return "Older";
 }
 
-function notificationVisual(message: string) {
-  const m = message.toLowerCase();
-  if (m.includes("approved"))
-    return { Icon: CheckCircle2, iconClassName: "text-emerald-600" as const };
-  if (m.includes("rejected")) return { Icon: XCircle, iconClassName: "text-destructive" as const };
-  if (m.includes("comment"))
-    return { Icon: MessageSquare, iconClassName: "text-muted-foreground" as const };
-  return { Icon: Bell, iconClassName: "text-muted-foreground" as const };
+function notificationVisual(event: string) {
+  switch (event) {
+    case "COACH_APPROVED":
+    case "ADMIN_APPROVED":
+      return { Icon: CheckCircle2, iconClassName: "text-emerald-600" as const };
+    case "COACH_REJECTED":
+    case "ADMIN_REJECTED":
+      return { Icon: XCircle, iconClassName: "text-destructive" as const };
+    case "MARKED_PAID":
+      return { Icon: CircleDollarSign, iconClassName: "text-emerald-600" as const };
+    case "REQUEST_SUBMITTED":
+      return { Icon: FileText, iconClassName: "text-muted-foreground" as const };
+    default:
+      return { Icon: Bell, iconClassName: "text-muted-foreground" as const };
+  }
 }
 
 async function fetchNotificationsData() {
@@ -96,6 +103,29 @@ export function NotificationBell() {
 
   useEffect(() => {
     let cancelled = false;
+
+    async function poll() {
+      const data = await fetchNotificationsData().catch(() => null);
+      if (!cancelled && data) {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      }
+    }
+
+    // Fetch on mount and keep a low-frequency background poll running
+    // independent of the popover state, so the unread badge appears
+    // before the bell is ever opened.
+    void poll();
+    const backgroundInterval = setInterval(() => void poll(), 120_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(backgroundInterval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     if (!open) {
       return;
     }
@@ -108,6 +138,7 @@ export function NotificationBell() {
       }
     }
 
+    // Faster poll + relative-time refresh only while the popover is open.
     const fetchInterval = setInterval(() => void poll(), 30_000);
     const timeInterval = setInterval(() => setNowMs(Date.now()), 60_000);
 
@@ -164,9 +195,12 @@ export function NotificationBell() {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
+              role="status"
+              aria-live="polite"
+              aria-label={`${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`}
               className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px] font-semibold"
             >
-              {unreadCount > 99 ? "99+" : unreadCount}
+              <span aria-hidden>{unreadCount > 99 ? "99+" : unreadCount}</span>
             </Badge>
           )}
         </Button>
@@ -189,11 +223,11 @@ export function NotificationBell() {
                 if (!items?.length) return null;
                 return (
                   <div key={label}>
-                    <p className="bg-muted/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <h4 className="bg-muted/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {label}
-                    </p>
+                    </h4>
                     {items.map((n) => {
-                      const { Icon, iconClassName } = notificationVisual(n.message);
+                      const { Icon, iconClassName } = notificationVisual(n.event);
                       return (
                         <Button
                           key={n.id}
@@ -212,6 +246,7 @@ export function NotificationBell() {
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm leading-snug text-foreground line-clamp-2">
+                                {!n.read && <span className="sr-only">Unread: </span>}
                                 {n.message}
                               </p>
                               <p className="mt-0.5 text-xs text-muted-foreground">

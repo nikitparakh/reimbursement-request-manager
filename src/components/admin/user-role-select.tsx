@@ -45,8 +45,15 @@ export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {
         setRole(newRole);
         toast.success("Global role updated");
       } else {
-        toast.error("Could not update global role");
+        const detail = await readErrorMessage(res, "Could not update global role");
+        toast.error(
+          res.status === 403
+            ? "You do not have permission to change this role."
+            : detail,
+        );
       }
+    } catch {
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -70,4 +77,15 @@ export function UserRoleSelect({ userId, currentRole }: UserRoleSelectProps) {
       </SelectContent>
     </Select>
   );
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body) return fallback;
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

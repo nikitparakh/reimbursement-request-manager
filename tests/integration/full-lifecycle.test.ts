@@ -193,6 +193,17 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
       createdById: user.id,
       coachId: coach.id,
     });
+    // Seed parsed content so the request clears the submit content gate.
+    const rejectReceipt = await createReceipt({ requestId: req.id });
+    const rejectExtraction = await createExtraction({
+      receiptFileId: rejectReceipt.id,
+      total: 50,
+    });
+    await createLineItem({
+      receiptExtractionId: rejectExtraction.id,
+      lineTotal: 50,
+      position: 0,
+    });
 
     // Submit
     setMockUser({ id: user.id, email: user.email, role: "USER" });
@@ -305,6 +316,17 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
       teamId: team.id,
       createdById: user.id,
       coachId: coach.id,
+    });
+    // Seed parsed content so the request clears the submit content gate.
+    const adminRejectReceipt = await createReceipt({ requestId: req.id });
+    const adminRejectExtraction = await createExtraction({
+      receiptFileId: adminRejectReceipt.id,
+      total: 50,
+    });
+    await createLineItem({
+      receiptExtractionId: adminRejectExtraction.id,
+      lineTotal: 50,
+      position: 0,
     });
 
     // Submit

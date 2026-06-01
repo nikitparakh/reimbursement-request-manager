@@ -100,7 +100,7 @@ export default async function AdminInboxPage({
         description="Review submitted requests, approve, reject, or mark paid."
       />
 
-      {items.length === 0 && !cursor ? (
+      {items.length === 0 ? (
         <EmptyState
           title="No pending requests"
           description="All requests have been processed."
@@ -143,13 +143,16 @@ export default async function AdminInboxPage({
                       <EditableLineItems requestId={request.id} receipts={receiptsForEditor} canComment />
                     </CardContent>
                   )}
-                  <CardFooter>
-                    <ApprovalDecision
-                      requestId={request.id}
-                      endpoint={adminEndpoint(request.id)}
-                      allowMarkPaid={isCoachApproved}
-                    />
-                  </CardFooter>
+                  {isCoachApproved ? (
+                    <CardFooter>
+                      <ApprovalDecision
+                        requestId={request.id}
+                        endpoint={adminEndpoint(request.id)}
+                        showApproveReject
+                        allowMarkPaid={false}
+                      />
+                    </CardFooter>
+                  ) : null}
                 </Card>
               );
             })}

@@ -161,7 +161,7 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
     expect(status).toBe(404);
   });
 
-  it("wrong starting status → throws (assertTransition)", async () => {
+  it("wrong starting status → 409 (precondition)", async () => {
     const admin = await createUser({ role: "SUPER_ADMIN" });
     const user = await createUser({ role: "USER" });
     const team = await createTeam();
@@ -173,13 +173,14 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
 
     setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
-    await expect(
-      callRouteJSON(
-        POST,
-        { method: "POST", body: { decision: "APPROVE" } },
-        { requestId: req.id }
-      )
-    ).rejects.toThrow("Invalid status transition");
+    // An invalid/stale starting status now surfaces a friendly 409 instead of
+    // throwing an opaque 500 out of the route.
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+    expect(status).toBe(409);
   });
 
   it("nonexistent → 404", async () => {

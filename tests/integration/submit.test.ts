@@ -11,8 +11,37 @@ import {
   createTeam,
   createMembership,
   createRequest,
+  createReceipt,
+  createExtraction,
+  createLineItem,
 } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
+
+// Seed a request with one parsed receipt + a positive-total line item so it
+// clears the submit content gate (≥1 receipt, ≥1 extraction, requestedTotal>0).
+async function seedSubmittableContent(requestId: string) {
+  const receipt = await createReceipt({ requestId });
+  const extraction = await createExtraction({ receiptFileId: receipt.id });
+  await createLineItem({
+    receiptExtractionId: extraction.id,
+    lineTotal: 50,
+    position: 0,
+  });
+}
+
+// Seed an approved COACH on the team so a plain member's submission has a
+// review recipient. The submit route now blocks (409) a member submitting on a
+// coachless team with no scoped admins — a silent dead-letter the audit closed
+// — so the happy-path submit tests must give the team a coach to route to.
+async function seedTeamCoach(teamId: string) {
+  const coach = await createUser({ role: "USER" });
+  await createMembership({
+    userId: coach.id,
+    teamId,
+    roleInTeam: "COACH",
+  });
+  return coach;
+}
 
 describe("POST /api/requests/[requestId]/submit", () => {
   beforeEach(async () => {
@@ -32,6 +61,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
       teamId: team.id,
       createdById: user.id,
     });
+    await seedTeamCoach(team.id);
+    await seedSubmittableContent(req.id);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
@@ -53,6 +84,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
       teamId: team.id,
       createdById: user.id,
     });
+    await seedTeamCoach(team.id);
+    await seedSubmittableContent(req.id);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
@@ -72,6 +105,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
       teamId: team.id,
       createdById: user.id,
     });
+    await seedTeamCoach(team.id);
+    await seedSubmittableContent(req.id);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
@@ -102,7 +137,7 @@ describe("POST /api/requests/[requestId]/submit", () => {
     expect(status).toBe(404);
   });
 
-  it("already submitted → throws (assertTransition)", async () => {
+  it("already submitted → 409 (invalid transition)", async () => {
     const user = await createUser({ role: "USER" });
     const team = await createTeam();
     const req = await createRequest({
@@ -110,12 +145,18 @@ describe("POST /api/requests/[requestId]/submit", () => {
       createdById: user.id,
       status: "SUBMITTED",
     });
+    await seedSubmittableContent(req.id);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
-    await expect(
-      callRouteJSON(POST, { method: "POST" }, { requestId: req.id })
-    ).rejects.toThrow("Invalid status transition");
+    // Re-submitting an already-SUBMITTED request now surfaces a friendly 409
+    // instead of throwing an opaque 500 out of the route.
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST" },
+      { requestId: req.id }
+    );
+    expect(status).toBe(409);
   });
 
   it("nonexistent → 404", async () => {

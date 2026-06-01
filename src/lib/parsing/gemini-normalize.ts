@@ -7,6 +7,32 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 
+// Gemini output is untrusted: bound every string and array we persist so a
+// prompt-injected / malformed response can't bloat D1 or the generated PDF.
+const MAX_MERCHANT_LEN = 256;
+const MAX_DESCRIPTION_LEN = 512;
+const MAX_CATEGORY_LEN = 128;
+const MAX_CURRENCY_LEN = 8;
+const MAX_LINE_ITEMS = 500;
+const MAX_RAW_JSON_CHARS = 100_000;
+
+// Strip C0/C1 control characters (these are single-line display fields, so
+// any whitespace runs are collapsed too) and trim. Caps to maxLen.
+function sanitizeString(value: string, maxLen: number): string {
+  let out = "";
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    // Drop C0 (0x00-0x1F), DEL (0x7F), and C1 (0x80-0x9F) controls.
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      out += " ";
+    } else {
+      out += char;
+    }
+  }
+  const stripped = out.replace(/\s+/g, " ").trim();
+  return stripped.length > maxLen ? stripped.slice(0, maxLen) : stripped;
+}
+
 const VALID_DOCUMENT_TYPES = new Set([
   "RECEIPT",
   "INVOICE",
@@ -104,12 +130,20 @@ function toLineItem(value: unknown): NormalizedLineItem | null {
 
   if (!description && lineTotal === null) return null;
 
+  const safeDescription = sanitizeString(
+    description ?? "Unlabeled expense",
+    MAX_DESCRIPTION_LEN
+  ) || "Unlabeled expense";
+  const safeCategory = category
+    ? sanitizeString(category, MAX_CATEGORY_LEN) || null
+    : null;
+
   return normalizedLineItemSchema.parse({
-    description: description ?? "Unlabeled expense",
+    description: safeDescription,
     quantity,
     unitPrice,
     lineTotal,
-    category,
+    category: safeCategory,
   });
 }
 
@@ -259,7 +293,9 @@ export function normalizeGeminiPayload(payload: unknown, model: string) {
   const candidates = collectCandidates(payload);
   const selected = candidates.sort((left, right) => scoreCandidate(right) - scoreCandidate(left))[0];
   const source = selected ?? (isRecord(payload) ? payload : {});
-  const lineItems = collectLineItems(candidates);
+  // Cap the line-item array size — untrusted Gemini output could otherwise emit
+  // an unbounded list that bloats D1 and the generated PDF.
+  const lineItems = collectLineItems(candidates).slice(0, MAX_LINE_ITEMS);
 
   const selectedTax = toNumberOrNull(source.tax);
   const aggregatedTax = candidates.reduce(
@@ -278,23 +314,59 @@ export function normalizeGeminiPayload(payload: unknown, model: string) {
   const docType = normalizeDocumentType(source.documentType);
   const reconFlags = reconciliationFlags(docType, lineItems, subtotal, tax, total);
 
+  const merchant =
+    typeof source.merchant === "string"
+      ? sanitizeString(source.merchant, MAX_MERCHANT_LEN) || null
+      : null;
+  const currency =
+    typeof source.currency === "string" && source.currency.trim()
+      ? sanitizeString(source.currency, MAX_CURRENCY_LEN) || "USD"
+      : "USD";
+
+  // Bound the persisted raw payload. The full untrusted response can be large;
+  // store it as a truncated string blob when it would exceed the cap rather than
+  // persisting an unbounded object graph.
+  const rawResponse = boundRawPayload(payload);
+
   return normalizedReceiptSchema.parse({
     documentType: docType,
-    merchant: typeof source.merchant === "string" ? source.merchant : null,
+    merchant,
     receiptDate: toIsoDateOrNull(source.receiptDate),
     subtotal,
     tax,
     total,
-    currency: typeof source.currency === "string" && source.currency ? source.currency : "USD",
+    currency,
     confidence: toConfidenceOrNull(source.confidence) ?? 0.5,
     flags: [...toFlags(source.flags), ...reconFlags],
     lineItems,
     raw: {
       source: "gemini",
       model,
-      response: payload,
+      response: rawResponse,
       selected,
       candidateCount: candidates.length,
     },
   });
+}
+
+/**
+ * Bound the size of the raw Gemini payload before it is persisted. If the
+ * JSON-serialized form exceeds {@link MAX_RAW_JSON_CHARS}, store a truncated
+ * string marker instead of the full (untrusted, unbounded) object graph.
+ */
+function boundRawPayload(payload: unknown): unknown {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(payload) ?? "";
+  } catch {
+    return { truncated: true, reason: "unserializable" };
+  }
+  if (serialized.length <= MAX_RAW_JSON_CHARS) {
+    return payload;
+  }
+  return {
+    truncated: true,
+    originalLength: serialized.length,
+    preview: serialized.slice(0, MAX_RAW_JSON_CHARS),
+  };
 }

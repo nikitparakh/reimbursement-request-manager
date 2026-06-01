@@ -222,7 +222,7 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
     expect(status).toBe(404);
   });
 
-  it("non-SUBMITTED request → throws (assertTransition)", async () => {
+  it("non-SUBMITTED request → 409 (precondition)", async () => {
     const coach = await createUser({ role: "USER" });
     const user = await createUser({ role: "USER" });
     const team = await createTeam();
@@ -240,13 +240,14 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
 
     setMockUser({ id: coach.id, email: coach.email, role: "USER" });
 
-    await expect(
-      callRouteJSON(
-        POST,
-        { method: "POST", body: { decision: "APPROVE" } },
-        { requestId: req.id }
-      )
-    ).rejects.toThrow("Invalid status transition");
+    // A non-SUBMITTED (stale/invalid) starting status now surfaces a friendly
+    // 409 instead of throwing an opaque 500 out of the route.
+    const { status } = await callRouteJSON(
+      POST,
+      { method: "POST", body: { decision: "APPROVE" } },
+      { requestId: req.id }
+    );
+    expect(status).toBe(409);
   });
 
   it("nonexistent → 404", async () => {

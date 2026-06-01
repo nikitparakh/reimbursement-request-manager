@@ -136,7 +136,7 @@ export default async function CoachInboxPage({
         description="Review reimbursement requests submitted by your teams."
       />
 
-      {items.length === 0 && !cursor ? (
+      {items.length === 0 ? (
         <EmptyState
           title="No pending requests"
           description="There are no submitted requests awaiting your review."

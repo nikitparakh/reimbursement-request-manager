@@ -147,10 +147,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
     // Move the user off /onboarding into their workspace. router.refresh()
     // re-renders the server NavBar/layout so the now-populated access flags
     // (team membership just created) repopulate the nav instead of leaving the
-    // user stranded on an empty-nav onboarding page.
-    const destination =
-      data.roleIntent === "COACH" ? "/coach/team-overview" : "/team";
-    router.replace(destination);
+    // user stranded on an empty-nav onboarding page. Self-service onboarding is
+    // always a Parent/Mentor join, so the destination is the member workspace.
+    router.replace("/team");
     router.refresh();
   }
 
@@ -299,27 +298,9 @@ export function TeamSelector({ districts }: { districts: DistrictOption[] }) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="roleIntent"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Role</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="PARENT_MENTOR">Parent/Mentor</SelectItem>
-                  <SelectItem value="COACH">Coach</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Self-service onboarding joins as Parent/Mentor only. Coach access is
+            a privileged role granted by a scoped admin — it can't be
+            self-selected here (the API rejects a self-granted approved coach). */}
 
         <Button type="submit" disabled={!teamIdValue} loading={form.formState.isSubmitting}>
           Save

@@ -89,11 +89,23 @@ export async function POST(
     }),
   ]);
 
-  if (!school || !targetUser) {
+  // Run authorization before any existence lookups so this endpoint cannot be
+  // used as an existence oracle (probing user/school ids) by an authenticated
+  // but unprivileged caller. A super-admin may manage any school; otherwise the
+  // actor must be a scoped admin of the school named in the request body.
+  if (!school) {
+    if (!access.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (body.data.role === "PROGRAM_ADMIN" && !program) {
-    return NextResponse.json({ error: "Program not found" }, { status: 404 });
+  if (!canManageScopeRole(access, body.data.role, school)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Only privileged callers reach here; existence checks no longer leak.
+  if (!targetUser) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (body.data.role === "PROGRAM_ADMIN" && !body.data.programId) {
     return NextResponse.json(
@@ -101,8 +113,8 @@ export async function POST(
       { status: 400 }
     );
   }
-  if (!canManageScopeRole(access, body.data.role, school)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (body.data.role === "PROGRAM_ADMIN" && !program) {
+    return NextResponse.json({ error: "Program not found" }, { status: 404 });
   }
 
   const scopeKey = buildUserScopeRoleKey({
@@ -199,7 +211,13 @@ export async function DELETE(
     }),
   ]);
 
+  // Authorize before surfacing existence so a non-privileged caller cannot
+  // probe scope ids. A non-super-admin who cannot manage the scope (or any
+  // request where the scope is missing/unreadable) gets a uniform 403.
   if (!scope || scope.userId !== id || !scope.school) {
+    if (!access.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (scope.role !== "SCHOOL_ADMIN" && scope.role !== "PROGRAM_ADMIN") {

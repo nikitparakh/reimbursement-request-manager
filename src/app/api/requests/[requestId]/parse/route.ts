@@ -31,14 +31,24 @@ export async function POST(
     );
   }
 
-  const receiptsToProcess = await db.query.receiptFiles.findMany({
-    where: and(
-      eq(receiptFiles.requestId, requestId),
-      inArray(receiptFiles.parseStatus, ["QUEUED", "FAILED"])
-    ),
-  });
+  // Idempotent, stampede-safe claim: atomically flip QUEUED/FAILED receipts to
+  // PROCESSING and only act on the rows THIS request actually claimed. Rows
+  // already PROCESSING (a concurrent/retried parse) are left alone, so we never
+  // re-enqueue them or fire duplicate Gemini calls.
+  const receiptsToProcess = await db
+    .update(receiptFiles)
+    .set({ parseStatus: "PROCESSING" })
+    .where(
+      and(
+        eq(receiptFiles.requestId, requestId),
+        inArray(receiptFiles.parseStatus, ["QUEUED", "FAILED"])
+      )
+    )
+    .returning();
 
   if (receiptsToProcess.length === 0) {
+    // Either nothing to parse, or a concurrent request already claimed every
+    // pending receipt — treat as a no-op rather than re-parsing PROCESSING rows.
     return NextResponse.json({ queued: 0 });
   }
 
@@ -46,11 +56,30 @@ export async function POST(
   // client connection). The frontend polls receiptFile.parseStatus.
   const queue = getReceiptQueue();
   if (queue) {
-    await queue.sendBatch(
-      receiptsToProcess.map((receipt) => ({
-        body: { receiptFileId: receipt.id, requestId },
-      }))
-    );
+    try {
+      await queue.sendBatch(
+        receiptsToProcess.map((receipt) => ({
+          body: { receiptFileId: receipt.id, requestId },
+        }))
+      );
+    } catch (error) {
+      // Enqueue failed after we claimed the rows: release them back to QUEUED so
+      // they aren't stranded in PROCESSING with no consumer to advance them.
+      console.error("[parse] failed to enqueue claimed receipts", error);
+      await db
+        .update(receiptFiles)
+        .set({ parseStatus: "QUEUED" })
+        .where(
+          inArray(
+            receiptFiles.id,
+            receiptsToProcess.map((receipt) => receipt.id)
+          )
+        );
+      return NextResponse.json(
+        { error: "Could not start parsing. Please try again." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { queued: receiptsToProcess.length, async: true },
       { status: 202 }

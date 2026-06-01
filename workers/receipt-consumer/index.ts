@@ -36,24 +36,40 @@ const handler = {
       aiModel: env.GOOGLE_AI_MODEL,
     };
 
-    const requestIds = new Set<string>();
+    // Track each request's messages so ack/retry can be decided AFTER the
+    // recompute step — otherwise a recompute failure on an already-ack'd message
+    // would silently strand a stale (often $0) requestedTotal with no retry.
+    const messagesByRequest = new Map<
+      string,
+      Array<Message<ReceiptParseMessage>>
+    >();
     for (const message of batch.messages) {
       try {
         await processReceipt(message.body.receiptFileId, ctx);
-        requestIds.add(message.body.requestId);
-        message.ack();
+        const { requestId } = message.body;
+        const group = messagesByRequest.get(requestId) ?? [];
+        group.push(message);
+        messagesByRequest.set(requestId, group);
       } catch (error) {
         console.error("[queue] receipt parse failed", message.body, error);
         message.retry();
       }
     }
 
-    // Recompute each affected request's total once per batch.
-    for (const requestId of requestIds) {
+    // Recompute each affected request's total once per batch. Only ack the
+    // request's messages once its recompute succeeds; on failure, retry them so
+    // the total is reconciled on redelivery instead of being lost.
+    for (const [requestId, messages] of messagesByRequest) {
       try {
         await recomputeRequestTotal(requestId, ctx);
+        for (const message of messages) {
+          message.ack();
+        }
       } catch (error) {
         console.error("[queue] total recompute failed", requestId, error);
+        for (const message of messages) {
+          message.retry();
+        }
       }
     }
   },

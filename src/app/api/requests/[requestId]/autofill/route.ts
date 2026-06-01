@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { reimbursementRequests } from "@/db/schema";
+import { reimbursementRequests, receiptFiles } from "@/db/schema";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { requireUser } from "@/lib/rbac";
+import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 export async function POST(
   _request: Request,
@@ -17,20 +18,26 @@ export async function POST(
   }
 
   const { requestId } = await params;
-  const requestRecord = await db.query.reimbursementRequests.findFirst({
-    where: eq(reimbursementRequests.id, requestId),
-    with: {
-      receiptFiles: {
-        with: { extraction: { with: { lineItems: true } } },
-      },
-    },
-  });
 
-  if (!requestRecord || requestRecord.createdById !== userId) {
+  // Authorize through getRequestAccess, then gate on a writable (DRAFT) state so
+  // auto-fill can never overwrite the pinned total on an approved/paid request.
+  const requestAccess = await getRequestAccess(userId, requestId);
+  if (!requestAccess || requestAccess.request.createdById !== userId) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
   }
+  if (!requestAccess.canEditDraft) {
+    return NextResponse.json(
+      { error: "This request can no longer be auto-filled." },
+      { status: 409 }
+    );
+  }
 
-  const pendingParses = requestRecord.receiptFiles.filter(
+  const files = await db.query.receiptFiles.findMany({
+    where: eq(receiptFiles.requestId, requestId),
+    with: { extraction: { with: { lineItems: true } } },
+  });
+
+  const pendingParses = files.filter(
     (item) => item.parseStatus === "QUEUED" || item.parseStatus === "PROCESSING"
   );
   if (pendingParses.length > 0) {
@@ -43,7 +50,7 @@ export async function POST(
     );
   }
 
-  const extractions = requestRecord.receiptFiles
+  const extractions = files
     .map((item) => item.extraction)
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
   const total = aggregateReimbursableTotals(extractions);

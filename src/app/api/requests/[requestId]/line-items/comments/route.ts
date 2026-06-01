@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { lineItemComments, receiptLineItems, users } from "@/db/schema";
+import { lineItemComments, receiptLineItems, reimbursementRequests, users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
@@ -52,6 +52,20 @@ export async function POST(
   });
   if (!lineItem || lineItem.receiptExtraction.receiptFile.requestId !== requestId) {
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
+  }
+
+  // Re-check the request status in the insert path to avoid a TOCTOU where a
+  // concurrent approval moves the request out of a commentable state between the
+  // access read above and the insert below.
+  const fresh = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    columns: { status: true },
+  });
+  if (!fresh || fresh.status !== requestAccess.request.status) {
+    return NextResponse.json(
+      { error: "Comments are only allowed during review" },
+      { status: 409 }
+    );
   }
 
   const [comment] = await db

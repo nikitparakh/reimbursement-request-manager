@@ -20,6 +20,19 @@ function getAdminAssignments(context: AccessContext) {
 
 /** Drizzle condition on the `teams` table for a single admin assignment. */
 function buildTeamCondition(assignment: ScopedRoleAssignment): SQL | undefined {
+  // A program-scope with no school/district/team bound must NOT match teams in
+  // every school/district (program and school/district are independent on a
+  // team). Without a school/district/team anchor, a program-only admin has no
+  // authority, so deny rather than silently authorize cross-tenant action.
+  if (
+    assignment.programId &&
+    !assignment.schoolId &&
+    !assignment.districtId &&
+    !assignment.teamId
+  ) {
+    return MATCH_NONE;
+  }
+
   const parts: (SQL | undefined)[] = [];
 
   if (assignment.teamId) {
@@ -63,6 +76,15 @@ export function buildManagedTeamRegistrationWhere(
 
   const conditions = getAdminAssignments(context)
     .map((assignment) => {
+      // A program-scope with no school/district anchor must not match
+      // registration requests across every school/district.
+      if (
+        assignment.programId &&
+        !assignment.schoolId &&
+        !assignment.districtId
+      ) {
+        return MATCH_NONE;
+      }
       const parts: (SQL | undefined)[] = [];
       if (assignment.districtId) {
         parts.push(eq(teamRegistrationRequests.districtId, assignment.districtId));

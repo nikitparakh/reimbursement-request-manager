@@ -17,7 +17,18 @@ import {
  */
 const money = customType<{ data: number; driverData: number }>({
   dataType: () => "integer",
-  toDriver: (value) => Math.round(value * 100),
+  // Deterministic dollars -> cents. Reject non-finite values (NaN/Infinity)
+  // rather than silently coercing them to 0, which would corrupt totals.
+  // Negative values are intentionally allowed (line items carry negative
+  // discounts), so we do NOT floor at 0 here.
+  toDriver: (value) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error("Invalid money value: expected a finite number");
+    }
+    // toFixed(2) before rounding keeps the dollars<->cents conversion
+    // deterministic and avoids binary floating-point drift.
+    return Math.round(Number(value.toFixed(2)) * 100);
+  },
   fromDriver: (value) => value / 100,
 });
 

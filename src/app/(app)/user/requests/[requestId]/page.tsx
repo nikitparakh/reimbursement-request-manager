@@ -233,6 +233,7 @@ export default async function UserRequestDetailPage({
                 parseStatuses={Object.fromEntries(
                   requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus])
                 )}
+                requestId={requestRecord.id}
               />
             </ReceiptPollingWrapper>
           </CardContent>
@@ -264,6 +265,7 @@ export default async function UserRequestDetailPage({
                 <ExtractionReview
                   receipts={receiptsWithExtractions}
                   parseStatuses={Object.fromEntries(requestRecord.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+                  requestId={requestRecord.id}
                 />
               </ReceiptPollingWrapper>
             )}

@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { teamMemberships, teams, userScopeRoles } from "@/db/schema";
+import {
+  reimbursementRequests,
+  teamMemberships,
+  teams,
+  userScopeRoles,
+} from "@/db/schema";
 import { canManageTeams, getAccessContext } from "@/lib/access";
 import { requireUser } from "@/lib/rbac";
+
+// Non-terminal statuses where an unresolved request still depends on its
+// coach/creator. DRAFT is included because removing the author orphans an
+// in-progress draft.
+const OPEN_REQUEST_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "COACH_APPROVED",
+  "ADMIN_APPROVED",
+] as const;
 
 export async function DELETE(
   _request: Request,
@@ -58,6 +73,54 @@ export async function DELETE(
     })
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Refuse to remove the team's only *approved* COACH: a coachless team
+  // silently drops submission notifications and leaves new requests with
+  // coachId=null. A pending (approved=false) coach self-join is not an approved
+  // coach, so removing it is always allowed.
+  if (membership.roleInTeam === "COACH" && membership.approved) {
+    const coachCount = await db.$count(
+      teamMemberships,
+      and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.roleInTeam, "COACH"),
+        eq(teamMemberships.approved, true),
+      ),
+    );
+    if (coachCount <= 1) {
+      return NextResponse.json(
+        {
+          error:
+            "This is the team's only coach. Add a replacement coach before removing them.",
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  // Block removal while the member is the coach or creator of an open,
+  // in-flight request — otherwise the request is orphaned (loses its coach
+  // or author with no reassignment).
+  const openRequest = await db.query.reimbursementRequests.findFirst({
+    where: and(
+      eq(reimbursementRequests.teamId, teamId),
+      inArray(reimbursementRequests.status, OPEN_REQUEST_STATUSES),
+      or(
+        eq(reimbursementRequests.coachId, membership.userId),
+        eq(reimbursementRequests.createdById, membership.userId),
+      ),
+    ),
+    columns: { id: true },
+  });
+  if (openRequest) {
+    return NextResponse.json(
+      {
+        error:
+          "This member has open reimbursement requests (as coach or creator). Reassign the coach or resolve those requests before removing them.",
+      },
+      { status: 409 },
+    );
   }
 
   await db.batch([

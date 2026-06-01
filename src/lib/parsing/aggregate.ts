@@ -18,14 +18,19 @@ export function aggregateReimbursableTotals(extractions: ExtractionForTotals[]) 
   const totals = extractions
     .filter((item) => allowed.has(item.documentType))
     .map((item) => {
-      // Always use line item totals — excludes tax, reflects user edits
+      // Always use line item totals — excludes tax, reflects user edits.
+      // Non-finite line totals are treated as 0 so a single bad value cannot
+      // drive the reimbursable total to NaN. Negative discounts are preserved.
       const lineItemTotal =
         item.lineItems
           ?.filter((line) => !line.excludedAt)
           .map((line) => toNumber(line.lineTotal) ?? 0)
           .reduce((sum, amount) => sum + amount, 0) ?? 0;
-      return lineItemTotal;
+      return Number.isFinite(lineItemTotal) ? lineItemTotal : 0;
     });
 
-  return Number(totals.reduce((sum, value) => sum + value, 0).toFixed(2));
+  const total = totals.reduce((sum, value) => sum + value, 0);
+  // Keep rounding deterministic (toFixed(2) then a single Number parse) and
+  // never return a non-finite total.
+  return Number.isFinite(total) ? Number(total.toFixed(2)) : 0;
 }

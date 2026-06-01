@@ -35,12 +35,21 @@ export async function POST(
     );
   }
 
-  const updated = await transitionRequestStatus({
-    requestId,
-    actorId: userId,
-    nextStatus: "DRAFT",
-    action: "REOPEN",
-  });
+  let updated;
+  try {
+    updated = await transitionRequestStatus({
+      requestId,
+      actorId: userId,
+      nextStatus: "DRAFT",
+      action: "REOPEN",
+    });
+  } catch {
+    // Stale/concurrent transition (STALE_TRANSITION) or invalid transition.
+    return NextResponse.json(
+      { error: "This request has already been updated. Please refresh." },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json(updated);
 }

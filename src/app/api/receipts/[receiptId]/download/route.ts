@@ -42,10 +42,31 @@ export async function GET(
 
   const bytes = await readStoredObject(receipt.storageUrl);
 
+  // Only serve a content type from a known-safe allowlist; anything else (e.g.
+  // an uploaded text/html or image/svg+xml) is downgraded to a generic binary
+  // type so the browser can't render it inline as same-origin active content.
+  const SAFE_CONTENT_TYPES = new Set([
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+  ]);
+  const contentType = SAFE_CONTENT_TYPES.has(receipt.mimeType)
+    ? receipt.mimeType
+    : "application/octet-stream";
+
+  // RFC 5987-encode the filename, and keep an ASCII-only fallback for older
+  // clients. Strip control chars / quotes from the fallback defensively.
+  const asciiFallback = receipt.fileName.replace(/["\\\r\n]/g, "_");
+  const encodedFilename = encodeURIComponent(receipt.fileName);
+
   return new NextResponse(Buffer.from(bytes), {
     headers: {
-      "Content-Type": receipt.mimeType,
-      "Content-Disposition": `inline; filename="${receipt.fileName}"`,
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`,
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
     },
   });
 }

@@ -30,7 +30,7 @@ export default function ErrorPage({
           </div>
           <CardTitle className="text-xl">Something went wrong</CardTitle>
           <CardDescription>
-            {error.message || "An unexpected error occurred. You can try again or return home."}
+            An unexpected error occurred. You can try again or return home.
           </CardDescription>
         </CardHeader>
         {error.digest ? (

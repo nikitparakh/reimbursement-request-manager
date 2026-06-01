@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,14 @@ export function EditableLineItems({
   });
 
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Last value successfully persisted (or initially loaded) per row, so a
+  // failed save can revert the optimistic edit instead of keeping stale state.
+  const lastSavedRows = useRef<Map<string, EditableRow>>(new Map());
+  if (lastSavedRows.current.size === 0) {
+    for (const rows of receiptRows.values()) {
+      for (const row of rows) lastSavedRows.current.set(row.id, row);
+    }
+  }
 
   useEffect(() => {
     const timers = debounceTimers.current;
@@ -118,18 +127,80 @@ export function EditableLineItems({
 
   const saveLineItem = useCallback(
     async (row: EditableRow) => {
-      await fetch(`/api/requests/${requestId}/line-items`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lineItemId: row.id,
-          description: row.description,
-          quantity: row.quantity ? parseFloat(row.quantity) : null,
-          unitPrice: row.unitPrice ? parseFloat(row.unitPrice) : null,
-          lineTotal: row.lineTotal ? parseFloat(row.lineTotal) : null,
-          category: row.category || null,
-        }),
-      });
+      // Restore a row to its last-saved value after a failed save, so the
+      // optimistic edit (and the live total derived from it) is reconciled
+      // back to what the server actually holds.
+      const revertRow = (rowId: string) => {
+        const saved = lastSavedRows.current.get(rowId);
+        setReceiptRows((prev) => {
+          const next = new Map(prev);
+          for (const [extractionId, rows] of next) {
+            const idx = rows.findIndex((r) => r.id === rowId);
+            if (idx === -1) continue;
+            const restored = [...rows];
+            restored[idx] = saved ?? restored[idx];
+            next.set(extractionId, restored);
+            return next;
+          }
+          return prev;
+        });
+      };
+      // Apply the server's authoritative lineTotal to a row so the live total
+      // reflects persisted state rather than a stale optimistic value.
+      const reconcileRowTotal = (rowId: string, lineTotal: string) => {
+        setReceiptRows((prev) => {
+          const next = new Map(prev);
+          for (const [extractionId, rows] of next) {
+            const idx = rows.findIndex((r) => r.id === rowId);
+            if (idx === -1) continue;
+            const reconciled = [...rows];
+            reconciled[idx] = { ...reconciled[idx], lineTotal };
+            next.set(extractionId, reconciled);
+            return next;
+          }
+          return prev;
+        });
+      };
+
+      try {
+        const res = await fetch(`/api/requests/${requestId}/line-items`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lineItemId: row.id,
+            description: row.description,
+            quantity: row.quantity ? parseFloat(row.quantity) : null,
+            unitPrice: row.unitPrice ? parseFloat(row.unitPrice) : null,
+            lineTotal: row.lineTotal ? parseFloat(row.lineTotal) : null,
+            category: row.category || null,
+          }),
+        });
+        if (!res.ok) {
+          revertRow(row.id);
+          toast.error("Couldn't save that change. Reverted to the last saved value.");
+          return;
+        }
+        // Persisted successfully — this is now the value to revert to next time.
+        lastSavedRows.current.set(row.id, row);
+        // Reconcile the live total from the server's authoritative row rather
+        // than trusting the optimistic local value.
+        const updated = (await res.json().catch(() => null)) as {
+          lineTotal?: number | null;
+        } | null;
+        if (updated && "lineTotal" in updated) {
+          const serverTotal =
+            updated.lineTotal === null || updated.lineTotal === undefined
+              ? ""
+              : String(updated.lineTotal);
+          if (serverTotal !== row.lineTotal) {
+            reconcileRowTotal(row.id, serverTotal);
+            lastSavedRows.current.set(row.id, { ...row, lineTotal: serverTotal });
+          }
+        }
+      } catch {
+        revertRow(row.id);
+        toast.error("Couldn't save that change. Check your connection and try again.");
+      }
     },
     [requestId],
   );
@@ -157,9 +228,18 @@ export function EditableLineItems({
       if (idx === -1) return prev;
       const updated = { ...rows[idx], [field]: value };
       if (field === "quantity" || field === "unitPrice") {
-        const qty = parseNum(updated.quantity);
-        const price = parseNum(updated.unitPrice);
-        updated.lineTotal = (qty * price).toFixed(2);
+        const existingTotal = parseNum(updated.lineTotal);
+        const hasQty = updated.quantity.trim() !== "";
+        const hasPrice = updated.unitPrice.trim() !== "";
+        // Only auto-derive lineTotal from qty*price when we have both inputs
+        // and we wouldn't be clobbering a negative (discount/credit) total.
+        // Discounts come back with a negative lineTotal and no unit price;
+        // recomputing qty*price (price → 0) would silently destroy the credit.
+        if (hasQty && hasPrice && existingTotal >= 0) {
+          const qty = parseNum(updated.quantity);
+          const price = parseNum(updated.unitPrice);
+          updated.lineTotal = (qty * price).toFixed(2);
+        }
       }
       rows[idx] = updated;
       next.set(extractionId, rows);
@@ -473,7 +553,6 @@ export function EditableLineItems({
                             onBlur={() =>
                               row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
                             }
-                            min={0}
                             step={0.01}
                           />
                         </TableCell>
@@ -654,7 +733,6 @@ export function EditableLineItems({
                           onBlur={() =>
                             row.isNew && row.description.trim() ? void saveNewRow(ext.id, row.id) : undefined
                           }
-                          min={0}
                           step={0.01}
                         />
                       </div>

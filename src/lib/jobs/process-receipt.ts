@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { db as defaultDb, type DB } from "@/lib/db";
 import {
   receiptExtractions,
@@ -86,29 +87,47 @@ export async function processReceipt(
       category: item.category,
     }));
 
-    // D1 has no interactive transactions: upsert the extraction first (we need
-    // its id), then apply the dependent writes atomically with db.batch().
-    const [extraction] = await db
-      .insert(receiptExtractions)
-      .values({
-        receiptFileId: file.id,
-        ...extractionData,
-      })
-      .onConflictDoUpdate({
-        target: receiptExtractions.receiptFileId,
-        set: extractionData,
-      })
-      .returning();
+    // Preserve reviewer exclusions and user edits across a re-parse. Look up the
+    // existing extraction (if any) and its current line items; if a human has
+    // already excluded items (excludedAt/excludedById) or edited rows exist, we
+    // MUST NOT blow them away — only seed line items when none exist yet.
+    const existingExtraction = await db.query.receiptExtractions.findFirst({
+      where: eq(receiptExtractions.receiptFileId, file.id),
+      with: { lineItems: true },
+    });
+
+    const existingLineItems = existingExtraction?.lineItems ?? [];
+    const hasHumanEdits = existingLineItems.some(
+      (item) => item.excludedAt !== null || item.excludedById !== null
+    );
+    // Only (re)seed line items from the AI extraction when there are none yet.
+    // Once any line items exist — and especially once a reviewer has excluded
+    // or edited them — we keep the existing rows untouched.
+    const shouldSeedLineItems =
+      existingLineItems.length === 0 && !hasHumanEdits;
+
+    // Use an app-side id so the extraction upsert can be folded into the same
+    // atomic db.batch() as the dependent line-item / status writes (D1 has no
+    // interactive transactions).
+    const extractionId = existingExtraction?.id ?? nanoid();
 
     await db.batch([
       db
-        .delete(receiptLineItems)
-        .where(eq(receiptLineItems.receiptExtractionId, extraction.id)),
-      ...(lineItemRows.length > 0
+        .insert(receiptExtractions)
+        .values({
+          id: extractionId,
+          receiptFileId: file.id,
+          ...extractionData,
+        })
+        .onConflictDoUpdate({
+          target: receiptExtractions.receiptFileId,
+          set: extractionData,
+        }),
+      ...(shouldSeedLineItems && lineItemRows.length > 0
         ? [
             db.insert(receiptLineItems).values(
               lineItemRows.map((item) => ({
-                receiptExtractionId: extraction.id,
+                receiptExtractionId: extractionId,
                 ...item,
               })),
             ),
@@ -150,7 +169,11 @@ export async function recomputeRequestTotal(
 
   if (!request) return;
 
+  // Only sum extractions whose receipt finished parsing (parseStatus === DONE).
+  // Receipts still QUEUED/PROCESSING/FAILED may carry stale or partially-written
+  // line items; including them would fold a stale total into requestedTotal.
   const extractions = request.receiptFiles
+    .filter((f) => f.parseStatus === "DONE")
     .map((f) => f.extraction)
     .filter((e): e is NonNullable<typeof e> => Boolean(e));
   const total = aggregateReimbursableTotals(extractions);

@@ -9,6 +9,15 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -51,6 +60,9 @@ export function ApprovalDecision({
 }) {
   const router = useRouter();
   const [markPaidBusy, setMarkPaidBusy] = useState(false);
+  const [decided, setDecided] = useState(false);
+  const [decisionResult, setDecisionResult] = useState<string | null>(null);
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
 
   const form = useForm<ApprovalDecisionFormValues>({
     resolver: zodResolver(approvalDecisionSchema),
@@ -87,12 +99,26 @@ export function ApprovalDecision({
     }
 
     form.clearErrors("comment");
+    setDecided(true);
+    const resultLabel =
+      decision === "APPROVE"
+        ? "Request approved."
+        : decision === "REJECT"
+          ? "Request rejected."
+          : "Request marked as paid.";
+    setDecisionResult(resultLabel);
     toast.success("Decision recorded.");
     router.refresh();
   }
 
   async function onSubmit(values: ApprovalDecisionFormValues) {
     await postDecision(values.decision, values.comment ?? "");
+  }
+
+  function confirmReject() {
+    setRejectConfirmOpen(false);
+    form.setValue("decision", "REJECT");
+    void form.handleSubmit(onSubmit)();
   }
 
   async function handleMarkPaid() {
@@ -120,7 +146,7 @@ export function ApprovalDecision({
                   id={`comment-${requestId}`}
                   placeholder="Add a comment..."
                   rows={2}
-                  disabled={busy}
+                  disabled={busy || decided}
                 />
               </FormControl>
               <FormDescription>
@@ -138,7 +164,7 @@ export function ApprovalDecision({
                 size="sm"
                 type="button"
                 loading={busy}
-                disabled={busy}
+                disabled={busy || decided}
                 onClick={() => {
                   form.setValue("decision", "APPROVE");
                   void form.handleSubmit(onSubmit)();
@@ -152,10 +178,12 @@ export function ApprovalDecision({
                 type="button"
                 className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
                 loading={busy}
-                disabled={busy}
+                disabled={busy || decided}
                 onClick={() => {
                   form.setValue("decision", "REJECT");
-                  void form.handleSubmit(onSubmit)();
+                  void form.trigger().then((valid) => {
+                    if (valid) setRejectConfirmOpen(true);
+                  });
                 }}
               >
                 Reject
@@ -168,14 +196,41 @@ export function ApprovalDecision({
               size="sm"
               type="button"
               loading={markPaidBusy}
-              disabled={form.formState.isSubmitting || markPaidBusy}
+              disabled={form.formState.isSubmitting || markPaidBusy || decided}
               onClick={() => void handleMarkPaid()}
             >
               Mark Paid
             </Button>
           ) : null}
         </div>
+        <p className="sr-only" role="status" aria-live="polite">
+          {decisionResult ?? ""}
+        </p>
       </form>
+      <AlertDialog open={rejectConfirmOpen} onOpenChange={setRejectConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject this request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The requester will be notified and the request will be sent back.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
+              loading={busy}
+              disabled={busy}
+              onClick={confirmReject}
+            >
+              Reject
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Form>
   );
 }

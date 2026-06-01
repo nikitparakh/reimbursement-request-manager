@@ -72,6 +72,12 @@ export async function POST(request: Request) {
   }
 
   const membershipRole = body.data.roleIntent === "COACH" ? "COACH" : "PARENT_MENTOR";
+  // Self-service onboarding may never self-grant privileged (COACH) access. A
+  // PARENT_MENTOR self-join is approved immediately; a COACH self-join is
+  // created pending (approved=false) until a scoped admin confirms it. This
+  // prevents a new user from making themselves an approved coach of any team
+  // and approving/rejecting that team's reimbursements.
+  const membershipApproved = membershipRole !== "COACH";
 
   try {
     // D1 has no interactive transactions: apply both writes atomically with
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
           userId,
           teamId: body.data.teamId,
           roleInTeam: membershipRole,
-          approved: true,
+          approved: membershipApproved,
         })
         .onConflictDoUpdate({
           target: [
@@ -91,7 +97,9 @@ export async function POST(request: Request) {
             teamMemberships.teamId,
             teamMemberships.roleInTeam,
           ],
-          set: { approved: true },
+          // Never escalate an existing membership to approved via a COACH
+          // self-join; only PARENT_MENTOR self-joins may set approved=true.
+          set: { approved: membershipApproved },
         })
         .returning(),
       db

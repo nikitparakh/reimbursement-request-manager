@@ -34,6 +34,36 @@ const formSchema = z.object({
 type TeamOption = { id: string; name: string };
 type RequestFormValues = z.infer<typeof formSchema>;
 
+const FALLBACK_ERROR = "Failed to create request";
+
+/**
+ * Surface server error payloads that may be a plain string or a zod
+ * `flatten()` object ({ formErrors, fieldErrors }), instead of silently
+ * dropping the object form to a generic message.
+ */
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error || FALLBACK_ERROR;
+  if (error && typeof error === "object") {
+    const flat = error as {
+      formErrors?: unknown;
+      fieldErrors?: Record<string, unknown>;
+    };
+    if (Array.isArray(flat.formErrors)) {
+      const first = flat.formErrors.find((m): m is string => typeof m === "string");
+      if (first) return first;
+    }
+    if (flat.fieldErrors && typeof flat.fieldErrors === "object") {
+      for (const messages of Object.values(flat.fieldErrors)) {
+        if (Array.isArray(messages)) {
+          const first = messages.find((m): m is string => typeof m === "string");
+          if (first) return first;
+        }
+      }
+    }
+  }
+  return FALLBACK_ERROR;
+}
+
 export function RequestForm({ teams }: { teams: TeamOption[] }) {
   const router = useRouter();
   const form = useForm<RequestFormValues>({
@@ -57,10 +87,7 @@ export function RequestForm({ teams }: { teams: TeamOption[] }) {
         id?: string;
       };
       if (!response.ok) {
-        const msg =
-          typeof payload.error === "string"
-            ? payload.error
-            : "Failed to create request";
+        const msg = extractErrorMessage(payload.error);
         toast.error(msg);
         return;
       }

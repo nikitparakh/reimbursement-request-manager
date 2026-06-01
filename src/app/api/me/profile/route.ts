@@ -5,15 +5,42 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
-const profileSchema = z.object({
-  mailingAddressLine1: z.string().trim().max(120).nullish(),
-  mailingAddressLine2: z.string().trim().max(120).nullish(),
-  mailingCity: z.string().trim().max(80).nullish(),
-  mailingState: z.string().trim().max(40).nullish(),
-  mailingPostalCode: z.string().trim().max(20).nullish(),
-  zelleType: z.enum(["email", "phone"]).nullish(),
-  zelleValue: z.string().trim().max(120).nullish(),
-});
+// Allows common phone formats: digits with optional +, spaces, dashes, dots,
+// and parentheses; 7-15 digits (E.164 max is 15). Non-enforcing input type='tel'
+// is only a browser hint, so the destination is validated here too.
+const PHONE_REGEX = /^\+?[0-9][0-9().\-\s]{5,19}$/;
+
+const profileSchema = z
+  .object({
+    mailingAddressLine1: z.string().trim().max(120).nullish(),
+    mailingAddressLine2: z.string().trim().max(120).nullish(),
+    mailingCity: z.string().trim().max(80).nullish(),
+    mailingState: z.string().trim().max(40).nullish(),
+    mailingPostalCode: z.string().trim().max(20).nullish(),
+    zelleType: z.enum(["email", "phone"]).nullish(),
+    zelleValue: z.string().trim().max(120).nullish(),
+  })
+  .superRefine((data, ctx) => {
+    const value = data.zelleValue?.trim();
+    if (!data.zelleType || !value) return;
+    if (data.zelleType === "email") {
+      if (!z.string().email().safeParse(value).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid email address for the Zelle destination",
+          path: ["zelleValue"],
+        });
+      }
+    } else if (data.zelleType === "phone") {
+      if (!PHONE_REGEX.test(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid phone number for the Zelle destination",
+          path: ["zelleValue"],
+        });
+      }
+    }
+  });
 
 function normalizeOptional(value: string | null | undefined) {
   const trimmed = value?.trim();

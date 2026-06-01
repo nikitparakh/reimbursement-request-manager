@@ -5,15 +5,25 @@ import { db } from "@/lib/db";
 import { schools, programs, teamRegistrationRequests } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
+const optionalText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : null;
+    });
+
 const schema = z.object({
   districtId: z.string().min(1),
   schoolId: z.string().min(1),
   programId: z.string().min(1),
   teamName: z.string().min(2),
-  shortCode: z.string().max(12).optional(),
-  glAccount: z.string().max(30).optional(),
+  shortCode: optionalText(12),
+  glAccount: optionalText(30),
   fllDivision: z.enum(["DISCOVER", "EXPLORE", "CHALLENGE"]).optional(),
-  notes: z.string().max(500).optional(),
+  notes: optionalText(500),
 });
 
 export async function POST(request: Request) {
@@ -65,7 +75,7 @@ export async function POST(request: Request) {
       districtId: body.data.districtId,
       schoolId: body.data.schoolId,
       programId: body.data.programId,
-      teamName: body.data.teamName,
+      teamName: body.data.teamName.trim(),
       shortCode: body.data.shortCode,
       glAccount: body.data.glAccount,
       fllDivision: body.data.fllDivision,

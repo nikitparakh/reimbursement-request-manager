@@ -29,6 +29,10 @@ import { formatDate } from "@/lib/format";
 
 const ZELLE_NONE = "__none__";
 
+// Mirrors the server-side phone validation in src/app/api/me/profile/route.ts.
+// Allows digits with optional +, spaces, dashes, dots, and parentheses (7-15 digits).
+const PHONE_REGEX = /^\+?[0-9][0-9().\-\s]{5,19}$/;
+
 const profileFormSchema = z
   .object({
     mailingAddressLine1: z.string().trim().max(120, "Must be at most 120 characters"),
@@ -41,7 +45,8 @@ const profileFormSchema = z
   })
   .superRefine((data, ctx) => {
     const hasType = data.zelleType !== "";
-    const hasValue = data.zelleValue.trim().length > 0;
+    const value = data.zelleValue.trim();
+    const hasValue = value.length > 0;
     if (hasType && !hasValue) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -54,6 +59,20 @@ const profileFormSchema = z
         message: "Select a Zelle type",
         path: ["zelleType"],
       });
+    } else if (hasType && hasValue) {
+      if (data.zelleType === "email" && !z.string().email().safeParse(value).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid email address for the Zelle destination",
+          path: ["zelleValue"],
+        });
+      } else if (data.zelleType === "phone" && !PHONE_REGEX.test(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid phone number for the Zelle destination",
+          path: ["zelleValue"],
+        });
+      }
     }
   });
 
