@@ -3,7 +3,7 @@ import type {
   GlobalRole,
   ScopedRole,
   TeamMembershipRole,
-} from "@prisma/client";
+} from "@/db/schema";
 import { buildAccessContext } from "@/lib/access";
 import {
   getNavigationLinks,
@@ -69,7 +69,12 @@ describe("navigation helpers", () => {
       { href: "/admin/team-requests", label: "Team Registrations", prefetch: false },
       { href: "/admin/users", label: "Manage Users", prefetch: false },
     ]);
-    expect(getRequestDetailHref(context, "req-1")).toBe("/admin/requests/req-1");
+    expect(
+      getRequestDetailHref(context, "req-1", {
+        districtId: "district-1",
+        schoolId: "school-1",
+      })
+    ).toBe("/admin/requests/req-1");
   });
 
   it("omits user management for program admins but keeps admin request links", () => {
@@ -87,7 +92,13 @@ describe("navigation helpers", () => {
       { href: "/admin/teams", label: "Manage Teams", prefetch: false },
       { href: "/admin/team-requests", label: "Team Registrations", prefetch: false },
     ]);
-    expect(getRequestDetailHref(context, "req-1")).toBe("/admin/requests/req-1");
+    expect(
+      getRequestDetailHref(context, "req-1", {
+        districtId: "district-1",
+        schoolId: "school-1",
+        programId: "program-1",
+      })
+    ).toBe("/admin/requests/req-1");
   });
 
   it("does not show Profile for pure admins who never get reimbursed", () => {
@@ -114,20 +125,34 @@ describe("navigation helpers", () => {
     expect(getNavigationLinks(context).some((link) => link.href === "/profile")).toBe(true);
   });
 
-  it("deduplicates coach and parent links while keeping member navigation", () => {
+  it("deduplicates coach and parent links; gates the bouncing My Requests link for coaches", () => {
     const context = accessContext("USER", [], [
       membership("COACH", { teamId: "team-1" }),
       membership("PARENT_MENTOR", { teamId: "team-1" }),
     ]);
 
+    // No "My Requests" link: /user/requests redirects coaches to
+    // /coach/team-reimbursements, so linking it would bounce.
     expect(getNavigationLinks(context)).toEqual([
+      { href: "/coach/inbox", label: "Inbox" },
       { href: "/coach/team-overview", label: "Team Overview" },
       { href: "/coach/team-reimbursements", label: "Team Reimbursements" },
       { href: "/team", label: "My Team" },
       { href: "/user/requests/new", label: "New Request" },
-      { href: "/user/requests", label: "My Requests" },
       { href: "/profile", label: "Profile" },
+      { href: "/policy", label: "Policy" },
     ]);
-    expect(getRequestDetailHref(context, "req-1")).toBe("/user/requests/req-1");
+    expect(
+      getRequestDetailHref(context, "req-1", { teamId: "team-1" })
+    ).toBe("/user/requests/req-1");
+  });
+
+  it("links My Requests only for a pure parent/mentor", () => {
+    const parentOnly = accessContext("USER", [], [
+      membership("PARENT_MENTOR", { teamId: "team-1" }),
+    ]);
+    expect(
+      getNavigationLinks(parentOnly).some((link) => link.href === "/user/requests")
+    ).toBe(true);
   });
 });

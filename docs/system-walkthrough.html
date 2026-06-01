@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reimbursement Manager — System & Experience Walkthrough</title>
+<style>
+  :root {
+    --indigo: #4f46e5;
+    --indigo-700: #4338ca;
+    --indigo-50: #eef2ff;
+    --ink: #0f172a;
+    --slate: #475569;
+    --slate-400: #94a3b8;
+    --slate-200: #e2e8f0;
+    --slate-100: #f1f5f9;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --high: #dc2626;
+    --high-bg: #fef2f2;
+    --med: #d97706;
+    --med-bg: #fffbeb;
+    --low: #2563eb;
+    --low-bg: #eff6ff;
+    --green: #059669;
+    --green-bg: #ecfdf5;
+    --shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: #1e1b2e;
+    -webkit-font-smoothing: antialiased;
+  }
+  .deck { width: 100%; height: 100%; }
+
+  .slide {
+    display: none;
+    position: fixed;
+    inset: 0;
+    padding: 56px 72px 96px;
+    overflow-y: auto;
+    background: var(--bg);
+    animation: fade .35s ease;
+  }
+  .slide.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .kicker {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--indigo);
+    background: var(--indigo-50);
+    padding: 5px 12px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  h1 { font-size: 40px; line-height: 1.12; letter-spacing: -0.02em; margin-bottom: 14px; }
+  h2 { font-size: 30px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 10px; }
+  h3 { font-size: 18px; margin-bottom: 8px; }
+  p { color: var(--slate); font-size: 16px; line-height: 1.6; }
+  .lead { font-size: 18px; color: var(--slate); max-width: 820px; }
+  .muted { color: var(--slate-400); }
+  code { font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: .86em; background: var(--slate-100); padding: 1px 6px; border-radius: 5px; color: var(--indigo-700); }
+
+  /* Cover */
+  .cover { background: radial-gradient(120% 120% at 80% 0%, #4338ca 0%, #312e81 45%, #1e1b2e 100%); color: #fff; }
+  .cover .wrap { padding-top: 6vh; }
+  .cover h1 { font-size: 58px; color: #fff; }
+  .cover .kicker { background: rgba(255,255,255,.14); color: #c7d2fe; }
+  .cover p { color: #c7d2fe; font-size: 19px; }
+  .cover .meta { margin-top: 40px; display: flex; gap: 40px; flex-wrap: wrap; }
+  .cover .meta div span { display: block; }
+  .cover .meta .n { font-size: 30px; font-weight: 800; color: #fff; }
+  .cover .meta .l { font-size: 13px; color: #a5b4fc; text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+  .cover .toc { margin-top: 44px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 36px; max-width: 760px; }
+  .cover .toc a { color: #ddd6fe; text-decoration: none; font-size: 15px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 12px; cursor: pointer; }
+  .cover .toc a:hover { color: #fff; }
+  .cover .toc a b { color: #818cf8; font-variant-numeric: tabular-nums; }
+
+  /* section divider */
+  .divider { background: linear-gradient(135deg, #312e81, #4338ca); color: #fff; }
+  .slide.divider.active { display: flex; align-items: center; }
+  .divider .wrap { width: 100%; }
+  .divider .kicker { background: rgba(255,255,255,.14); color: #c7d2fe; }
+  .divider h1 { color: #fff; font-size: 46px; max-width: 880px; }
+  .divider p { color: #c7d2fe; font-size: 18px; max-width: 720px; margin-top: 12px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .mt { margin-top: 24px; }
+  .mt-sm { margin-top: 14px; }
+
+  .card { background: var(--card); border: 1px solid var(--slate-200); border-radius: 14px; padding: 22px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .card.tight { padding: 16px 18px; }
+
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .04em; }
+  .pill.role { background: var(--indigo-50); color: var(--indigo-700); }
+  .pill.green { background: var(--green-bg); color: var(--green); }
+  .pill.high { background: var(--high-bg); color: var(--high); }
+  .pill.med { background: var(--med-bg); color: var(--med); }
+  .pill.low { background: var(--low-bg); color: var(--low); }
+
+  ul.clean { list-style: none; }
+  ul.clean li { position: relative; padding-left: 24px; margin-bottom: 9px; font-size: 14.5px; color: var(--slate); line-height: 1.5; }
+  ul.can li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+  ul.cant li::before { content: "✕"; position: absolute; left: 0; color: var(--high); font-weight: 800; }
+  ul.dot li::before { content: ""; position: absolute; left: 4px; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--indigo); }
+
+  .navchips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 6px; }
+  .navchip { font-size: 12px; font-weight: 600; background: var(--ink); color: #fff; padding: 5px 11px; border-radius: 7px; }
+  .navchip.off { background: var(--slate-100); color: var(--slate-400); text-decoration: line-through; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--slate-200); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--slate-400); font-weight: 700; background: var(--slate-100); }
+  td.yes { color: var(--green); font-weight: 700; }
+  td.no { color: var(--slate-400); }
+  tbody tr:hover { background: var(--indigo-50); }
+  .tbl-wrap { background: #fff; border: 1px solid var(--slate-200); border-radius: 14px; overflow: hidden; }
+
+  /* state machine */
+  .sm { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+  .node { padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; border: 2px solid; white-space: nowrap; }
+  .node.draft { border-color: var(--slate-400); color: var(--slate); background: #fff; }
+  .node.sub { border-color: var(--low); color: var(--low); background: var(--low-bg); }
+  .node.coach { border-color: var(--med); color: var(--med); background: var(--med-bg); }
+  .node.admin { border-color: var(--indigo); color: var(--indigo-700); background: var(--indigo-50); }
+  .node.paid { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+  .node.rej { border-color: var(--high); color: var(--high); background: var(--high-bg); }
+  .arrow { color: var(--slate-400); font-weight: 800; font-size: 18px; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 18px; font-size: 13px; color: var(--slate); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+
+  /* gap cards */
+  .gap { border-left: 4px solid var(--slate-200); padding: 14px 18px; background: #fff; border-radius: 0 12px 12px 0; border: 1px solid var(--slate-200); }
+  .gap.high { border-left-color: var(--high); }
+  .gap.med { border-left-color: var(--med); }
+  .gap.low { border-left-color: var(--low); }
+  .gap h3 { font-size: 15px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .gap p { font-size: 13.5px; line-height: 1.55; }
+  .gap .file { font-family: "SF Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--slate-400); margin-top: 8px; display: block; }
+
+  .flow-steps { counter-reset: step; }
+  .flow-steps li { list-style: none; position: relative; padding-left: 38px; margin-bottom: 12px; font-size: 14px; color: var(--slate); line-height: 1.5; }
+  .flow-steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: -1px; width: 26px; height: 26px; background: var(--indigo); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+
+  .callout { background: var(--med-bg); border: 1px solid #fde68a; border-radius: 12px; padding: 16px 18px; margin-top: 18px; }
+  .callout.info { background: var(--indigo-50); border-color: #c7d2fe; }
+  .callout strong { color: var(--ink); }
+  .callout p { color: #78350f; font-size: 14px; }
+  .callout.info p { color: var(--indigo-700); }
+
+  /* footer nav */
+  .controls { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-top: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; z-index: 50; }
+  .controls .title { font-size: 13px; color: var(--slate-400); font-weight: 600; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .controls .btns { display: flex; align-items: center; gap: 8px; }
+  .controls button { font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--slate-200); background: #fff; color: var(--ink); padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+  .controls button:hover { background: var(--indigo-50); border-color: var(--indigo); color: var(--indigo-700); }
+  .counter { font-size: 13px; color: var(--slate); font-variant-numeric: tabular-nums; min-width: 60px; text-align: center; font-weight: 600; }
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--indigo); z-index: 60; transition: width .3s ease; }
+  .hint { position: fixed; bottom: 64px; right: 16px; font-size: 11px; color: var(--slate-400); z-index: 40; }
+
+  @media print {
+    .slide { display: block !important; position: relative; inset: auto; page-break-after: always; min-height: 100vh; box-shadow: none; }
+    .controls, .progress, .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+  <!-- 1. COVER -->
+  <section class="slide active cover">
+    <div class="wrap">
+      <span class="kicker">Codebase &amp; Experience Audit · May 2026</span>
+      <h1>Reimbursement Request Manager</h1>
+      <p>How the system works, what each role sees, how approvals and notifications flow — and where the behavior has gaps.</p>
+      <div class="meta">
+        <div><span class="n">7</span><span class="l">User roles</span></div>
+        <div><span class="n">7</span><span class="l">Request statuses</span></div>
+        <div><span class="n">6</span><span class="l">Notification events</span></div>
+        <div><span class="n">25</span><span class="l">Behavior gaps found</span></div>
+      </div>
+      <div class="toc">
+        <a onclick="goName('arch')"><b>01</b> Architecture at a glance</a>
+        <a onclick="goName('together')"><b>02</b> How it all fits together</a>
+        <a onclick="goName('roles')"><b>03</b> The role hierarchy</a>
+        <a onclick="goName('role-cards')"><b>04</b> Role-by-role experience</a>
+        <a onclick="goName('approvals')"><b>05</b> Approvals &amp; state machine</a>
+        <a onclick="goName('notif')"><b>06</b> Notifications up the chain</a>
+        <a onclick="goName('profile')"><b>07</b> Profile &amp; Clerk auth</a>
+        <a onclick="goName('viewing')"><b>08</b> Viewing requests</a>
+        <a onclick="goName('admin')"><b>09</b> Admin controls</a>
+        <a onclick="goName('gaps')"><b>10</b> Behavior gaps</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. ARCHITECTURE -->
+  <section class="slide" data-name="arch">
+    <div class="wrap">
+      <span class="kicker">01 · Architecture</span>
+      <h2>A Cloudflare-native Next.js app, with Clerk for identity</h2>
+      <p class="lead">Clerk owns <em>who you are</em>. The app's own database owns <em>what you can do</em>. Everything else — requests, receipts, approvals — lives on Cloudflare.</p>
+
+      <div class="grid3 mt">
+        <div class="card tight">
+          <span class="pill role">Identity</span>
+          <h3 class="mt-sm">Clerk</h3>
+          <p>Hosted sign-in / sign-up. Issues the session. App links it via <code>User.clerkUserId</code>.</p>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Authorization</span>
+          <h3 class="mt-sm">App DB (D1 + Drizzle)</h3>
+          <p>Source of truth for global role, scoped admin roles, team memberships, profile &amp; payout.</p>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Edge gate</span>
+          <h3 class="mt-sm"><code>proxy.ts</code></h3>
+          <p>Clerk middleware. <strong>Coarse</strong> auth only — protects every route except the public ones.</p>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Storage</span>
+          <h3 class="mt-sm">R2</h3>
+          <p>Receipts as <code>r2://&lt;key&gt;</code>, private + auth-gated download proxy.</p>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Async</span>
+          <h3 class="mt-sm">Queues + AI</h3>
+          <p>Receipt parsing offloaded to a consumer Worker; Gemini extracts line items.</p>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Per-page</span>
+          <h3 class="mt-sm">Server guards</h3>
+          <p><strong>Fine</strong> authorization lives in each page/route via <code>auth()</code> + <code>canManage*</code> predicates.</p>
+        </div>
+      </div>
+
+      <div class="callout info mt">
+        <p><strong>Key mental model:</strong> the Edge middleware only checks "are you logged in?". The real "are you allowed?" decision is re-made server-side on every page and API route from the app DB's role + scope + membership data. Clerk never decides authorization.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. HOW IT FITS TOGETHER -->
+  <section class="slide" data-name="together">
+    <div class="wrap">
+      <span class="kicker">02 · End-to-end</span>
+      <h2>One reimbursement, creation → payment</h2>
+      <p class="lead">The lifecycle threads through identity, roles, approvals, and notifications — each owned by a different subsystem.</p>
+      <ol class="flow-steps mt">
+        <li><strong>Identity &amp; provisioning.</strong> First authenticated request lazily creates an app <code>User</code> row keyed on <code>clerkUserId</code> (role forced to <code>USER</code>). That row — not Clerk — drives everything downstream.</li>
+        <li><strong>Membership gate.</strong> A plain USER with no approved team membership sees an empty navbar and cannot create a request. The originator is, in practice, an approved <strong>Parent/Mentor</strong> or <strong>Coach</strong>.</li>
+        <li><strong>Draft &amp; submit.</strong> Owner drafts, uploads receipts (parsed by Gemini), edits line items, then submits. <code>transitionRequestStatus</code> atomically writes status + an <code>approvalAction</code> + an audit log and recomputes the total.</li>
+        <li><strong>Coach review.</strong> The coach (or an admin acting at the coach stage) approves/rejects. Approval fans out a "ready for admin review" notification to the scope-resolved admin set.</li>
+        <li><strong>Admin review &amp; payment.</strong> A scoped/super admin sees it in the inbox, approves, then marks it <code>PAID</code>. Payout (Zelle) happens out-of-band; <code>PAID</code> is terminal.</li>
+        <li><strong>Reopen loop.</strong> A rejected request can be reopened to <code>DRAFT</code> — but silently (no notification, no cache bust).</li>
+      </ol>
+      <div class="callout mt">
+        <p><strong>The seam that matters:</strong> the User row's <code>email</code> is the single delivery key for <em>all</em> notifications <em>and</em> the basis for "don't notify the actor of their own action." Identity drift in Clerk silently breaks both. (More in §06–07.)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. ROLE DIVIDER -->
+  <section class="slide divider" data-name="roles">
+    <div class="wrap">
+      <span class="kicker">03 · Roles</span>
+      <h1>Seven roles, three orthogonal axes</h1>
+      <p>Access is <strong>cumulative</strong>: a global role, plus one or more scoped admin assignments, plus one or more approved team memberships. A school admin who coaches a team has both sets of powers.</p>
+    </div>
+  </section>
+
+  <!-- 5. ROLE OVERVIEW TABLE -->
+  <section class="slide" data-name="role-overview">
+    <div class="wrap">
+      <span class="kicker">03 · Roles</span>
+      <h2>What unlocks what</h2>
+      <p class="lead">Capabilities derive from booleans in the <code>AccessContext</code>, computed once per request from the DB.</p>
+      <div class="tbl-wrap mt">
+        <table>
+          <thead><tr><th>Role</th><th>Granted by</th><th>Can create</th><th>Coach review</th><th>Admin review / pay</th><th>Manage users</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Signed-out</strong></td><td>—</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td><strong>Signed-in USER</strong></td><td>Clerk login</td><td class="no">Not until team</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td><strong>Parent / Mentor</strong></td><td>Approved <code>PARENT_MENTOR</code></td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td><strong>Coach</strong></td><td>Approved <code>COACH</code></td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td><strong>Program Admin</strong></td><td>Scoped <code>PROGRAM_ADMIN</code></td><td class="yes">Scoped</td><td class="yes">Scoped</td><td class="yes">Scoped</td><td class="no">No</td></tr>
+            <tr><td><strong>School Admin</strong></td><td>Scoped <code>SCHOOL_ADMIN</code></td><td class="yes">Scoped</td><td class="yes">Scoped</td><td class="yes">Scoped</td><td class="yes">Scoped</td></tr>
+            <tr><td><strong>Super Admin</strong></td><td>Global <code>SUPER_ADMIN</code></td><td class="yes">All</td><td class="yes">All</td><td class="yes">All</td><td class="yes">All</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--green)"></span> Scoped = limited to the assigned district / school / program / team</span>
+        <span><span class="swatch" style="background:var(--indigo)"></span> Navbar links are deduplicated when roles combine</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. ROLE CARDS: signed-out + user -->
+  <section class="slide" data-name="role-cards">
+    <div class="wrap">
+      <span class="kicker">04 · Role experience</span>
+      <h2>Visitor &amp; signed-in USER</h2>
+      <div class="grid2 mt">
+        <div class="card">
+          <span class="pill role">Signed-out visitor</span>
+          <ul class="clean can mt-sm">
+            <li>Landing page, <code>/policy</code>, sign-in / sign-up / admin-sign-up</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Any authenticated page or API — blocked by Clerk middleware <em>and</em> per-page <code>unauthorized()</code></li>
+          </ul>
+          <div class="navchips"><span class="navchip">Sign In</span><span class="navchip">Sign Up</span></div>
+        </div>
+        <div class="card">
+          <span class="pill role">Signed-in USER · no team</span>
+          <ul class="clean can mt-sm">
+            <li>Dashboard, profile, onboarding</li>
+            <li>Open "new request" page &amp; own request list (both effectively empty)</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Create a request (no approved membership → empty team picker)</li>
+            <li><code>/team</code> (redirects to onboarding), all <code>/coach/*</code> and <code>/admin/*</code></li>
+          </ul>
+          <div class="navchips"><span class="navchip off">No role links at all</span></div>
+          <p class="muted" style="font-size:12px;margin-top:8px">Profile &amp; My Requests are reachable only via dashboard tiles — no navbar affordance.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. ROLE CARDS: parent + coach -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">04 · Role experience</span>
+      <h2>Parent / Mentor &amp; Coach</h2>
+      <div class="grid2 mt">
+        <div class="card">
+          <span class="pill role">Parent / Mentor</span>
+          <ul class="clean can mt-sm">
+            <li>Team workspace &amp; roster</li>
+            <li>Create, draft, upload receipts, submit own requests</li>
+            <li>View own &amp; team requests; download their PDFs</li>
+            <li>Reopen their own rejected requests</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Approve / reject anything</li>
+            <li>Edit or comment on line items after DRAFT</li>
+          </ul>
+          <div class="navchips"><span class="navchip">My Team</span><span class="navchip">New Request</span><span class="navchip">My Requests</span><span class="navchip">Profile</span></div>
+        </div>
+        <div class="card">
+          <span class="pill role">Coach</span>
+          <ul class="clean can mt-sm">
+            <li>Team overview &amp; team reimbursement queue</li>
+            <li><strong>Approve / reject</strong> submitted requests (coach stage)</li>
+            <li>Edit &amp; comment on line items while <code>SUBMITTED</code></li>
+            <li>Redirected from <code>/user/requests</code> → coach queue</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Final admin approval / payment (unless also admin)</li>
+            <li>Manage users / teams / registrations</li>
+          </ul>
+          <div class="navchips"><span class="navchip">Team Overview</span><span class="navchip">Team Reimbursements</span><span class="navchip">New Request</span><span class="navchip">Profile</span></div>
+        </div>
+      </div>
+      <div class="callout mt"><p><strong>Gap:</strong> the actual coach approve/reject page <code>/coach/inbox</code> is in <em>no</em> navbar and undocumented — coaches reach the review action only by deep link.</p></div>
+    </div>
+  </section>
+
+  <!-- 8. ROLE CARDS: admins -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">04 · Role experience</span>
+      <h2>Program · School · Super Admin</h2>
+      <div class="grid3 mt">
+        <div class="card tight">
+          <span class="pill role">Program Admin</span>
+          <p class="muted" style="font-size:12px;margin:6px 0 10px">Scoped to school + program</p>
+          <ul class="clean can">
+            <li>Admin inbox &amp; reimbursements (scoped)</li>
+            <li>Manage teams, decide registrations</li>
+            <li>Take admin actions in scope</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Manage users (any)</li>
+            <li>Assign any scope</li>
+            <li>Create teams directly</li>
+          </ul>
+        </div>
+        <div class="card tight">
+          <span class="pill role">School Admin</span>
+          <p class="muted" style="font-size:12px;margin:6px 0 10px">Scoped to school / district</p>
+          <ul class="clean can">
+            <li>Everything Program Admin can</li>
+            <li><strong>Manage users</strong> in scope</li>
+            <li>Grant <code>PROGRAM_ADMIN</code> in scope</li>
+          </ul>
+          <ul class="clean cant">
+            <li>Grant <code>SCHOOL_ADMIN</code> / <code>SUPER_ADMIN</code></li>
+            <li>Act outside school / district</li>
+          </ul>
+        </div>
+        <div class="card tight">
+          <span class="pill role">Super Admin</span>
+          <p class="muted" style="font-size:12px;margin:6px 0 10px">Global — bypasses all scope</p>
+          <ul class="clean can">
+            <li>Manage all users, teams, requests</li>
+            <li>Promote / demote <code>SUPER_ADMIN</code></li>
+            <li>Grant <code>SCHOOL_ADMIN</code></li>
+            <li>Create teams via API; final approval + pay</li>
+          </ul>
+          <ul class="clean cant">
+            <li class="muted" style="color:var(--slate-400)">No app-level restriction</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout mt"><p><strong>Doc vs code:</strong> <code>user-capabilities.md</code> lists "Profile" in admin navbars, but <code>navigation.ts</code> only renders Profile for coaches / parents — a pure admin gets no Profile link unless they're also a team member.</p></div>
+    </div>
+  </section>
+
+  <!-- 9. APPROVALS DIVIDER + STATE MACHINE -->
+  <section class="slide" data-name="approvals">
+    <div class="wrap">
+      <span class="kicker">05 · Approvals</span>
+      <h2>The request state machine</h2>
+      <p class="lead">Transitions are declared in <code>status.ts</code> and enforced centrally by <code>transitionRequestStatus()</code> — every change writes status + approval action + audit log atomically.</p>
+
+      <div class="card mt">
+        <div class="sm">
+          <span class="node draft">DRAFT</span><span class="arrow">→</span>
+          <span class="node sub">SUBMITTED</span><span class="arrow">→</span>
+          <span class="node coach">COACH_APPROVED</span><span class="arrow">→</span>
+          <span class="node admin">ADMIN_APPROVED</span><span class="arrow">→</span>
+          <span class="node paid">PAID</span>
+        </div>
+        <div class="sm" style="margin-top:14px">
+          <span class="node sub">SUBMITTED</span><span class="arrow">→</span>
+          <span class="node rej">COACH_REJECTED</span><span class="arrow">⟲</span>
+          <span class="node draft">DRAFT</span>
+          <span style="width:40px"></span>
+          <span class="node coach">COACH_APPROVED</span><span class="arrow">→</span>
+          <span class="node rej">ADMIN_REJECTED</span><span class="arrow">⟲</span>
+          <span class="node draft">DRAFT</span>
+        </div>
+      </div>
+
+      <div class="grid3 mt">
+        <div class="card tight"><h3>Dual fast-path</h3><p style="font-size:13.5px">If an admin or the team's own coach submits, <code>SUBMITTED → COACH_APPROVED</code> auto-chains, skipping coach review.</p></div>
+        <div class="card tight"><h3>Authorization</h3><p style="font-size:13.5px">Coach stage: any <code>COACH</code> on the team <em>or</em> a reimbursement admin. Admin stage: reimbursement admin only.</p></div>
+        <div class="card tight"><h3><code>PAID</code> is terminal</h3><p style="font-size:13.5px">No transition out — no reopen, no reversal. An erroneous "mark paid" can only be fixed in the DB.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. APPROVAL AUTHORIZATION -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">05 · Approvals</span>
+      <h2>Who can do each transition</h2>
+      <div class="tbl-wrap mt">
+        <table>
+          <thead><tr><th>Transition</th><th>Endpoint</th><th>Authorized actor</th><th>Side effects</th></tr></thead>
+          <tbody>
+            <tr><td>DRAFT → SUBMITTED</td><td><code>/submit</code></td><td>Request owner only</td><td>Audit log; notify coach</td></tr>
+            <tr><td>SUBMITTED → COACH_APPROVED/REJECTED</td><td><code>/coach-decision</code></td><td>Any team coach <em>or</em> reimbursement admin</td><td>Notify creator; on approve, fan-out to admins; bust cache</td></tr>
+            <tr><td>SUBMITTED → COACH_APPROVED (auto)</td><td><code>/submit</code></td><td>Admin / self-coach submitter</td><td>Notify <em>other</em> admins only — <strong>not the creator</strong></td></tr>
+            <tr><td>COACH_APPROVED → ADMIN_APPROVED/REJECTED</td><td><code>/admin-decision</code></td><td>Reimbursement admin only</td><td>Notify creator only; bust cache</td></tr>
+            <tr><td>ADMIN_APPROVED → PAID</td><td><code>/admin-decision</code></td><td>Reimbursement admin only</td><td>Notify creator only</td></tr>
+            <tr><td>*_REJECTED → DRAFT</td><td><code>/reopen</code></td><td>Owner / coach / admin</td><td><strong>None</strong> — no notification, no cache bust</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout mt"><p><strong>Two structural gaps:</strong> (1) routes check role but not current <em>status</em> before transitioning — an illegal transition surfaces as a raw <code>500</code> from <code>assertTransition</code> instead of a clean 409. (2) The total is recomputed live on every transition, so the amount marked <code>PAID</code> may differ from what the admin approved if line items changed in between.</p></div>
+    </div>
+  </section>
+
+  <!-- 11. NOTIFICATIONS -->
+  <section class="slide" data-name="notif">
+    <div class="wrap">
+      <span class="kicker">06 · Notifications</span>
+      <h2>How notifications percolate</h2>
+      <p class="lead">In-app only — no email / SMS / push anywhere. A single <code>sendNotification()</code> resolves recipient <strong>emails</strong> → user rows and inserts one row per recipient. The bell polls every 30s, but <em>only while open</em>.</p>
+      <div class="tbl-wrap mt">
+        <table>
+          <thead><tr><th>Event</th><th>Fires when</th><th>Creator</th><th>Coach</th><th>In-scope admins</th></tr></thead>
+          <tbody>
+            <tr><td><code>REQUEST_SUBMITTED</code></td><td>Normal submit (coach set)</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+            <tr><td><code>COACH_APPROVED</code> (auto)</td><td>Admin/self-coach submit</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ (minus actor)</td></tr>
+            <tr><td><code>COACH_APPROVED</code></td><td>Coach approves</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓ (minus actor)</td></tr>
+            <tr><td><code>COACH_REJECTED</code></td><td>Coach rejects</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td><code>ADMIN_APPROVED</code></td><td>Admin approves</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td><code>ADMIN_REJECTED</code></td><td>Admin rejects</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td><code>MARKED_PAID</code></td><td>Admin marks paid</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr style="background:var(--high-bg)"><td><strong>(reopen)</strong></td><td>Rejected → DRAFT</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout mt"><p><strong>The chain only flows up, never back down.</strong> Admin-stage decisions notify <em>only the creator</em> — the coach who approved and other admins get no closing signal. Reopen notifies no one. So no single actor reliably sees a request's full lifecycle.</p></div>
+    </div>
+  </section>
+
+  <!-- 12. NOTIFICATION RESOLUTION -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">06 · Notifications</span>
+      <h2>Recipient resolution is scope-aware</h2>
+      <div class="grid2 mt">
+        <div class="card">
+          <h3>Admin recipient query</h3>
+          <p>For a request's <code>{districtId, schoolId, programId}</code>, <code>getAdminReviewRecipientEmails</code> ORs three matches:</p>
+          <ul class="clean dot mt-sm">
+            <li>Every global <code>SUPER_ADMIN</code></li>
+            <li><code>SCHOOL_ADMIN</code> matching the school, or the district when school is null (district-wide)</li>
+            <li><code>PROGRAM_ADMIN</code> matching both school and program</li>
+          </ul>
+          <p class="mt-sm">Returns deduped, non-null emails; the acting admin is filtered out by <code>email !== actor.email</code>.</p>
+        </div>
+        <div class="card">
+          <h3>The fragile link: email</h3>
+          <p>Delivery is keyed entirely on <code>users.email</code>. <code>sendNotification</code> looks up recipients with <code>inArray(users.email, …)</code> and <strong>silently returns</strong> if none match — no log, no fallback.</p>
+          <div class="callout" style="margin-top:14px"><p>If a coach/admin changes their email in Clerk, the app DB keeps the stale value (no sync). Their notifications stop arriving <em>and</em> the actor-self-exclusion comparison can misfire — all from one drifted field.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13. PROFILE / CLERK -->
+  <section class="slide" data-name="profile">
+    <div class="wrap">
+      <span class="kicker">07 · Profile &amp; auth</span>
+      <h2>Clerk owns identity; the app owns the rest</h2>
+      <p class="lead">On first authenticated request, the app lazily provisions a <code>User</code> row. Name &amp; email are copied from Clerk <strong>once</strong> and never re-synced.</p>
+      <ol class="flow-steps mt">
+        <li>Clerk middleware requires a session; app calls <code>auth()</code> → gets <code>clerkUserId</code>.</li>
+        <li>Look up <code>User</code> by <code>clerkUserId</code>; if found, return verbatim.</li>
+        <li>Otherwise read the Clerk profile, lowercase the email, and <code>insert … onConflictDoUpdate(target: email)</code> — this <em>adopts</em> a pre-seeded row by email and backfills <code>clerkUserId</code>.</li>
+        <li>Role is always forced to <code>USER</code>; elevation only happens via seed/DB.</li>
+      </ol>
+      <div class="grid2 mt">
+        <div class="card tight"><h3>App-owned, editable on <code>/profile</code></h3><ul class="clean dot mt-sm"><li>Mailing address</li><li>Zelle payout type + value</li><li>Role, scopes, team memberships, onboarding</li></ul></div>
+        <div class="card tight"><h3>Clerk-owned, <em>not</em> editable in app</h3><ul class="clean dot mt-sm"><li>Name &amp; email (copied once, drift forever)</li><li>Password / auth factors</li><li>The profile page can't even display or correct them</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14. PROFILE GAPS -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">07 · Profile &amp; auth</span>
+      <h2>Three high-severity auth gaps</h2>
+      <div class="mt" style="display:grid;gap:12px">
+        <div class="gap high"><h3><span class="pill high">HIGH</span> Policy consent never recorded for real users</h3><p><code>policyAcceptedAt</code> / <code>policyVersion</code> are written only by the seed script. The Clerk provisioning path never sets them, so every real user has <code>null</code> — yet the profile UI hardcodes "Policy accepted during registration." A UX lie and a compliance gap with no auditable consent.</p><span class="file">src/auth.ts · src/components/profile/profile-form.tsx</span></div>
+        <div class="gap high"><h3><span class="pill high">HIGH</span> No Clerk → DB sync (name / email drift)</h3><p>No webhook, no re-read on later logins. Change your email in Clerk and the app keeps the old one indefinitely — corrupting display name, notification targeting, and every email-based match.</p><span class="file">src/auth.ts</span></div>
+        <div class="gap high"><h3><span class="pill high">HIGH</span> Email-match account adoption is a takeover vector</h3><p>Provisioning binds any Clerk login to an existing row by email, without verifying the email is verified. A Clerk account matching a seeded <code>SUPER_ADMIN</code> email inherits that privileged row — and immediately enters the admin notification + approval set.</p><span class="file">src/auth.ts</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. VIEWING -->
+  <section class="slide" data-name="viewing">
+    <div class="wrap">
+      <span class="kicker">08 · Viewing</span>
+      <h2>Same request, three different views</h2>
+      <p class="lead">Three list surfaces and two detail routes. The <code>/user/requests/[id]</code> route serves both requesters <em>and</em> coaches; admins get a separate <code>/admin/requests/[id]</code>.</p>
+      <div class="tbl-wrap mt">
+        <table>
+          <thead><tr><th>Surface</th><th>List shows</th><th>Detail route</th><th>Can edit line items</th><th>Can comment</th></tr></thead>
+          <tbody>
+            <tr><td><strong>User</strong></td><td>Only own requests</td><td><code>/user/requests/[id]</code></td><td>DRAFT only (owner)</td><td class="no">No</td></tr>
+            <tr><td><strong>Coach</strong></td><td>All team requests (incl. DRAFT)</td><td><code>/user/requests/[id]</code> (shared)</td><td>DRAFT + SUBMITTED</td><td class="yes">While SUBMITTED</td></tr>
+            <tr><td><strong>Admin</strong></td><td>Scoped, COACH_APPROVED onward</td><td><code>/admin/requests/[id]</code></td><td>COACH_APPROVED only</td><td class="yes">SUBMITTED + COACH_APPROVED</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2 mt">
+        <div class="callout" style="margin:0"><p><strong>Visibility over-grant:</strong> <code>canView</code> &amp; <code>canDownloadPdf</code> include <em>any</em> team member. A plain teammate can open and PDF a teammate's request at any status by direct URL — even though the list UI implies they can't.</p></div>
+        <div class="callout" style="margin:0"><p><strong>PII leak:</strong> line-item comments expose reviewer <code>authorEmail</code> to every viewer, including the requester — surfacing internal reviewer identities on the requester-facing page.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16. ADMIN CONTROLS -->
+  <section class="slide" data-name="admin">
+    <div class="wrap">
+      <span class="kicker">09 · Admin controls</span>
+      <h2>The scope-assignment privilege ladder</h2>
+      <p class="lead">Who can grant which role is the most tightly gated surface — and mostly clean.</p>
+      <div class="tbl-wrap mt">
+        <table>
+          <thead><tr><th>Grant…</th><th>Super Admin</th><th>School Admin</th><th>Program Admin</th><th>Mechanism</th></tr></thead>
+          <tbody>
+            <tr><td><code>SUPER_ADMIN</code></td><td class="yes">✓</td><td class="no">✕</td><td class="no">✕</td><td><code>/users/[id]/role</code> · super only</td></tr>
+            <tr><td><code>SCHOOL_ADMIN</code></td><td class="yes">✓</td><td class="no">✕</td><td class="no">✕</td><td>scope API · super only</td></tr>
+            <tr><td><code>PROGRAM_ADMIN</code></td><td class="yes">✓ anywhere</td><td class="yes">✓ in scope</td><td class="no">✕</td><td>scope API · <code>canManageUsers</code></td></tr>
+            <tr><td>Manage users</td><td class="yes">All</td><td class="yes">Scoped</td><td class="no">✕</td><td><code>canManageUsers</code></td></tr>
+            <tr><td>Manage teams / registrations / inbox</td><td class="yes">All</td><td class="yes">Scoped</td><td class="yes">Scoped</td><td><code>canManageTeams</code> + WHERE-builders</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2 mt">
+        <div class="gap med"><h3><span class="pill med">MED</span> Two contradictory team-creation paths</h3><p>Direct <code>/api/teams</code> is super-admin-only, but approving a team-registration request creates a team for any in-scope Program/School admin — undermining the apparent restriction.</p></div>
+        <div class="gap med"><h3><span class="pill med">MED</span> No last-super-admin guard</h3><p>A Super Admin can demote themselves or the only remaining super admin to <code>USER</code> — total lockout, with no audit log of the change.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 17. GAPS DIVIDER -->
+  <section class="slide divider" data-name="gaps">
+    <div class="wrap">
+      <span class="kicker">10 · Behavior gaps</span>
+      <h1>Where the systems disagree with each other</h1>
+      <p>The most dangerous gaps aren't inside one module — they emerge when authorization, navigation, notification, and identity make <em>different assumptions</em> about the same action.</p>
+    </div>
+  </section>
+
+  <!-- 18. CROSS-CUTTING GAPS 1 -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">10 · Cross-cutting gaps</span>
+      <h2>Identity drift poisons the whole chain</h2>
+      <div class="mt" style="display:grid;gap:12px">
+        <div class="gap high"><h3><span class="pill high">HIGH</span> Clerk email drift silently drops every notification</h3><p>Email is the only delivery key. A reviewer who changes their Clerk email stops receiving "ready for review" pings entirely — the request just sits unread in their inbox — because the stale app-DB email matches no one. No log, no fallback.</p><span class="file">auth.ts × sender.ts × approvals</span></div>
+        <div class="gap high"><h3><span class="pill high">HIGH</span> Email-match adoption widens approval + notification scope</h3><p>Binding a Clerk login to a seeded admin row by unverified email instantly grants approval authority <em>and</em> enrolls that account in the admin recipient set for every in-scope request.</p><span class="file">auth.ts × admin controls × notifications</span></div>
+        <div class="gap med"><h3><span class="pill med">MED</span> Actor self-exclusion rides the drifted email</h3><p>"Don't notify the actor" is <code>email !== actor.email</code>. If the acting admin's email drifted, they get notified of their own approval — or the wrong admin gets excluded.</p><span class="file">submit/coach-decision × auth.ts</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 19. CROSS-CUTTING GAPS 2 -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">10 · Cross-cutting gaps</span>
+      <h2>The review action is hard to reach</h2>
+      <div class="mt" style="display:grid;gap:12px">
+        <div class="gap med"><h3><span class="pill med">MED</span> Coach review is unreachable by nav <em>and</em> mis-linked by notification</h3><p><code>/coach/inbox</code> (where coaches actually approve) is in no navbar. The one notification a coach gets deep-links to the <em>requester-framed</em> detail page ("view-only for you"), not to the page where they can act.</p><span class="file">navigation.ts × notifications × viewing</span></div>
+        <div class="gap med"><h3><span class="pill med">MED</span> Admins can act at the coach stage but are never told and can't navigate there</h3><p>An admin is authorized to coach-approve a SUBMITTED request, but the admin detail route blocks DRAFT/SUBMITTED, and the submit notification goes only to the coach. The only path is guessing the user deep link.</p><span class="file">request-access × admin route × notifications</span></div>
+        <div class="gap med"><h3><span class="pill med">MED</span> Reopen is invisible to notifications, cache, and progress at once</h3><p>Reopening a rejected request to DRAFT fires nothing, busts no cache, and leaves the progress timeline to re-derive state from a transition that left no trace.</p><span class="file">reopen/route.ts × 3 systems</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 20. GAP INVENTORY -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">10 · Behavior gaps</span>
+      <h2>Full inventory by severity</h2>
+      <div class="grid3 mt">
+        <div class="card tight">
+          <span class="pill high">HIGH · 4</span>
+          <ul class="clean dot mt-sm">
+            <li>Policy consent never recorded</li>
+            <li>No Clerk→DB name/email sync</li>
+            <li>Email-match account takeover</li>
+            <li>Any teammate can view + PDF others' requests</li>
+          </ul>
+        </div>
+        <div class="card tight">
+          <span class="pill med">MED · 12</span>
+          <ul class="clean dot mt-sm">
+            <li>Coach inbox unreachable / mis-linked</li>
+            <li>Admin coach-stage blind spot</li>
+            <li>Reopen fires no notification / cache</li>
+            <li>Chain never notifies down to coach</li>
+            <li>Illegal transitions surface as 500</li>
+            <li>Total recomputed at PAID</li>
+            <li>Two team-creation paths</li>
+            <li>No last-super-admin guard</li>
+            <li>Comment author email leak</li>
+            <li>Doc vs code nav divergence</li>
+            <li>Coach-stage = any team coach</li>
+            <li>Mis-scoped team metadata</li>
+          </ul>
+        </div>
+        <div class="card tight">
+          <span class="pill low">LOW · 9</span>
+          <ul class="clean dot mt-sm">
+            <li>Bell stale while closed</li>
+            <li>Non-transactional notify</li>
+            <li>Orphaned notification on delete</li>
+            <li>Provisioning writes on read paths</li>
+            <li>No global onboarding enforcement</li>
+            <li>Dead <code>admin-sign-up</code> route</li>
+            <li>Coach-list amount typing</li>
+            <li>Progress mislabels reviewer</li>
+            <li>PAID has no reversal path</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 21. RECOMMENDATIONS -->
+  <section class="slide">
+    <div class="wrap">
+      <span class="kicker">10 · Where to start</span>
+      <h2>Highest-leverage fixes</h2>
+      <div class="mt" style="display:grid;gap:12px">
+        <div class="card tight"><h3>1 · Add a Clerk webhook (or login re-sync) for name + email</h3><p>Single fix that closes the notification-drift, actor-exclusion, and display-name gaps at once. Treat email as a synced projection of Clerk, not a copy.</p></div>
+        <div class="card tight"><h3>2 · Require verified email before adopting an existing row</h3><p>Gate the <code>onConflictDoUpdate</code> adoption on Clerk's <code>email_verified</code> to close the seeded-admin takeover vector.</p></div>
+        <div class="card tight"><h3>3 · Record policy acceptance on the Clerk path</h3><p>Stamp <code>policyAcceptedAt</code>/<code>policyVersion</code> at provisioning or first onboarding step; stop hardcoding the false "accepted during registration" copy.</p></div>
+        <div class="card tight"><h3>4 · Make reopen a first-class transition</h3><p>Emit a notification and bust caches like every other transition; add a status pre-check to routes so illegal transitions return 409, not 500.</p></div>
+        <div class="card tight"><h3>5 · Tighten viewing &amp; comments</h3><p>Decide intent for team-member visibility; redact reviewer <code>authorEmail</code> from requester-facing comment surfaces.</p></div>
+        <div class="card tight"><h3>6 · Surface the coach inbox &amp; reconcile the docs</h3><p>Add <code>/coach/inbox</code> to navigation, point submit notifications at it, and re-align <code>user-capabilities.md</code> with the real nav guards.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 22. CLOSE -->
+  <section class="slide cover">
+    <div class="wrap">
+      <span class="kicker">Summary</span>
+      <h1>The architecture is sound.<br/>The seams need stitching.</h1>
+      <p>RBAC, scoping, and the state machine are well-built and centrally enforced. The risk lives at the boundaries — where Clerk identity, in-app notifications, navigation, and request visibility each assume something slightly different about the same user and the same request.</p>
+      <div class="meta">
+        <div><span class="n">Clerk</span><span class="l">owns identity</span></div>
+        <div><span class="n">App DB</span><span class="l">owns authorization</span></div>
+        <div><span class="n">email</span><span class="l">the fragile shared key</span></div>
+      </div>
+      <p style="margin-top:36px;font-size:14px;color:#a5b4fc">Generated from a 7-agent deep audit · 6 dimensions · grounded in source · May 2026</p>
+    </div>
+  </section>
+
+</div>
+
+<div class="hint">← → navigate · G grid · F fullscreen</div>
+<div class="controls">
+  <div class="title" id="slideTitle">Reimbursement Request Manager</div>
+  <div class="btns">
+    <button onclick="prev()">‹ Prev</button>
+    <span class="counter" id="counter">1 / 22</span>
+    <button onclick="next()">Next ›</button>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let i = 0;
+  const titles = slides.map(s => {
+    const h = s.querySelector('h1, h2');
+    return h ? h.textContent.trim() : 'Slide';
+  });
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    document.getElementById('counter').textContent = (i + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((i + 1) / slides.length * 100) + '%';
+    document.getElementById('slideTitle').textContent = titles[i];
+    slides[i].scrollTop = 0;
+    window.scrollTo(0, 0);
+  }
+  function next() { show(i + 1); }
+  function prev() { show(i - 1); }
+  function goName(name) {
+    const idx = slides.findIndex(s => s.dataset.name === name);
+    if (idx >= 0) show(idx);
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key.toLowerCase() === 'f') { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+    else if (e.key.toLowerCase() === 'g') toggleGrid();
+  });
+  // simple grid overview
+  let gridOpen = false;
+  function toggleGrid() {
+    if (gridOpen) { document.getElementById('gridOverlay').remove(); gridOpen = false; return; }
+    const ov = document.createElement('div');
+    ov.id = 'gridOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.96);z-index:100;overflow:auto;padding:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;';
+    slides.forEach((s, idx) => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff;border-radius:10px;padding:16px;cursor:pointer;min-height:90px;border:2px solid transparent;';
+      card.innerHTML = '<div style="font-size:11px;color:#94a3b8;font-weight:700">'+(idx+1)+'</div><div style="font-size:13px;font-weight:600;color:#0f172a;margin-top:6px;line-height:1.3">'+titles[idx]+'</div>';
+      card.onmouseenter = () => card.style.borderColor = '#4f46e5';
+      card.onmouseleave = () => card.style.borderColor = 'transparent';
+      card.onclick = () => { toggleGrid(); show(idx); };
+      ov.appendChild(card);
+    });
+    document.body.appendChild(ov);
+    gridOpen = true;
+  }
+  show(0);
+</script>
+</body>
+</html>

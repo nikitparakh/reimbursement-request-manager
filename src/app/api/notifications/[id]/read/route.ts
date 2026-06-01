@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { notifications } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
 export async function PATCH(
@@ -14,16 +16,19 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const notification = await db.notification.findUnique({ where: { id } });
+  const notification = await db.query.notifications.findFirst({
+    where: eq(notifications.id, id),
+  });
 
   if (!notification || notification.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const updated = await db.notification.update({
-    where: { id },
-    data: { read: true },
-  });
+  const [updated] = await db
+    .update(notifications)
+    .set({ read: true })
+    .where(eq(notifications.id, id))
+    .returning();
 
   return NextResponse.json(updated);
 }

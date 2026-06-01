@@ -1,6 +1,8 @@
 import { redirect, unauthorized } from "next/navigation";
+import { asc, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { districts as districtsTable, programs as programsTable, schools, teams, users } from "@/db/schema";
 import { TeamSelector } from "@/components/onboarding/team-selector";
 import { TeamRegistrationForm } from "@/components/onboarding/team-registration-form";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,9 +18,9 @@ export default async function OnboardingPage() {
     redirect("/");
   }
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { onboardingDone: true },
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+    columns: { onboardingDone: true },
   });
 
   if (user?.onboardingDone) {
@@ -26,22 +28,26 @@ export default async function OnboardingPage() {
   }
 
   const [districts, programs] = await Promise.all([
-    db.district.findMany({
-      where: { active: true },
-      orderBy: { name: "asc" },
-      select: {
+    db.query.districts.findMany({
+      where: eq(districtsTable.active, true),
+      orderBy: asc(districtsTable.name),
+      columns: {
         id: true,
         name: true,
+      },
+      with: {
         schools: {
-          where: { active: true },
-          orderBy: { name: "asc" },
-          select: {
+          where: eq(schools.active, true),
+          orderBy: asc(schools.name),
+          columns: {
             id: true,
             name: true,
+          },
+          with: {
             teams: {
-              where: { active: true },
-              orderBy: { name: "asc" },
-              select: {
+              where: eq(teams.active, true),
+              orderBy: asc(teams.name),
+              columns: {
                 id: true,
                 name: true,
                 shortCode: true,
@@ -52,10 +58,10 @@ export default async function OnboardingPage() {
         },
       },
     }),
-    db.program.findMany({
-      where: { active: true },
-      orderBy: { name: "asc" },
-      select: { id: true, code: true, name: true },
+    db.query.programs.findMany({
+      where: eq(programsTable.active, true),
+      orderBy: asc(programsTable.name),
+      columns: { id: true, code: true, name: true },
     }),
   ]);
 

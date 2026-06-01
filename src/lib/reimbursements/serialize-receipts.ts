@@ -1,5 +1,3 @@
-import type { Prisma } from "@prisma/client";
-
 export type SerializedLineItemComment = {
   id: string;
   authorId: string;
@@ -20,7 +18,7 @@ export type SerializedLineItem = {
   comments: SerializedLineItemComment[];
 };
 
-export type SerializedExtraction = {
+type SerializedExtraction = {
   id: string;
   documentType: string;
   merchant: string | null;
@@ -37,28 +35,45 @@ export type SerializedReceipt = {
   extraction: SerializedExtraction | null;
 };
 
-type PrismaReceiptWithExtraction = Prisma.ReceiptFileGetPayload<{
-  include: {
-    extraction: {
-      include: {
+type ReceiptWithExtraction = {
+  id: string;
+  fileName: string;
+  extraction:
+    | {
+        id: string;
+        documentType: string;
+        merchant: string | null;
+        subtotal: number | null;
+        tax: number | null;
+        total: number | null;
+        currency: string | null;
         lineItems: {
-          include: {
-            comments: {
-              include: { author: { select: { email: true } } };
-            };
-          };
-        };
-      };
-    };
-  };
-}>;
+          id: string;
+          receiptExtractionId: string;
+          description: string;
+          quantity: number | null;
+          unitPrice: number | null;
+          lineTotal: number | null;
+          category: string | null;
+          excludedAt: Date | null;
+          comments: {
+            id: string;
+            authorId: string;
+            author: { email: string };
+            text: string;
+            createdAt: Date;
+          }[];
+        }[];
+      }
+    | null;
+};
 
 /**
- * Converts Prisma Decimal fields to strings so the data
+ * Converts numeric/Date fields to strings so the data
  * can be passed from server components to client components.
  */
 export function serializeReceipts(
-  receipts: PrismaReceiptWithExtraction[]
+  receipts: ReceiptWithExtraction[]
 ): SerializedReceipt[] {
   return receipts.map((f) => ({
     id: f.id,

@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -106,6 +107,7 @@ function readPatchError(payload: unknown): string {
 }
 
 export function ProfileForm({ initialProfile }: ProfileFormProps) {
+  const router = useRouter();
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
@@ -138,6 +140,9 @@ export function ProfileForm({ initialProfile }: ProfileFormProps) {
       }
 
       toast.success("Profile updated.");
+      // Re-render the server component so the policy-accepted card and any
+      // other server-derived sections reflect the saved values.
+      router.refresh();
     } catch {
       toast.error("Unable to save profile.");
     }

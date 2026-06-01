@@ -1,16 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
-
-import { SignUpForm } from "@/components/auth/sign-up-form";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { SignUp } from "@clerk/nextjs";
 
 export default function SignUpPage() {
   return (
@@ -23,23 +12,7 @@ export default function SignUpPage() {
         className="h-12 w-auto"
         priority
       />
-      <Card className="w-full shadow-sm">
-        <CardHeader className="text-center">
-          <CardTitle>Reimbursement Request Manager</CardTitle>
-          <CardDescription>Create an account to submit team reimbursements</CardDescription>
-        </CardHeader>
-        <CardContent className="pb-4 pt-6">
-          <SignUpForm />
-        </CardContent>
-        <CardFooter className="flex flex-wrap items-center justify-center gap-1 border-t border-border bg-muted/30 px-6 py-4">
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Button variant="link" className="h-auto px-0.5 py-0 text-sm font-medium" asChild>
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-          </p>
-        </CardFooter>
-      </Card>
+      <SignUp routing="hash" signInUrl="/sign-in" fallbackRedirectUrl="/" />
     </div>
   );
 }

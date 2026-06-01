@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
@@ -49,7 +51,7 @@ export async function POST(
     invalidateApprovalCaches(current.teamId);
 
     const [actor, adminEmails] = await Promise.all([
-      db.user.findUnique({ where: { id: userId } }),
+      db.query.users.findFirst({ where: eq(users.id, userId) }),
       getAdminReviewRecipientEmails({
         districtId: current.team.school.districtId,
         schoolId: current.team.schoolId,
@@ -69,8 +71,8 @@ export async function POST(
     }
   } else if (current.coachId) {
     const [coach, actor] = await Promise.all([
-      db.user.findUnique({ where: { id: current.coachId } }),
-      db.user.findUnique({ where: { id: userId } }),
+      db.query.users.findFirst({ where: eq(users.id, current.coachId) }),
+      db.query.users.findFirst({ where: eq(users.id, userId) }),
     ]);
     if (coach?.email && actor?.email) {
       await sendNotification("REQUEST_SUBMITTED", {

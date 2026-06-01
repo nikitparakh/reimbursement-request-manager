@@ -4,20 +4,21 @@ import {
   type AccessTarget,
 } from "@/lib/access";
 
-export type NavLink = {
+type NavLink = {
   href: string;
   label: string;
   prefetch?: boolean;
 };
 
 export function getRequestDetailHref(
-  context: Pick<AccessContext, "canManageReimbursements" | "isSuperAdmin" | "scopedRoles">,
+  context: AccessContext,
   requestId: string,
-  target?: AccessTarget
+  // Required: the request's scope. Routing must be decided against the specific
+  // request, never the global canManageReimbursements flag (a scoped admin can
+  // manage some requests but not others).
+  target: AccessTarget
 ) {
-  const useAdminRoute = target
-    ? canManageReimbursements(context as AccessContext, target)
-    : context.canManageReimbursements;
+  const useAdminRoute = canManageReimbursements(context, target);
 
   return useAdminRoute
     ? `/admin/requests/${requestId}`
@@ -67,6 +68,7 @@ export function getNavigationLinks(
   }
 
   if (context.isCoach) {
+    addLink("/coach/inbox", "Inbox");
     addLink("/coach/team-overview", "Team Overview");
     addLink("/coach/team-reimbursements", "Team Reimbursements");
   }
@@ -79,7 +81,14 @@ export function getNavigationLinks(
     addLink("/user/requests/new", "New Request");
   }
 
-  if (context.isParentMentor) {
+  // "My Requests" lists the user's OWN submissions at /user/requests. That route
+  // redirects coaches to /coach/team-reimbursements and admins to /admin/requests,
+  // so only link it for a pure parent/mentor — otherwise the link bounces.
+  if (
+    context.isParentMentor &&
+    !context.isCoach &&
+    !context.canManageReimbursements
+  ) {
     addLink("/user/requests", "My Requests");
   }
 
@@ -88,6 +97,7 @@ export function getNavigationLinks(
   // need it — pure admins never get paid out.
   if (context.isCoach || context.isParentMentor) {
     addLink("/profile", "Profile");
+    addLink("/policy", "Policy");
   }
 
   return Array.from(links.values());

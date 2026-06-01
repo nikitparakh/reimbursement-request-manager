@@ -1,6 +1,10 @@
 import { notFound, unauthorized } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { EditableLineItems } from "@/components/reimbursements/editable-line-items";
 import { ExtractionReview } from "@/components/reimbursements/extraction-review";
@@ -67,20 +71,20 @@ export default async function UserRequestDetailPage({
   const requestAccess = await getRequestAccess(session.user.id, requestId);
   if (!requestAccess || !requestAccess.canView) notFound();
 
-  const requestRecord = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
+  const requestRecord = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
       team: true,
       receiptFiles: {
-        include: {
+        with: {
           extraction: {
-            include: {
+            with: {
               lineItems: {
-                orderBy: { position: "asc" },
-                include: {
+                orderBy: (lineItem, { asc }) => asc(lineItem.position),
+                with: {
                   comments: {
-                    orderBy: { createdAt: "asc" },
-                    include: { author: { select: { email: true } } },
+                    orderBy: (comment, { asc }) => asc(comment.createdAt),
+                    with: { author: { columns: { email: true } } },
                   },
                 },
               },
@@ -89,8 +93,8 @@ export default async function UserRequestDetailPage({
         },
       },
       approvals: {
-        select: { id: true, action: true, comment: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
+        columns: { id: true, action: true, comment: true, createdAt: true },
+        orderBy: (approval, { asc }) => asc(approval.createdAt),
       },
     },
   });
@@ -127,6 +131,19 @@ export default async function UserRequestDetailPage({
   return (
     <LiveTotalProvider initialTotal={Number(requestRecord.requestedTotal)}>
     <div className="space-y-6">
+      <Link
+        href={
+          requestAccess.isReimbursementAdmin
+            ? "/admin/requests"
+            : requestAccess.isCoach
+              ? "/coach/team-reimbursements"
+              : "/user/requests"
+        }
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Back to requests
+      </Link>
       {draftUi.showEditableDraftSections ? (
         <EditableRequestHeader
           requestId={requestRecord.id}

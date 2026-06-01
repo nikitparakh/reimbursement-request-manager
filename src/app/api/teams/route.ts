@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { programs, schools, teams } from "@/db/schema";
 import { requireSuperAdmin, requireUser } from "@/lib/rbac";
 
 const listSchema = z.object({
@@ -48,14 +50,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const teams = await db.team.findMany({
-    where: {
-      active: true,
-      ...(query.data.schoolId ? { schoolId: query.data.schoolId } : {}),
-      ...(query.data.programId ? { programId: query.data.programId } : {}),
-    },
-    orderBy: { name: "asc" },
-    select: {
+  const teamsList = await db.query.teams.findMany({
+    where: and(
+      eq(teams.active, true),
+      ...(query.data.schoolId ? [eq(teams.schoolId, query.data.schoolId)] : []),
+      ...(query.data.programId ? [eq(teams.programId, query.data.programId)] : [])
+    ),
+    orderBy: asc(teams.name),
+    columns: {
       id: true,
       schoolId: true,
       programId: true,
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
       fllDivision: true,
     },
   });
-  return NextResponse.json(teams);
+  return NextResponse.json(teamsList);
 }
 
 export async function POST(request: Request) {
@@ -80,13 +82,13 @@ export async function POST(request: Request) {
   }
 
   const [school, program] = await Promise.all([
-    db.school.findUnique({
-      where: { id: body.data.schoolId },
-      select: { id: true },
+    db.query.schools.findFirst({
+      where: eq(schools.id, body.data.schoolId),
+      columns: { id: true },
     }),
-    db.program.findUnique({
-      where: { id: body.data.programId },
-      select: { id: true, code: true },
+    db.query.programs.findFirst({
+      where: eq(programs.id, body.data.programId),
+      columns: { id: true, code: true },
     }),
   ]);
 
@@ -103,15 +105,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const team = await db.team.create({
-    data: {
+  const [team] = await db
+    .insert(teams)
+    .values({
       schoolId: school.id,
       programId: program.id,
       name: body.data.name,
       shortCode: body.data.shortCode,
       glAccount: body.data.glAccount,
       fllDivision: body.data.fllDivision,
-    },
-  });
+    })
+    .returning();
   return NextResponse.json(team, { status: 201 });
 }

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { transitionRequestStatus } from "@/lib/reimbursements/workflow";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { invalidateApprovalCaches } from "@/lib/reimbursements/cache";
 import { sendNotification } from "@/lib/notifications/sender";
@@ -56,8 +58,8 @@ export async function POST(
   });
   invalidateApprovalCaches(current.teamId);
   const [creator, actor, adminEmails] = await Promise.all([
-    db.user.findUnique({ where: { id: current.createdById } }),
-    db.user.findUnique({ where: { id: actorId } }),
+    db.query.users.findFirst({ where: eq(users.id, current.createdById) }),
+    db.query.users.findFirst({ where: eq(users.id, actorId) }),
     getAdminReviewRecipientEmails({
       districtId: current.team.school.districtId,
       schoolId: current.team.schoolId,

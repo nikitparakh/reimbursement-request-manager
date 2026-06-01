@@ -1,22 +1,38 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq, inArray, max } from "drizzle-orm";
 import { db } from "@/lib/db";
+import {
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+} from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
 async function recalculateRequestTotal(requestId: string) {
-  const extractions = await db.receiptExtraction.findMany({
-    where: { receiptFile: { requestId } },
-    include: { lineItems: true },
+  const files = await db.query.receiptFiles.findMany({
+    where: eq(receiptFiles.requestId, requestId),
+    columns: { id: true },
   });
+  const fileIds = files.map((f) => f.id);
+
+  const extractions =
+    fileIds.length > 0
+      ? await db.query.receiptExtractions.findMany({
+          where: inArray(receiptExtractions.receiptFileId, fileIds),
+          with: { lineItems: true },
+        })
+      : [];
 
   const total = aggregateReimbursableTotals(extractions);
 
-  await db.reimbursementRequest.update({
-    where: { id: requestId },
-    data: { requestedTotal: total },
-  });
+  await db
+    .update(reimbursementRequests)
+    .set({ requestedTotal: total })
+    .where(eq(reimbursementRequests.id, requestId));
 }
 
 const updateSchema = z.object({
@@ -58,9 +74,9 @@ export async function PUT(
 
   const { lineItemId, excluded, ...updates } = body.data;
 
-  const lineItem = await db.receiptLineItem.findUnique({
-    where: { id: lineItemId },
-    include: { receiptExtraction: { include: { receiptFile: true } } },
+  const lineItem = await db.query.receiptLineItems.findFirst({
+    where: eq(receiptLineItems.id, lineItemId),
+    with: { receiptExtraction: { with: { receiptFile: true } } },
   });
   if (!lineItem || lineItem.receiptExtraction.receiptFile.requestId !== requestId) {
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
@@ -72,10 +88,11 @@ export async function PUT(
     data.excludedById = null;
   }
 
-  const updated = await db.receiptLineItem.update({
-    where: { id: lineItemId },
-    data,
-  });
+  const [updated] = await db
+    .update(receiptLineItems)
+    .set(data)
+    .where(eq(receiptLineItems.id, lineItemId))
+    .returning();
 
   await recalculateRequestTotal(requestId);
 
@@ -118,25 +135,26 @@ export async function POST(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const extraction = await db.receiptExtraction.findUnique({
-    where: { id: body.data.receiptExtractionId },
-    include: { receiptFile: true },
+  const extraction = await db.query.receiptExtractions.findFirst({
+    where: eq(receiptExtractions.id, body.data.receiptExtractionId),
+    with: { receiptFile: true },
   });
   if (!extraction || extraction.receiptFile.requestId !== requestId) {
     return NextResponse.json({ error: "Extraction not found" }, { status: 404 });
   }
 
-  const maxPos = await db.receiptLineItem.aggregate({
-    where: { receiptExtractionId: body.data.receiptExtractionId },
-    _max: { position: true },
-  });
+  const [maxPos] = await db
+    .select({ value: max(receiptLineItems.position) })
+    .from(receiptLineItems)
+    .where(eq(receiptLineItems.receiptExtractionId, body.data.receiptExtractionId));
 
-  const created = await db.receiptLineItem.create({
-    data: {
+  const [created] = await db
+    .insert(receiptLineItems)
+    .values({
       ...body.data,
-      position: (maxPos._max.position ?? -1) + 1,
-    },
-  });
+      position: (maxPos?.value ?? -1) + 1,
+    })
+    .returning();
 
   await recalculateRequestTotal(requestId);
 
@@ -174,9 +192,9 @@ export async function DELETE(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const lineItem = await db.receiptLineItem.findUnique({
-    where: { id: body.data.lineItemId },
-    include: { receiptExtraction: { include: { receiptFile: true } } },
+  const lineItem = await db.query.receiptLineItems.findFirst({
+    where: eq(receiptLineItems.id, body.data.lineItemId),
+    with: { receiptExtraction: { with: { receiptFile: true } } },
   });
   if (!lineItem || lineItem.receiptExtraction.receiptFile.requestId !== requestId) {
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
@@ -187,12 +205,14 @@ export async function DELETE(
     requestAccess.request.status !== "DRAFT";
 
   if (isReviewerExclusion) {
-    await db.receiptLineItem.update({
-      where: { id: body.data.lineItemId },
-      data: { excludedAt: new Date(), excludedById: requestAccess.userId },
-    });
+    await db
+      .update(receiptLineItems)
+      .set({ excludedAt: new Date(), excludedById: requestAccess.userId })
+      .where(eq(receiptLineItems.id, body.data.lineItemId));
   } else {
-    await db.receiptLineItem.delete({ where: { id: body.data.lineItemId } });
+    await db
+      .delete(receiptLineItems)
+      .where(eq(receiptLineItems.id, body.data.lineItemId));
   }
 
   await recalculateRequestTotal(requestId);

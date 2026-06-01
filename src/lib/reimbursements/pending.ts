@@ -1,9 +1,8 @@
-import type { RequestStatus } from "@prisma/client";
+import type { RequestStatus } from "@/db/schema";
 
 import type { AccessContext } from "@/lib/access";
 
 export const PENDING_REVIEW_FILTER = "pending" as const;
-export type PendingReviewFilter = typeof PENDING_REVIEW_FILTER;
 
 /**
  * Returns the request statuses that the given user can still act on

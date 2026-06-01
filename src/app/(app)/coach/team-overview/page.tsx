@@ -1,9 +1,12 @@
-import { unauthorized } from "next/navigation";
+import { forbidden, unauthorized } from "next/navigation";
 import { BanknoteArrowUp, Clock, FileText } from "lucide-react";
+import { inArray, ne } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { teams } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
+import { getRequestDetailHref } from "@/lib/navigation";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,12 +26,12 @@ export default async function CoachTeamOverviewPage() {
   const session = await auth();
   if (!session?.user) unauthorized();
   const access = await getCachedAccessContext(session.user.id);
-  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
+  if (!access.isCoach && !access.canManageReimbursements) forbidden();
 
   const managedTeams = access.canManageReimbursements
-    ? await db.team.findMany({
+    ? await db.query.teams.findMany({
         where: buildManagedTeamWhere(access),
-        select: { id: true },
+        columns: { id: true },
       })
     : [];
 
@@ -60,28 +63,27 @@ export default async function CoachTeamOverviewPage() {
     );
   }
 
-  const teams = await db.team.findMany({
-    where: { id: { in: teamIds } },
-    include: {
-      school: { include: { district: true } },
+  const teamsList = await db.query.teams.findMany({
+    where: inArray(teams.id, teamIds),
+    with: {
+      school: { with: { district: true } },
       program: true,
       memberships: {
-        where: { approved: true },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
+        where: (membership, { eq }) => eq(membership.approved, true),
+        with: {
+          user: { columns: { id: true, name: true, email: true } },
         },
-        orderBy: [{ roleInTeam: "asc" }, { createdAt: "asc" }],
+        orderBy: (membership, { asc }) => [
+          asc(membership.roleInTeam),
+          asc(membership.createdAt),
+        ],
       },
       requests: {
-        where: {
-          status: {
-            not: "DRAFT",
-          },
+        where: (request) => ne(request.status, "DRAFT"),
+        with: {
+          createdBy: { columns: { name: true, email: true } },
         },
-        include: {
-          createdBy: { select: { name: true, email: true } },
-        },
-        orderBy: { createdAt: "desc" },
+        orderBy: (request, { desc }) => desc(request.createdAt),
       },
     },
   });
@@ -93,7 +95,7 @@ export default async function CoachTeamOverviewPage() {
         description={getTeamOverviewDescription(access)}
       />
 
-      {teams.map((team) => {
+      {teamsList.map((team) => {
         const paidAmount = team.requests
           .filter((r) => r.status === "PAID")
           .reduce((sum, r) => sum + Number(r.requestedTotal), 0);
@@ -110,6 +112,12 @@ export default async function CoachTeamOverviewPage() {
           status: r.status,
           date: formatDate(r.createdAt),
           dateMs: r.createdAt.getTime(),
+          detailHref: getRequestDetailHref(access, r.id, {
+            teamId: team.id,
+            schoolId: team.schoolId,
+            programId: team.programId,
+            districtId: team.school.districtId,
+          }),
         }));
 
         const memberRows = team.memberships.map((m) => ({
@@ -121,7 +129,7 @@ export default async function CoachTeamOverviewPage() {
 
         return (
           <div key={team.id} className="space-y-6">
-            {teams.length > 1 && (
+            {teamsList.length > 1 && (
               <Card>
                 <CardContent className="flex flex-wrap items-center gap-3">
                   <h2 className="text-xl font-semibold text-foreground">
@@ -142,7 +150,7 @@ export default async function CoachTeamOverviewPage() {
               </Card>
             )}
 
-            {teams.length === 1 && (
+            {teamsList.length === 1 && (
               <PageHeader
                 title={team.name}
                 badge={
@@ -227,7 +235,7 @@ export default async function CoachTeamOverviewPage() {
               </CardContent>
             </Card>
 
-            {teams.length > 1 && (
+            {teamsList.length > 1 && (
               <hr className="border-border" />
             )}
           </div>
@@ -236,4 +244,3 @@ export default async function CoachTeamOverviewPage() {
     </div>
   );
 }
-

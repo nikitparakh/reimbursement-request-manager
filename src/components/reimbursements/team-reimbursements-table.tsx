@@ -30,6 +30,8 @@ export type ReimbursementRow = {
   status: string;
   date: string;
   dateMs: number;
+  // Role-correct detail route resolved server-side (admin vs user route).
+  detailHref: string;
 };
 
 const STATUS_OPTIONS = [
@@ -51,7 +53,7 @@ function buildColumns(
   reopeningId: string | null,
   showRequester: boolean,
   hasAnyRejected: boolean,
-  onOpenRequest: (id: string) => void,
+  onOpenRequest: (href: string) => void,
 ): ColumnDef<ReimbursementRow>[] {
   const cols: ColumnDef<ReimbursementRow>[] = [
     {
@@ -63,7 +65,7 @@ function buildColumns(
         <button
           type="button"
           className="cursor-pointer truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => onOpenRequest(row.original.id)}
+          onClick={() => onOpenRequest(row.original.detailHref)}
         >
           {row.original.title}
         </button>
@@ -209,7 +211,7 @@ export function TeamReimbursementsTable({
         reopeningId,
         showRequester,
         hasAnyRejected,
-        (rid) => router.push(`/user/requests/${rid}`),
+        (href) => router.push(href),
       ),
     [handleReopen, reopeningId, showRequester, hasAnyRejected, router],
   );

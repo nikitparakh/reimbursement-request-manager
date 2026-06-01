@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { unauthorized } from "next/navigation";
+import { and, asc, eq, inArray, or, type SQL } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { getCachedAccessContext } from "@/lib/access";
+import { getCachedAccessContext, type AccessContext, type ScopedRoleAssignment } from "@/lib/access";
 import {
-  buildManagedTeamRegistrationWhere,
-  buildManagedTeamWhere,
-} from "@/lib/admin-scope";
+  schools,
+  teamMemberships,
+  teamRegistrationRequests,
+  teams,
+} from "@/db/schema";
 import { TeamRequestDecision } from "@/components/onboarding/team-request-decision";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +24,78 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+function getAdminAssignments(access: AccessContext) {
+  return access.scopedRoles.filter(
+    (assignment) =>
+      assignment.role === "SCHOOL_ADMIN" || assignment.role === "PROGRAM_ADMIN",
+  );
+}
+
+// Drizzle equivalent of buildManagedTeamWhere: returns a condition restricting
+// teams to the admin's managed scope. `undefined` means "no restriction"
+// (super admin); a never-matching condition means "deny all".
+function managedTeamCondition(access: AccessContext): SQL | undefined {
+  if (access.isSuperAdmin) return undefined;
+
+  const conditions = getAdminAssignments(access).map((assignment) => {
+    const parts: SQL[] = [];
+    if (assignment.teamId) {
+      parts.push(eq(teams.id, assignment.teamId));
+    }
+    if (assignment.schoolId) {
+      parts.push(eq(teams.schoolId, assignment.schoolId));
+    } else if (assignment.districtId) {
+      parts.push(
+        inArray(
+          teams.schoolId,
+          db
+            .select({ id: schools.id })
+            .from(schools)
+            .where(eq(schools.districtId, assignment.districtId)),
+        ),
+      );
+    }
+    if (assignment.programId) {
+      parts.push(eq(teams.programId, assignment.programId));
+    }
+    return parts.length > 0 ? and(...parts) : undefined;
+  });
+
+  const defined = conditions.filter((c): c is SQL => c !== undefined);
+  // No admin assignments -> deny all (mirror Prisma `{ id: { in: [] } }`).
+  if (getAdminAssignments(access).length === 0) {
+    return inArray(teams.id, []);
+  }
+  return defined.length > 0 ? or(...defined) : undefined;
+}
+
+// Drizzle equivalent of buildManagedTeamRegistrationWhere.
+function managedRegistrationCondition(access: AccessContext): SQL | undefined {
+  if (access.isSuperAdmin) return undefined;
+
+  const assignments = getAdminAssignments(access);
+  if (assignments.length === 0) {
+    return inArray(teamRegistrationRequests.id, []);
+  }
+
+  const conditions = assignments.map((assignment: ScopedRoleAssignment) => {
+    const parts: SQL[] = [];
+    if (assignment.districtId) {
+      parts.push(eq(teamRegistrationRequests.districtId, assignment.districtId));
+    }
+    if (assignment.schoolId) {
+      parts.push(eq(teamRegistrationRequests.schoolId, assignment.schoolId));
+    }
+    if (assignment.programId) {
+      parts.push(eq(teamRegistrationRequests.programId, assignment.programId));
+    }
+    return parts.length > 0 ? and(...parts) : undefined;
+  });
+
+  const defined = conditions.filter((c): c is SQL => c !== undefined);
+  return defined.length > 0 ? or(...defined) : undefined;
+}
 
 export default async function AdminTeamsPage({
   searchParams,
@@ -37,81 +112,91 @@ export default async function AdminTeamsPage({
   if (!access.canManageTeams) unauthorized();
 
   const { districtId, schoolId, programId } = await searchParams;
-  const teamFilters = {
-    ...(schoolId ? { schoolId } : {}),
-    ...(programId ? { programId } : {}),
-    ...(districtId ? { school: { districtId } } : {}),
-  };
-  const registrationFilters = {
-    ...(districtId ? { districtId } : {}),
-    ...(schoolId ? { schoolId } : {}),
-    ...(programId ? { programId } : {}),
-  };
 
-  const [teams, registrationRequests, createTeamSchools, createTeamPrograms] = await Promise.all([
-    db.team.findMany({
-      where: {
-        AND: [buildManagedTeamWhere(access), teamFilters],
-      },
-      include: {
-        school: { include: { district: true } },
-        program: true,
-        memberships: {
-          where: { approved: true },
-          select: { roleInTeam: true },
-        },
-        requests: {
-          where: {
-            status: {
-              in: [
+  // Team filters (mirror the Prisma `teamFilters` object).
+  const teamFilterParts: SQL[] = [];
+  if (schoolId) teamFilterParts.push(eq(teams.schoolId, schoolId));
+  if (programId) teamFilterParts.push(eq(teams.programId, programId));
+  if (districtId) {
+    teamFilterParts.push(
+      inArray(
+        teams.schoolId,
+        db
+          .select({ id: schools.id })
+          .from(schools)
+          .where(eq(schools.districtId, districtId)),
+      ),
+    );
+  }
+
+  // Registration filters (mirror the Prisma `registrationFilters` object).
+  const registrationFilterParts: SQL[] = [];
+  if (districtId)
+    registrationFilterParts.push(eq(teamRegistrationRequests.districtId, districtId));
+  if (schoolId)
+    registrationFilterParts.push(eq(teamRegistrationRequests.schoolId, schoolId));
+  if (programId)
+    registrationFilterParts.push(eq(teamRegistrationRequests.programId, programId));
+
+  const teamWhereParts: SQL[] = [];
+  const managedTeam = managedTeamCondition(access);
+  if (managedTeam) teamWhereParts.push(managedTeam);
+  teamWhereParts.push(...teamFilterParts);
+
+  const registrationWhereParts: SQL[] = [
+    eq(teamRegistrationRequests.status, "PENDING"),
+  ];
+  const managedRegistration = managedRegistrationCondition(access);
+  if (managedRegistration) registrationWhereParts.push(managedRegistration);
+  registrationWhereParts.push(...registrationFilterParts);
+
+  const [teamsList, registrationRequests, createTeamSchools, createTeamPrograms] =
+    await Promise.all([
+      db.query.teams.findMany({
+        where: teamWhereParts.length > 0 ? and(...teamWhereParts) : undefined,
+        with: {
+          school: { with: { district: true } },
+          program: true,
+          memberships: {
+            where: (m, { eq: eqOp }) => eqOp(m.approved, true),
+            columns: { roleInTeam: true },
+          },
+          requests: {
+            where: (r, { inArray: inArrayOp }) =>
+              inArrayOp(r.status, [
                 "COACH_APPROVED",
                 "COACH_REJECTED",
                 "ADMIN_APPROVED",
                 "ADMIN_REJECTED",
                 "PAID",
-              ],
-            },
+              ]),
+            columns: { status: true },
           },
-          select: { status: true },
         },
-      },
-      orderBy: { name: "asc" },
-    }),
-    db.teamRegistrationRequest.findMany({
-      where: {
-        AND: [
-          { status: "PENDING" },
-          buildManagedTeamRegistrationWhere(access),
-          registrationFilters,
-        ],
-      },
-      include: { requestedBy: true, school: true, district: true, program: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    access.isSuperAdmin
-      ? db.school.findMany({
-          select: {
-            id: true,
-            name: true,
-            district: {
-              select: {
-                name: true,
-              },
-            },
-          },
-          orderBy: [{ districtId: "asc" }, { name: "asc" }],
-        })
-      : Promise.resolve([]),
-    access.isSuperAdmin
-      ? db.program.findMany({
-          where: { active: true },
-          select: { id: true, name: true, code: true },
-          orderBy: { code: "asc" },
-        })
-      : Promise.resolve([]),
-  ]);
+        orderBy: (t, { asc: ascOp }) => ascOp(t.name),
+      }),
+      db.query.teamRegistrationRequests.findMany({
+        where: and(...registrationWhereParts),
+        with: { requestedBy: true, school: true, district: true, program: true },
+        orderBy: (r, { asc: ascOp }) => ascOp(r.createdAt),
+      }),
+      access.isSuperAdmin
+        ? db.query.schools.findMany({
+            columns: { id: true, name: true },
+            with: { district: { columns: { name: true } } },
+            orderBy: (s, { asc: ascOp }) => [ascOp(s.districtId), ascOp(s.name)],
+          })
+        : Promise.resolve([]),
+      access.isSuperAdmin
+        ? db.query.programs.findMany({
+            where: (p, { eq: eqOp }) => eqOp(p.active, true),
+            columns: { id: true, name: true, code: true },
+            orderBy: (p, { asc: ascOp }) => ascOp(p.code),
+          })
+        : Promise.resolve([]),
+    ]);
 
-  const teamsWithStats = teams.map((team) => ({
+  const teamsWithStats = teamsList.map((team) => ({
     id: team.id,
     name: team.name,
     shortCode: team.shortCode,
@@ -132,7 +217,7 @@ export default async function AdminTeamsPage({
     <div className="space-y-6">
       <PageHeader
         title="Manage Teams"
-        badge={<StatusBadge status={`${teams.length} teams`} />}
+        badge={<StatusBadge status={`${teamsList.length} teams`} />}
         description={
           access.isSuperAdmin
             ? "Create, view, and manage teams across districts, schools, and programs."

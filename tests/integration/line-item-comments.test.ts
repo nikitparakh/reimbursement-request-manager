@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import "../helpers/auth-mock";
 import { clearMockSession, setMockUser } from "../helpers/auth-mock";
 import { POST } from "@/app/api/requests/[requestId]/line-items/comments/route";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { schools } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createExtraction,
@@ -68,9 +70,10 @@ describe("POST /api/requests/[requestId]/line-items/comments", () => {
     const admin = await createUser();
     const user = await createUser({ role: "USER" });
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({
-      where: { id: team.schoolId },
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
     });
+    if (!school) throw new Error("School not found");
     await createScopedRole({
       userId: admin.id,
       role: "SCHOOL_ADMIN",

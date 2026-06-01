@@ -7,7 +7,6 @@ let tmpDir: string;
 
 beforeEach(async () => {
   vi.resetModules();
-  delete process.env.BLOB_READ_WRITE_TOKEN;
   tmpDir = await mkdtemp(path.join(tmpdir(), "veltest-storage-"));
   process.env.LOCAL_STORAGE_DIR = tmpDir;
 });

@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
 import { POST } from "@/app/api/requests/[requestId]/admin-decision/route";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { approvalActions, auditLogs } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import { createUser, createTeam, createRequest } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
@@ -209,14 +211,14 @@ describe("POST /api/requests/[requestId]/admin-decision", () => {
       { requestId: req.id }
     );
 
-    const approval = await db.approvalAction.findFirst({
-      where: { requestId: req.id },
+    const approval = await db.query.approvalActions.findFirst({
+      where: eq(approvalActions.requestId, req.id),
     });
     expect(approval!.action).toBe("APPROVE");
     expect(approval!.actorId).toBe(admin.id);
 
-    const log = await db.auditLog.findFirst({
-      where: { requestId: req.id },
+    const log = await db.query.auditLogs.findFirst({
+      where: eq(auditLogs.requestId, req.id),
     });
     expect(log!.eventType).toBe("REQUEST_STATUS_UPDATED");
   });

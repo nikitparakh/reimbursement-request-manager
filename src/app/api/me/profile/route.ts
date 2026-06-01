@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
 const profileSchema = z.object({
@@ -26,9 +28,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: {
       id: true,
       email: true,
       name: true,
@@ -71,9 +73,9 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const user = await db.user.update({
-    where: { id: userId },
-    data: {
+  const [user] = await db
+    .update(users)
+    .set({
       mailingAddressLine1: normalizeOptional(body.data.mailingAddressLine1),
       mailingAddressLine2: normalizeOptional(body.data.mailingAddressLine2),
       mailingCity: normalizeOptional(body.data.mailingCity),
@@ -81,22 +83,22 @@ export async function PATCH(request: Request) {
       mailingPostalCode: normalizeOptional(body.data.mailingPostalCode),
       zelleType: body.data.zelleType ?? null,
       zelleValue: normalizeOptional(body.data.zelleValue),
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      mailingAddressLine1: true,
-      mailingAddressLine2: true,
-      mailingCity: true,
-      mailingState: true,
-      mailingPostalCode: true,
-      zelleType: true,
-      zelleValue: true,
-      policyAcceptedAt: true,
-      policyVersion: true,
-    },
-  });
+    })
+    .where(eq(users.id, userId))
+    .returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      mailingAddressLine1: users.mailingAddressLine1,
+      mailingAddressLine2: users.mailingAddressLine2,
+      mailingCity: users.mailingCity,
+      mailingState: users.mailingState,
+      mailingPostalCode: users.mailingPostalCode,
+      zelleType: users.zelleType,
+      zelleValue: users.zelleValue,
+      policyAcceptedAt: users.policyAcceptedAt,
+      policyVersion: users.policyVersion,
+    });
 
   return NextResponse.json(user);
 }

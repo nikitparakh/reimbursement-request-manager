@@ -1,7 +1,7 @@
-import { Prisma } from "@prisma/client";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { approvalActions, auditLogs, reimbursementRequests } from "@/db/schema";
 import { assertTransition } from "@/lib/reimbursements/status";
-import { logAuditEvent } from "@/lib/audit/log";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 
 export async function transitionRequestStatus(input: {
@@ -18,60 +18,60 @@ export async function transitionRequestStatus(input: {
   action: "APPROVE" | "REJECT" | "REOPEN" | "MARK_PAID" | "SUBMIT";
   comment?: string;
 }) {
-  return db.$transaction(async (tx) => {
-    const request = await tx.reimbursementRequest.findUniqueOrThrow({
-      where: { id: input.requestId },
-      include: {
-        receiptFiles: {
-          include: { extraction: { include: { lineItems: true } } },
-        },
+  // D1 has no interactive transactions: read first, then apply the writes
+  // atomically with db.batch().
+  const request = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, input.requestId),
+    with: {
+      receiptFiles: {
+        with: { extraction: { with: { lineItems: true } } },
       },
-    });
-
-    assertTransition(request.status, input.nextStatus);
-
-    const extractions = request.receiptFiles
-      .map((f) => f.extraction)
-      .filter((e): e is NonNullable<typeof e> => Boolean(e));
-    const requestedTotal =
-      extractions.length > 0
-        ? aggregateReimbursableTotals(extractions)
-        : Number(request.requestedTotal);
-
-    const updated = await tx.reimbursementRequest.update({
-      where: { id: request.id },
-      data: {
-        status: input.nextStatus,
-        requestedTotal: new Prisma.Decimal(requestedTotal.toFixed(2)),
-        submittedAt: input.nextStatus === "SUBMITTED" ? new Date() : request.submittedAt,
-      },
-    });
-
-    await tx.approvalAction.create({
-      data: {
-        requestId: request.id,
-        actorId: input.actorId,
-        action: input.action,
-        comment: input.comment,
-      },
-    });
-
-    await logAuditEvent(
-      {
-        actorId: input.actorId,
-        requestId: request.id,
-        eventType: "REQUEST_STATUS_UPDATED",
-        message: `Request moved from ${request.status} to ${input.nextStatus}`,
-        metadata: {
-          from: request.status,
-          to: input.nextStatus,
-          action: input.action,
-          comment: input.comment ?? null,
-        },
-      },
-      tx
-    );
-
-    return updated;
+    },
   });
+  if (!request) throw new Error("Reimbursement request not found");
+
+  assertTransition(request.status, input.nextStatus);
+
+  const extractions = request.receiptFiles
+    .map((f) => f.extraction)
+    .filter((e): e is NonNullable<typeof e> => Boolean(e));
+  const requestedTotal =
+    extractions.length > 0
+      ? aggregateReimbursableTotals(extractions)
+      : Number(request.requestedTotal);
+
+  const submittedAt =
+    input.nextStatus === "SUBMITTED" ? new Date() : request.submittedAt;
+
+  const [updatedRows] = await db.batch([
+    db
+      .update(reimbursementRequests)
+      .set({
+        status: input.nextStatus,
+        requestedTotal: Number(requestedTotal.toFixed(2)),
+        submittedAt,
+      })
+      .where(eq(reimbursementRequests.id, request.id))
+      .returning(),
+    db.insert(approvalActions).values({
+      requestId: request.id,
+      actorId: input.actorId,
+      action: input.action,
+      comment: input.comment,
+    }),
+    db.insert(auditLogs).values({
+      actorId: input.actorId,
+      requestId: request.id,
+      eventType: "REQUEST_STATUS_UPDATED",
+      message: `Request moved from ${request.status} to ${input.nextStatus}`,
+      metadata: {
+        from: request.status,
+        to: input.nextStatus,
+        action: input.action,
+        comment: input.comment ?? null,
+      },
+    }),
+  ]);
+
+  return updatedRows[0];
 }

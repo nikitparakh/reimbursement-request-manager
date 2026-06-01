@@ -1,1 +1,0 @@
--- Legacy placeholder migration retained to satisfy Prisma migration history after local reset.

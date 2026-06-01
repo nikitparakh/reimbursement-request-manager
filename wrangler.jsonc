@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reimbursement-request-manager",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "reimbursement-manager",
+      // Replace with the id from `wrangler d1 create reimbursement-manager`.
+      "database_id": "00299ab5-5cb2-4b04-9856-bf40ce4895df",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RECEIPTS_BUCKET",
+      "bucket_name": "receipts"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "RECEIPT_QUEUE",
+        "queue": "receipt-parse"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -15,6 +15,8 @@ import {
 } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
 import { db } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { userScopeRoles } from "@/db/schema";
 
 describe("PATCH /api/admin/users/[id]/role", () => {
   beforeEach(async () => {
@@ -120,8 +122,11 @@ describe("POST /api/admin/users/[id]/scopes", () => {
     expect(status).toBe(201);
     expect((data as { role: string }).role).toBe("PROGRAM_ADMIN");
 
-    const scope = await db.userScopeRole.findFirst({
-      where: { userId: target.id, role: "PROGRAM_ADMIN" },
+    const scope = await db.query.userScopeRoles.findFirst({
+      where: and(
+        eq(userScopeRoles.userId, target.id),
+        eq(userScopeRoles.role, "PROGRAM_ADMIN")
+      ),
     });
     expect(scope?.schoolId).toBe(school.id);
     expect(scope?.programId).toBe(program.id);
@@ -220,6 +225,10 @@ describe("DELETE /api/admin/users/[id]/scopes", () => {
     );
 
     expect(status).toBe(200);
-    expect(await db.userScopeRole.findUnique({ where: { id: scope.id } })).toBeNull();
+    expect(
+      await db.query.userScopeRoles.findFirst({
+        where: eq(userScopeRoles.id, scope.id),
+      })
+    ).toBeUndefined();
   });
 });

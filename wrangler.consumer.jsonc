@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reimbursement-receipt-consumer",
+  "main": "workers/receipt-consumer/index.ts",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "reimbursement-manager",
+      "database_id": "00299ab5-5cb2-4b04-9856-bf40ce4895df"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RECEIPTS_BUCKET",
+      "bucket_name": "receipts"
+    }
+  ],
+  "vars": {
+    "GOOGLE_AI_MODEL": "gemini-2.5-flash"
+  },
+  "queues": {
+    "consumers": [
+      {
+        "queue": "receipt-parse",
+        "max_batch_size": 5,
+        "max_batch_timeout": 30,
+        "max_retries": 3,
+        "dead_letter_queue": "receipt-parse-dlq"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

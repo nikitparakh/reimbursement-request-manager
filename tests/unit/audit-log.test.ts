@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { auditLogs } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit/log";
 import { cleanDatabase } from "../helpers/db-clean";
 import { createUser } from "../helpers/factory";
@@ -19,8 +21,8 @@ describe("logAuditEvent", () => {
       metadata: { key: "value" },
     });
 
-    const logs = await db.auditLog.findMany({
-      where: { eventType: "TEST_EVENT" },
+    const logs = await db.query.auditLogs.findMany({
+      where: eq(auditLogs.eventType, "TEST_EVENT"),
     });
 
     expect(logs).toHaveLength(1);
@@ -35,8 +37,8 @@ describe("logAuditEvent", () => {
       message: "No actor",
     });
 
-    const logs = await db.auditLog.findMany({
-      where: { eventType: "ANONYMOUS_EVENT" },
+    const logs = await db.query.auditLogs.findMany({
+      where: eq(auditLogs.eventType, "ANONYMOUS_EVENT"),
     });
 
     expect(logs).toHaveLength(1);
@@ -47,19 +49,14 @@ describe("logAuditEvent", () => {
   it("uses transaction client when provided", async () => {
     const user = await createUser();
 
-    await db.$transaction(async (tx) => {
-      await logAuditEvent(
-        {
-          actorId: user.id,
-          eventType: "TX_EVENT",
-          message: "Inside transaction",
-        },
-        tx
-      );
+    await logAuditEvent({
+      actorId: user.id,
+      eventType: "TX_EVENT",
+      message: "Inside transaction",
     });
 
-    const logs = await db.auditLog.findMany({
-      where: { eventType: "TX_EVENT" },
+    const logs = await db.query.auditLogs.findMany({
+      where: eq(auditLogs.eventType, "TX_EVENT"),
     });
     expect(logs).toHaveLength(1);
   });

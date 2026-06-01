@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { teams } from "@/db/schema";
 import { canManageTeams, getAccessContext } from "@/lib/access";
 import { requireUser } from "@/lib/rbac";
 
@@ -30,11 +32,11 @@ export async function PATCH(
 
   const [access, team] = await Promise.all([
     getAccessContext(userId),
-    db.team.findUnique({
-      where: { id: teamId },
-      include: {
+    db.query.teams.findFirst({
+      where: eq(teams.id, teamId),
+      with: {
         school: {
-          select: {
+          columns: {
             districtId: true,
           },
         },
@@ -55,10 +57,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const updated = await db.team.update({
-    where: { id: teamId },
-    data: body.data,
-  });
+  const [updated] = await db
+    .update(teams)
+    .set(body.data)
+    .where(eq(teams.id, teamId))
+    .returning();
 
   return NextResponse.json(updated);
 }

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { asc } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { notifications } from "@/db/schema";
 import { sendNotification } from "@/lib/notifications/sender";
 import { cleanDatabase } from "../helpers/db-clean";
 import { createUser, createTeam, createRequest } from "../helpers/factory";
@@ -22,17 +24,17 @@ describe("sendNotification", () => {
       message: "A request was submitted",
     });
 
-    const notifications = await db.notification.findMany({
-      orderBy: { createdAt: "asc" },
+    const rows = await db.query.notifications.findMany({
+      orderBy: asc(notifications.createdAt),
     });
 
-    expect(notifications).toHaveLength(2);
-    expect(notifications[0].userId).toBe(user1.id);
-    expect(notifications[1].userId).toBe(user2.id);
-    expect(notifications[0].event).toBe("REQUEST_SUBMITTED");
-    expect(notifications[0].message).toBe("A request was submitted");
-    expect(notifications[0].read).toBe(false);
-    expect(notifications[0].requestId).toBe(req.id);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].userId).toBe(user1.id);
+    expect(rows[1].userId).toBe(user2.id);
+    expect(rows[0].event).toBe("REQUEST_SUBMITTED");
+    expect(rows[0].message).toBe("A request was submitted");
+    expect(rows[0].read).toBe(false);
+    expect(rows[0].requestId).toBe(req.id);
   });
 
   it("does nothing when no recipients match", async () => {
@@ -43,7 +45,7 @@ describe("sendNotification", () => {
       message: "Approved",
     });
 
-    const count = await db.notification.count();
+    const count = await db.$count(notifications);
     expect(count).toBe(0);
   });
 
@@ -59,8 +61,8 @@ describe("sendNotification", () => {
       message: "Final approval",
     });
 
-    const notifications = await db.notification.findMany();
-    expect(notifications).toHaveLength(1);
-    expect(notifications[0].message).toBe("Final approval");
+    const rows = await db.query.notifications.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].message).toBe("Final approval");
   });
 });

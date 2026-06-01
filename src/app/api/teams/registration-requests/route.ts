@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { schools, programs, teamRegistrationRequests } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
 const schema = z.object({
@@ -29,13 +31,13 @@ export async function POST(request: Request) {
   }
 
   const [school, program] = await Promise.all([
-    db.school.findUnique({
-      where: { id: body.data.schoolId },
-      select: { id: true, districtId: true },
+    db.query.schools.findFirst({
+      where: eq(schools.id, body.data.schoolId),
+      columns: { id: true, districtId: true },
     }),
-    db.program.findUnique({
-      where: { id: body.data.programId },
-      select: { id: true, code: true },
+    db.query.programs.findFirst({
+      where: eq(programs.id, body.data.programId),
+      columns: { id: true, code: true },
     }),
   ]);
   if (!school || !program) {
@@ -57,8 +59,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const created = await db.teamRegistrationRequest.create({
-    data: {
+  const [created] = await db
+    .insert(teamRegistrationRequests)
+    .values({
       districtId: body.data.districtId,
       schoolId: body.data.schoolId,
       programId: body.data.programId,
@@ -68,8 +71,8 @@ export async function POST(request: Request) {
       fllDivision: body.data.fllDivision,
       notes: body.data.notes,
       requestedById: userId,
-    },
-  });
+    })
+    .returning();
 
   return NextResponse.json(created, { status: 201 });
 }

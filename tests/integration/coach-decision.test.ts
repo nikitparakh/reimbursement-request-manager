@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { and, eq } from "drizzle-orm";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
 import { POST } from "@/app/api/requests/[requestId]/coach-decision/route";
 import { db } from "@/lib/db";
+import {
+  approvalActions,
+  auditLogs,
+  notifications,
+  schools,
+} from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createUser,
@@ -285,13 +292,13 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
       { requestId: req.id }
     );
 
-    const approval = await db.approvalAction.findFirst({
-      where: { requestId: req.id },
+    const approval = await db.query.approvalActions.findFirst({
+      where: eq(approvalActions.requestId, req.id),
     });
     expect(approval!.action).toBe("APPROVE");
 
-    const log = await db.auditLog.findFirst({
-      where: { requestId: req.id },
+    const log = await db.query.auditLogs.findFirst({
+      where: eq(auditLogs.requestId, req.id),
     });
     expect(log!.eventType).toBe("REQUEST_STATUS_UPDATED");
   });
@@ -301,7 +308,10 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
     const user = await createUser({ role: "USER" });
     const districtAdmin = await createUser({ role: "USER" });
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({ where: { id: team.schoolId } });
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
+    });
+    if (!school) throw new Error("School not found");
     await createMembership({
       userId: coach.id,
       teamId: team.id,
@@ -330,12 +340,12 @@ describe("POST /api/requests/[requestId]/coach-decision", () => {
 
     expect(status).toBe(200);
     expect(
-      await db.notification.findFirst({
-        where: {
-          userId: districtAdmin.id,
-          requestId: req.id,
-          event: "COACH_APPROVED",
-        },
+      await db.query.notifications.findFirst({
+        where: and(
+          eq(notifications.userId, districtAdmin.id),
+          eq(notifications.requestId, req.id),
+          eq(notifications.event, "COACH_APPROVED")
+        ),
       })
     ).toBeTruthy();
   });

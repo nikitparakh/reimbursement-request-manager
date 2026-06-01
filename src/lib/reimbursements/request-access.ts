@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { canManageReimbursements, getAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 
-export type RequestAccess = {
+type RequestAccess = {
   userId: string;
   request: {
     id: string;
@@ -35,22 +37,26 @@ export type RequestAccess = {
 export async function getRequestAccess(userId: string, requestId: string) {
   const [context, request] = await Promise.all([
     getAccessContext(userId),
-    db.reimbursementRequest.findUnique({
-      where: { id: requestId },
-      select: {
+    db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, requestId),
+      columns: {
         id: true,
         title: true,
         teamId: true,
         createdById: true,
         coachId: true,
         status: true,
+      },
+      with: {
         team: {
-          select: {
+          columns: {
             id: true,
             schoolId: true,
             programId: true,
+          },
+          with: {
             school: {
-              select: {
+              columns: {
                 districtId: true,
               },
             },

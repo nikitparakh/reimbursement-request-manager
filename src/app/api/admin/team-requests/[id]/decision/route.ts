@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { teamRegistrationRequests, teams } from "@/db/schema";
 import { canManageTeamRequests, getAccessContext } from "@/lib/access";
 import { requireUser } from "@/lib/rbac";
 
@@ -29,7 +31,9 @@ export async function POST(
   const { id } = await params;
   const [access, req] = await Promise.all([
     getAccessContext(actorId),
-    db.teamRegistrationRequest.findUnique({ where: { id } }),
+    db.query.teamRegistrationRequests.findFirst({
+      where: eq(teamRegistrationRequests.id, id),
+    }),
   ]);
   if (!req) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (req.status !== "PENDING") {
@@ -49,38 +53,41 @@ export async function POST(
   }
 
   if (body.data.decision === "REJECT") {
-    const updated = await db.teamRegistrationRequest.update({
-      where: { id },
-      data: {
+    const [updated] = await db
+      .update(teamRegistrationRequests)
+      .set({
         status: "REJECTED",
         reviewedById: actorId,
         reviewedAt: new Date(),
         rejectionReason: body.data.comment,
-      },
-    });
+      })
+      .where(eq(teamRegistrationRequests.id, id))
+      .returning();
     return NextResponse.json(updated);
   }
 
-  const team = await db.team.create({
-    data: {
+  const [team] = await db
+    .insert(teams)
+    .values({
       schoolId: req.schoolId,
       programId: req.programId,
       name: req.teamName,
       shortCode: req.shortCode ?? undefined,
       glAccount: req.glAccount ?? undefined,
       fllDivision: req.fllDivision ?? undefined,
-    },
-  });
+    })
+    .returning();
 
-  const updated = await db.teamRegistrationRequest.update({
-    where: { id },
-    data: {
+  const [updated] = await db
+    .update(teamRegistrationRequests)
+    .set({
       status: "APPROVED",
       reviewedById: actorId,
       reviewedAt: new Date(),
       approvedTeamId: team.id,
-    },
-  });
+    })
+    .where(eq(teamRegistrationRequests.id, id))
+    .returning();
 
   return NextResponse.json({ request: updated, team });
 }

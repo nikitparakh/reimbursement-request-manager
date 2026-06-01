@@ -1,8 +1,9 @@
-import { Prisma } from "@prisma/client";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { canManageUsers, getAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
+import { programs, schools, userScopeRoles, users } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { buildUserScopeRoleKey } from "@/lib/user-scope-role";
 
@@ -72,19 +73,19 @@ export async function POST(
   const { id } = await params;
   const [access, school, program, targetUser] = await Promise.all([
     getAccessContext(actorId),
-    db.school.findUnique({
-      where: { id: body.data.schoolId },
-      select: { id: true, districtId: true, name: true },
+    db.query.schools.findFirst({
+      where: eq(schools.id, body.data.schoolId),
+      columns: { id: true, districtId: true, name: true },
     }),
     body.data.programId
-      ? db.program.findUnique({
-          where: { id: body.data.programId },
-          select: { id: true, name: true },
+      ? db.query.programs.findFirst({
+          where: eq(programs.id, body.data.programId),
+          columns: { id: true, name: true },
         })
       : Promise.resolve(null),
-    db.user.findUnique({
-      where: { id },
-      select: { id: true },
+    db.query.users.findFirst({
+      where: eq(users.id, id),
+      columns: { id: true },
     }),
   ]);
 
@@ -109,53 +110,51 @@ export async function POST(
     schoolId: school.id,
     programId: body.data.programId ?? null,
   });
-  const scopeLookup = {
-    userId_role_scopeKey: {
-      userId: id,
-      role: body.data.role,
-      scopeKey,
-    },
-  } as const;
-  const existing = await db.userScopeRole.findUnique({
-    where: scopeLookup,
-    include: {
-      school: { select: { name: true } },
-      program: { select: { name: true } },
-    },
-  });
+  const findExistingScope = () =>
+    db.query.userScopeRoles.findFirst({
+      where: and(
+        eq(userScopeRoles.userId, id),
+        eq(userScopeRoles.role, body.data.role),
+        eq(userScopeRoles.scopeKey, scopeKey)
+      ),
+      with: {
+        school: { columns: { name: true } },
+        program: { columns: { name: true } },
+      },
+    });
+  const existing = await findExistingScope();
   if (existing) {
     return NextResponse.json(serializeScope(existing), { status: 200 });
   }
 
   try {
-    const scope = await db.userScopeRole.create({
-      data: {
+    const [created] = await db
+      .insert(userScopeRoles)
+      .values({
         userId: id,
         role: body.data.role,
         districtId: school.districtId,
         schoolId: school.id,
         programId: body.data.programId ?? null,
         scopeKey,
-      },
-      include: {
-        school: { select: { name: true } },
-        program: { select: { name: true } },
+      })
+      .returning();
+
+    const scope = await db.query.userScopeRoles.findFirst({
+      where: eq(userScopeRoles.id, created.id),
+      with: {
+        school: { columns: { name: true } },
+        program: { columns: { name: true } },
       },
     });
 
-    return NextResponse.json(serializeScope(scope), { status: 201 });
+    return NextResponse.json(serializeScope(scope ?? created), { status: 201 });
   } catch (error) {
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
+      error instanceof Error &&
+      /UNIQUE constraint failed|SQLITE_CONSTRAINT/i.test(error.message)
     ) {
-      const existingAfterRace = await db.userScopeRole.findUnique({
-        where: scopeLookup,
-        include: {
-          school: { select: { name: true } },
-          program: { select: { name: true } },
-        },
-      });
+      const existingAfterRace = await findExistingScope();
 
       if (existingAfterRace) {
         return NextResponse.json(serializeScope(existingAfterRace), {
@@ -187,11 +186,11 @@ export async function DELETE(
   const { id } = await params;
   const [access, scope] = await Promise.all([
     getAccessContext(actorId),
-    db.userScopeRole.findUnique({
-      where: { id: body.data.scopeId },
-      include: {
+    db.query.userScopeRoles.findFirst({
+      where: eq(userScopeRoles.id, body.data.scopeId),
+      with: {
         school: {
-          select: {
+          columns: {
             id: true,
             districtId: true,
           },
@@ -210,9 +209,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await db.userScopeRole.delete({
-    where: { id: scope.id },
-  });
+  await db.delete(userScopeRoles).where(eq(userScopeRoles.id, scope.id));
 
   return NextResponse.json({ deleted: true });
 }

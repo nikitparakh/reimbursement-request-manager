@@ -1,23 +1,40 @@
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
+import {
+  approvalActions,
+  auditLogs,
+  districts,
+  lineItemComments,
+  notifications,
+  programs,
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+  schools,
+  teamMemberships,
+  teamRegistrationRequests,
+  teams,
+  userScopeRoles,
+  users,
+} from "@/db/schema";
 
 export async function cleanDatabase() {
+  const db = getDb();
   // Delete in reverse dependency order to avoid FK violations
-  await db.notification.deleteMany();
-  await db.auditLog.deleteMany();
-  await db.approvalAction.deleteMany();
-  await db.receiptLineItem.deleteMany();
-  await db.receiptExtraction.deleteMany();
-  await db.receiptFile.deleteMany();
-  await db.reimbursementRequest.deleteMany();
-  await db.teamRegistrationRequest.deleteMany();
-  await db.userScopeRole.deleteMany();
-  await db.teamMembership.deleteMany();
-  await db.team.deleteMany();
-  await db.school.deleteMany();
-  await db.district.deleteMany();
-  await db.program.deleteMany();
-  await db.session.deleteMany();
-  await db.account.deleteMany();
-  await db.verificationToken.deleteMany();
-  await db.user.deleteMany();
+  await db.delete(notifications);
+  await db.delete(auditLogs);
+  await db.delete(approvalActions);
+  await db.delete(lineItemComments);
+  await db.delete(receiptLineItems);
+  await db.delete(receiptExtractions);
+  await db.delete(receiptFiles);
+  await db.delete(reimbursementRequests);
+  await db.delete(teamRegistrationRequests);
+  await db.delete(userScopeRoles);
+  await db.delete(teamMemberships);
+  await db.delete(teams);
+  await db.delete(schools);
+  await db.delete(districts);
+  await db.delete(programs);
+  await db.delete(users);
 }

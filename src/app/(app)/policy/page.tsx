@@ -1,9 +1,11 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackLink } from "@/components/ui/back-link";
 
 export default function PolicyPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-10">
+      <BackLink href="/" label="Back to dashboard" />
       <PageHeader
         title="Reimbursement Policy"
         description="This policy explains the basic expectations for submitting and reviewing robotics reimbursement requests."

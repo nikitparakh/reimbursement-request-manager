@@ -1,6 +1,7 @@
-import { Prisma } from "@prisma/client";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 import { requireUser } from "@/lib/rbac";
 
@@ -16,11 +17,11 @@ export async function POST(
   }
 
   const { requestId } = await params;
-  const requestRecord = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
+  const requestRecord = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
       receiptFiles: {
-        include: { extraction: { include: { lineItems: true } } },
+        with: { extraction: { with: { lineItems: true } } },
       },
     },
   });
@@ -47,27 +48,11 @@ export async function POST(
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
   const total = aggregateReimbursableTotals(extractions);
 
-  console.info("[autofill] Aggregated request total from extractions", {
-    requestId,
-    receiptCount: requestRecord.receiptFiles.length,
-    extractionCount: extractions.length,
-    extractionSummaries: extractions.map((item) => ({
-      documentType: item.documentType,
-      total: item.total ? Number(item.total) : 0,
-      confidence: item.confidence,
-      lineItemCount: item.lineItems.length,
-      lineItemTotal: item.lineItems.reduce(
-        (sum, lineItem) => sum + (lineItem.lineTotal ? Number(lineItem.lineTotal) : 0),
-        0
-      ),
-    })),
-    computedTotal: total,
-  });
-
-  const updated = await db.reimbursementRequest.update({
-    where: { id: requestId },
-    data: { requestedTotal: new Prisma.Decimal(total.toFixed(2)) },
-  });
+  const [updated] = await db
+    .update(reimbursementRequests)
+    .set({ requestedTotal: Number(total.toFixed(2)) })
+    .where(eq(reimbursementRequests.id, requestId))
+    .returning();
 
   return NextResponse.json({
     requestedTotal: Number(updated.requestedTotal),

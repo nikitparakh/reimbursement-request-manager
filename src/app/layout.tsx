@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -29,14 +30,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${headingFont.variable}`}
-    >
-      <body className="bg-background min-h-screen font-sans text-foreground antialiased">
-        {children}
-        <Toaster richColors closeButton />
-      </body>
-    </html>
+    <ClerkProvider>
+      <html
+        lang="en"
+        className={`${geistSans.variable} ${geistMono.variable} ${headingFont.variable}`}
+      >
+        <body className="bg-background min-h-screen font-sans text-foreground antialiased">
+          {children}
+          <Toaster richColors closeButton />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

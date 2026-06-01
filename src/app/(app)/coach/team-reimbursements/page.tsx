@@ -1,8 +1,11 @@
-import type { RequestStatus } from "@prisma/client";
-import { unauthorized } from "next/navigation";
+import { and, desc, inArray } from "drizzle-orm";
+import { forbidden, unauthorized } from "next/navigation";
 import { auth } from "@/auth";
+import type { RequestStatus } from "@/db/schema";
+import { reimbursementRequests, teams } from "@/db/schema";
 import { db } from "@/lib/db";
 import { getCachedAccessContext } from "@/lib/access";
+import { getRequestDetailHref } from "@/lib/navigation";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import {
   TeamReimbursementsTable,
@@ -44,15 +47,15 @@ export default async function TeamReimbursementsPage({
   const session = await auth();
   if (!session?.user) unauthorized();
   const access = await getCachedAccessContext(session.user.id);
-  if (!access.isCoach && !access.canManageReimbursements) unauthorized();
+  if (!access.isCoach && !access.canManageReimbursements) forbidden();
 
   const { status: rawStatus } = await searchParams;
   const initialStatus = normalizeStatusParam(rawStatus);
 
   const managedTeamIds = access.canManageReimbursements
-    ? await db.team.findMany({
+    ? await db.query.teams.findMany({
         where: buildManagedTeamWhere(access),
-        select: { id: true },
+        columns: { id: true },
       })
     : [];
 
@@ -67,18 +70,25 @@ export default async function TeamReimbursementsPage({
   const pendingStatuses = getPendingReviewStatuses(access);
 
   const [requests, pendingCount] = await Promise.all([
-    db.reimbursementRequest.findMany({
-      where: { teamId: { in: teamIds } },
-      include: {
-        createdBy: { select: { email: true } },
-        team: { select: { name: true } },
+    db.query.reimbursementRequests.findMany({
+      where: inArray(reimbursementRequests.teamId, teamIds),
+      with: {
+        createdBy: { columns: { email: true } },
+        team: {
+          columns: { name: true, schoolId: true, programId: true },
+          with: { school: { columns: { districtId: true } } },
+        },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: desc(reimbursementRequests.createdAt),
     }),
     pendingStatuses.length > 0
-      ? db.reimbursementRequest.count({
-          where: { teamId: { in: teamIds }, status: { in: pendingStatuses } },
-        })
+      ? db.$count(
+          reimbursementRequests,
+          and(
+            inArray(reimbursementRequests.teamId, teamIds),
+            inArray(reimbursementRequests.status, pendingStatuses)
+          )
+        )
       : Promise.resolve(0),
   ]);
 
@@ -86,10 +96,16 @@ export default async function TeamReimbursementsPage({
     id: r.id,
     title: r.title,
     requester: r.createdBy.email,
-    amount: Number(r.requestedTotal),
+    amount: r.requestedTotal,
     status: r.status,
     date: formatDate(r.createdAt),
     dateMs: r.createdAt.getTime(),
+    detailHref: getRequestDetailHref(access, r.id, {
+      teamId: r.teamId,
+      schoolId: r.team.schoolId,
+      programId: r.team.programId,
+      districtId: r.team.school.districtId,
+    }),
   }));
 
   return (

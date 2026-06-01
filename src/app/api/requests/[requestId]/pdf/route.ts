@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PDFDocument as PDFLibDocument } from "pdf-lib";
+import { eq, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { readStoredObject } from "@/lib/storage";
 import { generateRequestPdf } from "@/lib/pdf/generate-request-pdf";
@@ -26,19 +28,19 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const request = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
+  const request = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
       team: true,
       createdBy: true,
       receiptFiles: {
-        include: {
+        with: {
           extraction: {
-            include: { lineItems: { orderBy: { position: "asc" } } },
+            with: { lineItems: { orderBy: (t) => asc(t.position) } },
           },
         },
       },
-      approvals: { include: { actor: true }, orderBy: { createdAt: "asc" } },
+      approvals: { with: { actor: true }, orderBy: (t) => asc(t.createdAt) },
     },
   });
 

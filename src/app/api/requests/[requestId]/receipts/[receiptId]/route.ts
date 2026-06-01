@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { receiptFiles } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { recomputeRequestTotal } from "@/lib/jobs/process-receipt";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
@@ -29,15 +31,15 @@ export async function DELETE(
     );
   }
 
-  const receipt = await db.receiptFile.findUnique({
-    where: { id: receiptId },
+  const receipt = await db.query.receiptFiles.findFirst({
+    where: eq(receiptFiles.id, receiptId),
   });
 
   if (!receipt || receipt.requestId !== requestId) {
     return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
   }
 
-  await db.receiptFile.delete({ where: { id: receiptId } });
+  await db.delete(receiptFiles).where(eq(receiptFiles.id, receiptId));
 
   await recomputeRequestTotal(requestId);
 

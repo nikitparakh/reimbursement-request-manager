@@ -1,89 +1,151 @@
-import { describe, expect, it } from "vitest";
-import type { GlobalRole, ScopedRole } from "@prisma/client";
+import { beforeEach, describe, expect, it } from "vitest";
+import "../helpers/auth-mock";
+import { getDb } from "@/lib/db";
 import { buildAccessContext } from "@/lib/access";
 import {
   buildManagedReimbursementWhere,
   buildManagedTeamRegistrationWhere,
   buildManagedTeamWhere,
 } from "@/lib/admin-scope";
+import { cleanDatabase } from "../helpers/db-clean";
+import {
+  createDistrict,
+  createProgram,
+  createRequest,
+  createSchool,
+  createTeam,
+  createTeamRegistrationRequest,
+  createUser,
+} from "../helpers/factory";
 
-function scopedRole(
-  role: ScopedRole,
-  overrides: {
+function context(
+  globalRole: "USER" | "SUPER_ADMIN",
+  scopedRoles: {
+    role: "SCHOOL_ADMIN" | "PROGRAM_ADMIN";
     districtId?: string | null;
     schoolId?: string | null;
     programId?: string | null;
     teamId?: string | null;
-  } = {}
+  }[]
 ) {
-  return {
-    role,
-    districtId: overrides.districtId ?? null,
-    schoolId: overrides.schoolId ?? null,
-    programId: overrides.programId ?? null,
-    teamId: overrides.teamId ?? null,
-  };
-}
-
-function accessContext(globalRole: GlobalRole, scopedRoles: ReturnType<typeof scopedRole>[]) {
   return buildAccessContext({
     userId: "user-1",
     globalRole,
-    scopedRoles,
+    scopedRoles: scopedRoles.map((r) => ({
+      role: r.role,
+      districtId: r.districtId ?? null,
+      schoolId: r.schoolId ?? null,
+      programId: r.programId ?? null,
+      teamId: r.teamId ?? null,
+    })),
   });
 }
 
 describe("admin scope helpers", () => {
-  it("gives super admins unscoped filters", () => {
-    const context = accessContext("SUPER_ADMIN", []);
-
-    expect(buildManagedTeamWhere(context)).toEqual({});
-    expect(buildManagedTeamRegistrationWhere(context)).toEqual({});
-    expect(buildManagedReimbursementWhere(context)).toEqual({});
+  beforeEach(async () => {
+    await cleanDatabase();
   });
 
-  it("builds school-admin filters from school scope", () => {
-    const context = accessContext("USER", [
-      scopedRole("SCHOOL_ADMIN", {
-        districtId: "district-1",
-        schoolId: "school-1",
-      }),
-    ]);
-
-    expect(buildManagedTeamWhere(context)).toEqual({
-      OR: [{ schoolId: "school-1" }],
-    });
-    expect(buildManagedTeamRegistrationWhere(context)).toEqual({
-      OR: [{ districtId: "district-1", schoolId: "school-1" }],
-    });
-    expect(buildManagedReimbursementWhere(context)).toEqual({
-      OR: [{ team: { schoolId: "school-1" } }],
-    });
+  it("gives super admins unscoped filters (undefined = no restriction)", () => {
+    const ctx = context("SUPER_ADMIN", []);
+    expect(buildManagedTeamWhere(ctx)).toBeUndefined();
+    expect(buildManagedTeamRegistrationWhere(ctx)).toBeUndefined();
+    expect(buildManagedReimbursementWhere(ctx)).toBeUndefined();
   });
 
-  it("keeps program-admin filters scoped to the assigned school-program pair", () => {
-    const context = accessContext("USER", [
-      scopedRole("PROGRAM_ADMIN", {
-        districtId: "district-1",
-        schoolId: "school-1",
-        programId: "program-1",
-      }),
+  it("school-admin filter matches only teams in the assigned school", async () => {
+    const db = getDb();
+    const district = await createDistrict();
+    const inSchool = await createSchool({ districtId: district.id });
+    const outSchool = await createSchool({ districtId: district.id });
+    const program = await createProgram({ code: "FLL" });
+    const inTeam = await createTeam({ schoolId: inSchool.id, programId: program.id });
+    await createTeam({ schoolId: outSchool.id, programId: program.id });
+
+    const ctx = context("USER", [
+      { role: "SCHOOL_ADMIN", districtId: district.id, schoolId: inSchool.id },
     ]);
 
-    expect(buildManagedTeamWhere(context)).toEqual({
-      OR: [{ schoolId: "school-1", programId: "program-1" }],
+    const where = buildManagedTeamWhere(ctx);
+    const matched = await db.query.teams.findMany({ where });
+    expect(matched.map((t) => t.id)).toEqual([inTeam.id]);
+  });
+
+  it("program-admin filter matches only the assigned school+program teams", async () => {
+    const db = getDb();
+    const district = await createDistrict();
+    const school = await createSchool({ districtId: district.id });
+    const fll = await createProgram({ code: "FLL" });
+    const ftc = await createProgram({ code: "FTC" });
+    const inTeam = await createTeam({ schoolId: school.id, programId: fll.id });
+    await createTeam({ schoolId: school.id, programId: ftc.id });
+
+    const ctx = context("USER", [
+      {
+        role: "PROGRAM_ADMIN",
+        districtId: district.id,
+        schoolId: school.id,
+        programId: fll.id,
+      },
+    ]);
+
+    const matched = await db.query.teams.findMany({
+      where: buildManagedTeamWhere(ctx),
     });
-    expect(buildManagedTeamRegistrationWhere(context)).toEqual({
-      OR: [
-        {
-          districtId: "district-1",
-          schoolId: "school-1",
-          programId: "program-1",
-        },
-      ],
+    expect(matched.map((t) => t.id)).toEqual([inTeam.id]);
+  });
+
+  it("reimbursement filter matches only requests for in-scope teams", async () => {
+    const db = getDb();
+    const district = await createDistrict();
+    const inSchool = await createSchool({ districtId: district.id });
+    const outSchool = await createSchool({ districtId: district.id });
+    const program = await createProgram({ code: "FLL" });
+    const inTeam = await createTeam({ schoolId: inSchool.id, programId: program.id });
+    const outTeam = await createTeam({ schoolId: outSchool.id, programId: program.id });
+    const user = await createUser();
+    const inReq = await createRequest({ teamId: inTeam.id, createdById: user.id });
+    await createRequest({ teamId: outTeam.id, createdById: user.id });
+
+    const ctx = context("USER", [
+      { role: "SCHOOL_ADMIN", districtId: district.id, schoolId: inSchool.id },
+    ]);
+
+    const matched = await db.query.reimbursementRequests.findMany({
+      where: buildManagedReimbursementWhere(ctx),
     });
-    expect(buildManagedReimbursementWhere(context)).toEqual({
-      OR: [{ team: { schoolId: "school-1", programId: "program-1" } }],
+    expect(matched.map((r) => r.id)).toEqual([inReq.id]);
+  });
+
+  it("registration filter matches only in-scope registration requests", async () => {
+    const db = getDb();
+    const district = await createDistrict();
+    const inSchool = await createSchool({ districtId: district.id });
+    const outSchool = await createSchool({ districtId: district.id });
+    const program = await createProgram({ code: "FLL" });
+    const requester = await createUser();
+    const inReg = await createTeamRegistrationRequest({
+      districtId: district.id,
+      schoolId: inSchool.id,
+      programId: program.id,
+      teamName: "In Scope",
+      requestedById: requester.id,
     });
+    await createTeamRegistrationRequest({
+      districtId: district.id,
+      schoolId: outSchool.id,
+      programId: program.id,
+      teamName: "Out of Scope",
+      requestedById: requester.id,
+    });
+
+    const ctx = context("USER", [
+      { role: "SCHOOL_ADMIN", districtId: district.id, schoolId: inSchool.id },
+    ]);
+
+    const matched = await db.query.teamRegistrationRequests.findMany({
+      where: buildManagedTeamRegistrationWhere(ctx),
+    });
+    expect(matched.map((r) => r.id)).toEqual([inReg.id]);
   });
 });

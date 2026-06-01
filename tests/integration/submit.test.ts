@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
+import { eq } from "drizzle-orm";
 import { POST } from "@/app/api/requests/[requestId]/submit/route";
 import { db } from "@/lib/db";
+import { approvalActions, auditLogs } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createUser,
@@ -55,8 +57,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
     setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
-    const approval = await db.approvalAction.findFirst({
-      where: { requestId: req.id },
+    const approval = await db.query.approvalActions.findFirst({
+      where: eq(approvalActions.requestId, req.id),
     });
     expect(approval).toBeTruthy();
     expect(approval!.action).toBe("SUBMIT");
@@ -74,8 +76,8 @@ describe("POST /api/requests/[requestId]/submit", () => {
     setMockUser({ id: user.id, email: user.email, role: "USER" });
     await callRouteJSON(POST, { method: "POST" }, { requestId: req.id });
 
-    const log = await db.auditLog.findFirst({
-      where: { requestId: req.id },
+    const log = await db.query.auditLogs.findFirst({
+      where: eq(auditLogs.requestId, req.id),
     });
     expect(log).toBeTruthy();
     expect(log!.eventType).toBe("REQUEST_STATUS_UPDATED");

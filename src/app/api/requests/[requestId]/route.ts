@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
 
@@ -27,11 +29,14 @@ export async function GET(
   if (!requestAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!requestAccess.canView) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const record = await db.reimbursementRequest.findUnique({
-    where: { id: requestId },
-    include: {
-      receiptFiles: { include: { extraction: true } },
-      approvals: { include: { actor: true }, orderBy: { createdAt: "asc" } },
+  const record = await db.query.reimbursementRequests.findFirst({
+    where: eq(reimbursementRequests.id, requestId),
+    with: {
+      receiptFiles: { with: { extraction: true } },
+      approvals: {
+        with: { actor: true },
+        orderBy: (approval) => asc(approval.createdAt),
+      },
     },
   });
 
@@ -69,13 +74,14 @@ export async function PATCH(
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
-  const updated = await db.reimbursementRequest.update({
-    where: { id: requestId },
-    data: {
+  const [updated] = await db
+    .update(reimbursementRequests)
+    .set({
       ...(body.data.title !== undefined && { title: body.data.title }),
       ...(body.data.description !== undefined && { description: body.data.description }),
-    },
-  });
+    })
+    .where(eq(reimbursementRequests.id, requestId))
+    .returning();
 
   return NextResponse.json(updated);
 }
@@ -104,7 +110,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await db.reimbursementRequest.delete({ where: { id: requestId } });
+  await db.delete(reimbursementRequests).where(eq(reimbursementRequests.id, requestId));
 
   return NextResponse.json({ deleted: true });
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ProgramCode } from "@prisma/client";
-import { useMemo } from "react";
+import type { ProgramCode } from "@/db/schema";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -89,6 +90,8 @@ export function TeamRegistrationForm({
     },
   });
 
+  const [submittedTeam, setSubmittedTeam] = useState<string | null>(null);
+
   const districtId = useWatch({ control: form.control, name: "districtId", defaultValue: initial.districtId });
   const schools = useMemo(
     () => districts.find((d) => d.id === districtId)?.schools ?? [],
@@ -121,6 +124,7 @@ export function TeamRegistrationForm({
     }
 
     toast.success("Team request sent for school admin review.");
+    setSubmittedTeam(payload.teamName);
     form.reset({
       ...defaultsFor(districts, programs),
       teamName: "",
@@ -133,6 +137,13 @@ export function TeamRegistrationForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {submittedTeam ? (
+          <Alert variant="success">
+            Request to create <span className="font-medium">{submittedTeam}</span> was
+            sent for school admin review. You&apos;ll be able to join it from
+            &quot;Join an existing team&quot; above once it&apos;s approved.
+          </Alert>
+        ) : null}
         <FormField
           control={form.control}
           name="districtId"

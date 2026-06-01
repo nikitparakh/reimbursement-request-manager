@@ -1,6 +1,8 @@
 import { unauthorized } from "next/navigation";
+import { and, inArray } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedReimbursementWhere } from "@/lib/admin-scope";
 import {
@@ -30,39 +32,32 @@ export default async function AdminReimbursementsPage() {
   if (!access.canManageReimbursements) unauthorized();
   const scopedWhere = buildManagedReimbursementWhere(access);
 
+  const statusFilter = inArray(reimbursementRequests.status, [
+    ...ADMIN_VISIBLE_STATUSES,
+  ]);
+  const where = and(scopedWhere, statusFilter);
+
   const [requests, totalCount] = await Promise.all([
-    db.reimbursementRequest.findMany({
-      where: {
-        AND: [
-          scopedWhere,
-          { status: { in: [...ADMIN_VISIBLE_STATUSES] } },
-        ],
-      },
-      include: {
-        createdBy: { select: { email: true } },
+    db.query.reimbursementRequests.findMany({
+      where,
+      with: {
+        createdBy: { columns: { email: true } },
         team: {
-          select: {
-            name: true,
+          columns: { name: true },
+          with: {
             school: {
-              select: {
-                name: true,
-                district: { select: { name: true } },
+              columns: { name: true },
+              with: {
+                district: { columns: { name: true } },
               },
             },
-            program: { select: { name: true } },
+            program: { columns: { name: true } },
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: (t, { desc }) => desc(t.createdAt),
     }),
-    db.reimbursementRequest.count({
-      where: {
-        AND: [
-          scopedWhere,
-          { status: { in: [...ADMIN_VISIBLE_STATUSES] } },
-        ],
-      },
-    }),
+    db.$count(reimbursementRequests, where),
   ]);
 
   const rows: AdminReimbursementRow[] = requests.map((r) => ({

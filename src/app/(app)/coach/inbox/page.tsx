@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { unauthorized } from "next/navigation";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { ApprovalDecision } from "@/components/reimbursements/approval-decision";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -9,6 +10,7 @@ import { Card, CardFooter, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests } from "@/db/schema";
 import { canManageReimbursements, getCachedAccessContext } from "@/lib/access";
 import { formatCurrency, formatDate } from "@/lib/format";
 
@@ -75,34 +77,49 @@ export default async function CoachInboxPage({
 
   const { cursor } = await searchParams;
 
-  const teamFilter = { teamId: { in: coachTeamIds } };
+  const baseFilter = and(
+    inArray(reimbursementRequests.teamId, coachTeamIds),
+    eq(reimbursementRequests.status, "SUBMITTED")
+  );
+
+  // Cursor pagination ordered by updatedAt desc. The cursor is a request id;
+  // resolve its updatedAt and fetch rows strictly older than it (mirrors
+  // Prisma's `cursor` + `skip: 1`).
+  let cursorFilter = baseFilter;
+  if (cursor) {
+    const cursorRow = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, cursor),
+      columns: { updatedAt: true },
+    });
+    if (cursorRow) {
+      cursorFilter = and(
+        baseFilter,
+        lt(reimbursementRequests.updatedAt, cursorRow.updatedAt)
+      );
+    }
+  }
 
   const [requests, totalCount] = await Promise.all([
-    db.reimbursementRequest.findMany({
-      where: {
-        AND: [teamFilter, { status: "SUBMITTED" }],
-      },
-      include: {
-        createdBy: { select: { email: true } },
+    db.query.reimbursementRequests.findMany({
+      where: cursorFilter,
+      with: {
+        createdBy: { columns: { email: true } },
         team: {
-          select: {
+          columns: {
             id: true,
             name: true,
             schoolId: true,
             programId: true,
-            school: { select: { districtId: true } },
+          },
+          with: {
+            school: { columns: { districtId: true } },
           },
         },
       },
-      orderBy: { updatedAt: "desc" },
-      take: PAGE_SIZE + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: desc(reimbursementRequests.updatedAt),
+      limit: PAGE_SIZE + 1,
     }),
-    db.reimbursementRequest.count({
-      where: {
-        AND: [teamFilter, { status: "SUBMITTED" }],
-      },
-    }),
+    db.$count(reimbursementRequests, baseFilter),
   ]);
 
   const hasMore = requests.length > PAGE_SIZE;

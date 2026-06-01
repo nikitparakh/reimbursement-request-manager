@@ -1,141 +1,236 @@
-import PDFDocument from "pdfkit";
-import type { Prisma } from "@prisma/client";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import type {
+  ApprovalActionRow,
+  ReceiptExtractionRow,
+  ReceiptFileRow,
+  ReceiptLineItemRow,
+  ReimbursementRequestRow,
+  TeamRow,
+  UserRow,
+} from "@/db/schema";
 import { formatCurrency, formatDate } from "@/lib/format";
 
-type FullRequest = Prisma.ReimbursementRequestGetPayload<{
-  include: {
-    team: true;
-    createdBy: true;
-    receiptFiles: {
-      include: {
-        extraction: { include: { lineItems: true } };
-      };
-    };
-    approvals: { include: { actor: true } };
-  };
-}>;
+type FullRequest = ReimbursementRequestRow & {
+  team: TeamRow;
+  createdBy: UserRow;
+  receiptFiles: (ReceiptFileRow & {
+    extraction: (ReceiptExtractionRow & { lineItems: ReceiptLineItemRow[] }) | null;
+  })[];
+  approvals: (ApprovalActionRow & { actor: UserRow })[];
+};
 
-const M = 50;
 const PAGE_W = 612;
+const PAGE_H = 792;
+const M = 50;
 const CONTENT_W = PAGE_W - M * 2;
+
+// slate palette
+const C = {
+  slate900: hex("#0f172a"),
+  slate800: hex("#1e293b"),
+  slate700: hex("#334155"),
+  slate600: hex("#475569"),
+  slate500: hex("#64748b"),
+  slate400: hex("#94a3b8"),
+  slate300: hex("#cbd5e1"),
+  slate200: hex("#e2e8f0"),
+};
+
+function hex(value: string) {
+  const n = parseInt(value.slice(1), 16);
+  return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+}
 
 function statusLabel(s: string) {
   return s.replace(/_/g, " ");
 }
 
-function hr(doc: PDFKit.PDFDocument) {
-  doc.strokeColor("#cbd5e1").lineWidth(0.5)
-    .moveTo(M, doc.y).lineTo(PAGE_W - M, doc.y).stroke();
+// Keep text within what the WinAnsi-encoded standard fonts can represent so a
+// stray Unicode character in receipt data never throws mid-render.
+function sanitize(text: string) {
+  return text.replace(
+    /[^\t\n\r\x20-\x7E\xA0-\xFF–—‘’“”•…]/g,
+    "?"
+  );
 }
 
-function resetX(doc: PDFKit.PDFDocument) {
-  doc.x = M;
+type Fonts = { reg: PDFFont; bold: PDFFont; oblique: PDFFont };
+
+/**
+ * Minimal top-down layout engine over pdf-lib (origin is bottom-left, so we
+ * track `y` as distance from the top and convert when drawing).
+ */
+class Builder {
+  page: PDFPage;
+  y = M;
+  constructor(
+    readonly doc: PDFDocument,
+    readonly fonts: Fonts
+  ) {
+    this.page = doc.addPage([PAGE_W, PAGE_H]);
+  }
+
+  ensure(needed: number) {
+    if (this.y + needed > PAGE_H - M) {
+      this.page = this.doc.addPage([PAGE_W, PAGE_H]);
+      this.y = M;
+    }
+  }
+
+  private wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
+    const lines: string[] = [];
+    for (const rawLine of sanitize(text).split("\n")) {
+      let current = "";
+      for (const word of rawLine.split(/\s+/)) {
+        const candidate = current ? `${current} ${word}` : word;
+        if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !current) {
+          current = candidate;
+        } else {
+          lines.push(current);
+          current = word;
+        }
+      }
+      lines.push(current);
+    }
+    return lines;
+  }
+
+  /** Draw text with its top at `topY` (from page top); returns height consumed. */
+  drawAt(
+    x: number,
+    topY: number,
+    text: string,
+    opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; width?: number }
+  ): number {
+    const font = opts.font ?? this.fonts.reg;
+    const size = opts.size ?? 10;
+    const color = opts.color ?? C.slate900;
+    const width = opts.width ?? CONTENT_W;
+    const lineHeight = size * 1.2;
+    const lines = this.wrap(text, font, size, width);
+    lines.forEach((line, i) => {
+      this.page.drawText(line, {
+        x,
+        y: PAGE_H - topY - size - i * lineHeight,
+        size,
+        font,
+        color,
+      });
+    });
+    return lines.length * lineHeight;
+  }
+
+  /** Draw at the current cursor and advance it. */
+  flow(
+    text: string,
+    opts: { x?: number; font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; width?: number } = {}
+  ) {
+    const consumed = this.drawAt(opts.x ?? M, this.y, text, opts);
+    this.y += consumed;
+  }
+
+  hr(color = C.slate300, thickness = 0.5) {
+    this.page.drawLine({
+      start: { x: M, y: PAGE_H - this.y },
+      end: { x: PAGE_W - M, y: PAGE_H - this.y },
+      thickness,
+      color,
+    });
+  }
 }
 
-function ensureSpace(doc: PDFKit.PDFDocument, needed: number) {
-  if (doc.y + needed > doc.page.height - M) doc.addPage();
+export async function generateRequestPdf(request: FullRequest): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  const fonts: Fonts = {
+    reg: await doc.embedFont(StandardFonts.Helvetica),
+    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+    oblique: await doc.embedFont(StandardFonts.HelveticaOblique),
+  };
+  const b = new Builder(doc, fonts);
+
+  writeHeader(b, request);
+  writeSummary(b, request);
+  writeReceipts(b, request);
+  writeTimeline(b, request);
+
+  return Buffer.from(await doc.save());
 }
 
-export async function generateRequestPdf(
-  request: FullRequest,
-): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "LETTER", margin: M });
-    const chunks: Buffer[] = [];
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
+function writeHeader(b: Builder, req: FullRequest) {
+  b.flow(req.title, { font: b.fonts.bold, size: 22, color: C.slate900, width: CONTENT_W });
+  b.y += 2;
 
-    writeHeader(doc, request);
-    writeSummary(doc, request);
-    writeReceipts(doc, request);
-    writeTimeline(doc, request);
-
-    doc.end();
-  });
-}
-
-function writeHeader(doc: PDFKit.PDFDocument, req: FullRequest) {
-  doc.font("Helvetica-Bold").fontSize(22).fillColor("#0f172a")
-    .text(req.title, M, M, { width: CONTENT_W });
-
-  resetX(doc);
   const headerParts = [req.team.name];
   if (req.team.glAccount) headerParts.push(`GL: ${req.team.glAccount}`);
   headerParts.push(statusLabel(req.status));
-  doc.font("Helvetica").fontSize(10).fillColor("#64748b")
-    .text(headerParts.join("  ·  "), M, doc.y + 4, { width: CONTENT_W });
+  b.flow(headerParts.join("  ·  "), { size: 10, color: C.slate500 });
 
-  doc.y += 14;
-  hr(doc);
-  doc.y += 10;
+  b.y += 10;
+  b.hr();
+  b.y += 10;
 }
 
-function writeSummary(doc: PDFKit.PDFDocument, req: FullRequest) {
+function writeSummary(b: Builder, req: FullRequest) {
   const col1 = M;
   const col2 = M + 170;
   const col3 = M + 340;
 
-  const row1Y = doc.y;
-  writeField(doc, col1, row1Y, "Requested Total", formatCurrency(Number(req.requestedTotal)), true);
-  const a1 = doc.y;
-  writeField(doc, col2, row1Y, "Submitter", req.createdBy.email, false);
-  const a2 = doc.y;
-  writeField(doc, col3, row1Y, "Status", statusLabel(req.status), false);
-  doc.y = Math.max(a1, a2, doc.y) + 8;
+  const row1Y = b.y;
+  const h1 = writeField(b, col1, row1Y, "Requested Total", formatCurrency(Number(req.requestedTotal)), true);
+  const h2 = writeField(b, col2, row1Y, "Submitter", req.createdBy.email, false);
+  const h3 = writeField(b, col3, row1Y, "Status", statusLabel(req.status), false);
+  b.y = row1Y + Math.max(h1, h2, h3) + 8;
 
-  const row2Y = doc.y;
-  writeField(doc, col1, row2Y, "Created", formatDate(req.createdAt), false);
-  const b1 = doc.y;
-  writeField(doc, col2, row2Y, "Submitted", formatDate(req.submittedAt), false);
-  doc.y = Math.max(b1, doc.y) + 4;
+  const row2Y = b.y;
+  const h4 = writeField(b, col1, row2Y, "Created", formatDate(req.createdAt), false);
+  const h5 = writeField(b, col2, row2Y, "Submitted", formatDate(req.submittedAt), false);
+  b.y = row2Y + Math.max(h4, h5) + 6;
 
   if (req.description) {
-    resetX(doc);
-    doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-      .text("Description", M, doc.y, { width: CONTENT_W });
-    doc.font("Helvetica").fontSize(9).fillColor("#334155")
-      .text(req.description, M, doc.y, { width: CONTENT_W });
-    doc.y += 4;
+    b.flow("Description", { size: 8, color: C.slate500 });
+    b.y += 1;
+    b.flow(req.description, { size: 9, color: C.slate700 });
+    b.y += 4;
   }
 
-  hr(doc);
-  doc.y += 12;
+  b.hr();
+  b.y += 12;
 }
 
+/** Draws a label + value at a fixed column; returns the column's total height. */
 function writeField(
-  doc: PDFKit.PDFDocument, x: number, startY: number,
-  label: string, value: string, bold: boolean,
-) {
-  doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-    .text(label, x, startY, { width: 160 });
-  const valFont = bold ? "Helvetica-Bold" : "Helvetica";
+  b: Builder,
+  x: number,
+  topY: number,
+  label: string,
+  value: string,
+  bold: boolean
+): number {
+  b.drawAt(x, topY, label, { size: 8, color: C.slate500, width: 160 });
+  const valFont = bold ? b.fonts.bold : b.fonts.reg;
   const valSize = bold ? 14 : 10;
-  doc.font(valFont).fontSize(valSize).fillColor("#0f172a")
-    .text(value, x, startY + 10, { width: 160 });
+  const valH = b.drawAt(x, topY + 12, value, { font: valFont, size: valSize, color: C.slate900, width: 160 });
+  return 12 + valH;
 }
 
-function writeReceipts(doc: PDFKit.PDFDocument, req: FullRequest) {
+const TBL = { desc: M, qty: M + 240, unit: M + 290, total: M + 360, cat: M + 430 } as const;
+const TBL_W = { desc: 235, qty: 45, unit: 65, total: 65, cat: CONTENT_W - 430 };
+
+function writeReceipts(b: Builder, req: FullRequest) {
   if (req.receiptFiles.length === 0) return;
 
-  ensureSpace(doc, 60);
-  resetX(doc);
-  doc.font("Helvetica-Bold").fontSize(14).fillColor("#0f172a")
-    .text("Receipts & Line Items", M, doc.y, { width: CONTENT_W });
-  doc.y += 8;
+  b.ensure(60);
+  b.flow("Receipts & Line Items", { font: b.fonts.bold, size: 14, color: C.slate900 });
+  b.y += 8;
 
   for (const file of req.receiptFiles) {
-    ensureSpace(doc, 60);
-    resetX(doc);
-
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a")
-      .text(file.fileName, M, doc.y, { width: CONTENT_W });
+    b.ensure(60);
+    b.flow(file.fileName, { font: b.fonts.bold, size: 10, color: C.slate900 });
 
     const ext = file.extraction;
     if (!ext) {
-      doc.font("Helvetica").fontSize(8).fillColor("#94a3b8")
-        .text("No extraction data", M, doc.y, { width: CONTENT_W });
-      doc.y += 12;
+      b.flow("No extraction data", { size: 8, color: C.slate400 });
+      b.y += 6;
       continue;
     }
 
@@ -144,13 +239,12 @@ function writeReceipts(doc: PDFKit.PDFDocument, req: FullRequest) {
     if (ext.receiptDate) meta.push(formatDate(ext.receiptDate));
     if (ext.documentType !== "OTHER") meta.push(ext.documentType);
     if (meta.length > 0) {
-      doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-        .text(meta.join("  ·  "), M, doc.y, { width: CONTENT_W });
+      b.flow(meta.join("  ·  "), { size: 8, color: C.slate500 });
     }
-    doc.y += 6;
+    b.y += 4;
 
     if (ext.lineItems.length > 0) {
-      writeLineItemsTable(doc, ext.lineItems);
+      writeLineItemsTable(b, ext.lineItems);
     }
 
     const totals: string[] = [];
@@ -158,100 +252,62 @@ function writeReceipts(doc: PDFKit.PDFDocument, req: FullRequest) {
     if (ext.tax !== null && Number(ext.tax) > 0) totals.push(`Tax: ${formatCurrency(Number(ext.tax))}`);
     if (ext.total !== null) totals.push(`Total: ${formatCurrency(Number(ext.total))}`);
     if (totals.length > 0) {
-      resetX(doc);
-      doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-        .text(totals.join("    "), M, doc.y, { width: CONTENT_W });
+      b.flow(totals.join("    "), { size: 8, color: C.slate500 });
     }
-    doc.y += 14;
+    b.y += 12;
   }
 
-  hr(doc);
-  doc.y += 12;
+  b.hr();
+  b.y += 12;
 }
 
-type LineItem = FullRequest["receiptFiles"][number]["extraction"] extends infer E
-  ? E extends { lineItems: infer L } ? L : never : never;
+function writeLineItemsTable(b: Builder, items: ReceiptLineItemRow[]) {
+  b.ensure(24);
 
-const TBL = {
-  desc: M,
-  qty: M + 240,
-  unit: M + 290,
-  total: M + 360,
-  cat: M + 430,
-} as const;
-const TBL_WIDTHS = {
-  desc: 235,
-  qty: 45,
-  unit: 65,
-  total: 65,
-  cat: CONTENT_W - 430,
-};
+  const headerY = b.y;
+  b.drawAt(TBL.desc, headerY, "DESCRIPTION", { font: b.fonts.bold, size: 7, color: C.slate500, width: TBL_W.desc });
+  b.drawAt(TBL.qty, headerY, "QTY", { font: b.fonts.bold, size: 7, color: C.slate500, width: TBL_W.qty });
+  b.drawAt(TBL.unit, headerY, "UNIT PRICE", { font: b.fonts.bold, size: 7, color: C.slate500, width: TBL_W.unit });
+  b.drawAt(TBL.total, headerY, "LINE TOTAL", { font: b.fonts.bold, size: 7, color: C.slate500, width: TBL_W.total });
+  b.drawAt(TBL.cat, headerY, "CATEGORY", { font: b.fonts.bold, size: 7, color: C.slate500, width: TBL_W.cat });
 
-function writeLineItemsTable(doc: PDFKit.PDFDocument, items: LineItem) {
-  ensureSpace(doc, 24);
-
-  const headerY = doc.y;
-  doc.font("Helvetica-Bold").fontSize(7).fillColor("#64748b");
-  doc.text("DESCRIPTION", TBL.desc, headerY, { width: TBL_WIDTHS.desc });
-  doc.text("QTY", TBL.qty, headerY, { width: TBL_WIDTHS.qty });
-  doc.text("UNIT PRICE", TBL.unit, headerY, { width: TBL_WIDTHS.unit });
-  doc.text("LINE TOTAL", TBL.total, headerY, { width: TBL_WIDTHS.total });
-  doc.text("CATEGORY", TBL.cat, headerY, { width: TBL_WIDTHS.cat });
-
-  doc.y = headerY + 12;
-  doc.strokeColor("#e2e8f0").lineWidth(0.3)
-    .moveTo(M, doc.y).lineTo(PAGE_W - M, doc.y).stroke();
-  doc.y += 4;
+  b.y = headerY + 12;
+  b.hr(C.slate200, 0.3);
+  b.y += 4;
 
   for (const item of items) {
-    ensureSpace(doc, 16);
-    const rowY = doc.y;
+    b.ensure(16);
+    const rowY = b.y;
     const excluded = item.excludedAt !== null;
-    const color = excluded ? "#94a3b8" : "#1e293b";
-
-    doc.font("Helvetica").fontSize(8).fillColor(color);
+    const color = excluded ? C.slate400 : C.slate800;
 
     const desc = excluded ? `${item.description} (excluded)` : item.description;
-    doc.text(desc, TBL.desc, rowY, { width: TBL_WIDTHS.desc });
-    const descBottom = doc.y;
+    const descH = b.drawAt(TBL.desc, rowY, desc, { size: 8, color, width: TBL_W.desc });
+    b.drawAt(TBL.qty, rowY, item.quantity?.toString() ?? "", { size: 8, color, width: TBL_W.qty });
+    b.drawAt(TBL.unit, rowY, item.unitPrice ? formatCurrency(Number(item.unitPrice)) : "", { size: 8, color, width: TBL_W.unit });
+    b.drawAt(TBL.total, rowY, item.lineTotal ? formatCurrency(Number(item.lineTotal)) : "", { size: 8, color, width: TBL_W.total });
+    b.drawAt(TBL.cat, rowY, item.category ?? "", { size: 8, color, width: TBL_W.cat });
 
-    doc.text(item.quantity?.toString() ?? "", TBL.qty, rowY, { width: TBL_WIDTHS.qty });
-    doc.text(item.unitPrice ? formatCurrency(Number(item.unitPrice)) : "", TBL.unit, rowY, { width: TBL_WIDTHS.unit });
-    doc.text(item.lineTotal ? formatCurrency(Number(item.lineTotal)) : "", TBL.total, rowY, { width: TBL_WIDTHS.total });
-    doc.text(item.category ?? "", TBL.cat, rowY, { width: TBL_WIDTHS.cat });
-
-    doc.y = Math.max(descBottom, rowY + 12) + 2;
+    b.y = rowY + Math.max(descH, 12) + 2;
   }
 
-  doc.y += 4;
-  doc.fillColor("#0f172a");
-  resetX(doc);
+  b.y += 4;
 }
 
-function writeTimeline(doc: PDFKit.PDFDocument, req: FullRequest) {
+function writeTimeline(b: Builder, req: FullRequest) {
   if (req.approvals.length === 0) return;
 
-  ensureSpace(doc, 50);
-  resetX(doc);
-  doc.font("Helvetica-Bold").fontSize(14).fillColor("#0f172a")
-    .text("Approval Timeline", M, doc.y, { width: CONTENT_W });
-  doc.y += 8;
+  b.ensure(50);
+  b.flow("Approval Timeline", { font: b.fonts.bold, size: 14, color: C.slate900 });
+  b.y += 8;
 
   for (const a of req.approvals) {
-    ensureSpace(doc, 36);
-    resetX(doc);
-
-    doc.font("Helvetica-Bold").fontSize(9).fillColor("#0f172a")
-      .text(`${a.action}  —  ${a.actor.email}`, M, doc.y, { width: CONTENT_W });
-
-    doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-      .text(formatDate(a.createdAt), M, doc.y, { width: CONTENT_W });
-
+    b.ensure(36);
+    b.flow(`${a.action}  —  ${a.actor.email}`, { font: b.fonts.bold, size: 9, color: C.slate900 });
+    b.flow(formatDate(a.createdAt), { size: 8, color: C.slate500 });
     if (a.comment) {
-      doc.font("Helvetica-Oblique").fontSize(8).fillColor("#475569")
-        .text(`"${a.comment}"`, M, doc.y, { width: CONTENT_W });
+      b.flow(`“${a.comment}”`, { font: b.fonts.oblique, size: 8, color: C.slate600 });
     }
-    doc.y += 6;
+    b.y += 6;
   }
 }
-

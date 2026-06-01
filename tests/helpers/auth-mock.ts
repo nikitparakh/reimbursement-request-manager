@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { GlobalRole } from "@prisma/client";
+import type { GlobalRole } from "@/db/schema";
 
 type MockUser = {
   id: string;

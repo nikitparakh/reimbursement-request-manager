@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { and, eq, inArray } from "drizzle-orm";
 import { requireUser } from "@/lib/rbac";
 import { processReceipt, recomputeRequestTotal } from "@/lib/jobs/process-receipt";
 import { db } from "@/lib/db";
+import { receiptFiles } from "@/db/schema";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
+import { getReceiptQueue } from "@/lib/queue";
 
 export async function POST(
   _request: Request,
@@ -28,14 +31,33 @@ export async function POST(
     );
   }
 
-  const receiptsToProcess = await db.receiptFile.findMany({
-    where: { requestId, parseStatus: { in: ["QUEUED", "FAILED"] } },
+  const receiptsToProcess = await db.query.receiptFiles.findMany({
+    where: and(
+      eq(receiptFiles.requestId, requestId),
+      inArray(receiptFiles.parseStatus, ["QUEUED", "FAILED"])
+    ),
   });
 
   if (receiptsToProcess.length === 0) {
     return NextResponse.json({ queued: 0 });
   }
 
+  // On Workers, hand off to the Cloudflare Queue consumer (decoupled from the
+  // client connection). The frontend polls receiptFile.parseStatus.
+  const queue = getReceiptQueue();
+  if (queue) {
+    await queue.sendBatch(
+      receiptsToProcess.map((receipt) => ({
+        body: { receiptFileId: receipt.id, requestId },
+      }))
+    );
+    return NextResponse.json(
+      { queued: receiptsToProcess.length, async: true },
+      { status: 202 }
+    );
+  }
+
+  // Fallback (tests / local dev without a queue binding): process inline.
   const results = await Promise.allSettled(
     receiptsToProcess.map((receipt) => processReceipt(receipt.id))
   );

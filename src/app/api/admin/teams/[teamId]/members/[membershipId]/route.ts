@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { teamMemberships, teams, userScopeRoles } from "@/db/schema";
 import { canManageTeams, getAccessContext } from "@/lib/access";
 import { requireUser } from "@/lib/rbac";
 
@@ -20,14 +22,17 @@ export async function DELETE(
 
   const [access, membership, team] = await Promise.all([
     getAccessContext(userId),
-    db.teamMembership.findFirst({
-      where: { id: membershipId, teamId },
+    db.query.teamMemberships.findFirst({
+      where: and(
+        eq(teamMemberships.id, membershipId),
+        eq(teamMemberships.teamId, teamId),
+      ),
     }),
-    db.team.findUnique({
-      where: { id: teamId },
-      include: {
+    db.query.teams.findFirst({
+      where: eq(teams.id, teamId),
+      with: {
         school: {
-          select: {
+          columns: {
             districtId: true,
           },
         },
@@ -55,15 +60,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await db.$transaction([
-    db.teamMembership.delete({ where: { id: membershipId } }),
-    db.userScopeRole.deleteMany({
-      where: {
-        userId: membership.userId,
-        role: membership.roleInTeam,
-        teamId,
-      },
-    }),
+  await db.batch([
+    db.delete(teamMemberships).where(eq(teamMemberships.id, membershipId)),
+    db.delete(userScopeRoles).where(
+      and(
+        eq(userScopeRoles.userId, membership.userId),
+        eq(userScopeRoles.role, membership.roleInTeam),
+        eq(userScopeRoles.teamId, teamId),
+      ),
+    ),
   ]);
 
   return NextResponse.json({ ok: true });

@@ -1,7 +1,15 @@
 import { unauthorized } from "next/navigation";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { auth } from "@/auth";
 import { canManageUsers, getCachedAccessContext } from "@/lib/access";
 import { db } from "@/lib/db";
+import {
+  schools,
+  teamMemberships,
+  teams,
+  userScopeRoles,
+  users as usersTable,
+} from "@/db/schema";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -14,93 +22,139 @@ export default async function AdminUsersPage() {
   const access = await getCachedAccessContext(session.user.id);
   if (!access.canManageUsers) unauthorized();
 
+  // School scope filter: super admins see all schools; otherwise restrict to
+  // schools the admin manages (by explicit schoolId or by owning the district).
+  const schoolScopeConditions = access.isSuperAdmin
+    ? []
+    : access.scopedRoles
+        .filter((scope) => scope.role === "SCHOOL_ADMIN")
+        .map((scope) => {
+          if (scope.schoolId) {
+            return eq(schools.id, scope.schoolId);
+          }
+          if (scope.districtId) {
+            return eq(schools.districtId, scope.districtId);
+          }
+          return null;
+        })
+        .filter((cond): cond is NonNullable<typeof cond> => Boolean(cond));
+
+  // Non-super-admins with no school scope conditions must match no schools.
   const managedSchoolWhere = access.isSuperAdmin
-    ? {}
-    : {
-        OR: access.scopedRoles
-          .filter((scope) => scope.role === "SCHOOL_ADMIN")
-          .map((scope) => {
-            if (scope.schoolId) {
-              return { id: scope.schoolId };
-            }
-            if (scope.districtId) {
-              return { districtId: scope.districtId };
-            }
-            return null;
-          })
-          .filter((scope): scope is NonNullable<typeof scope> => Boolean(scope)),
-      };
+    ? undefined
+    : schoolScopeConditions.length > 0
+      ? or(...schoolScopeConditions)
+      : inArray(schools.id, []);
 
   const [managedSchools, programs] = await Promise.all([
-    db.school.findMany({
+    db.query.schools.findMany({
       where: managedSchoolWhere,
-      select: {
+      columns: {
         id: true,
         name: true,
         districtId: true,
-        district: { select: { name: true } },
       },
-      orderBy: [{ district: { name: "asc" } }, { name: "asc" }],
+      with: {
+        district: { columns: { name: true } },
+      },
+      orderBy: (school, { asc }) => [asc(school.name)],
     }),
-    db.program.findMany({
-      select: { id: true, name: true, code: true },
-      orderBy: { code: "asc" },
+    db.query.programs.findMany({
+      columns: { id: true, name: true, code: true },
+      orderBy: (program, { asc }) => asc(program.code),
     }),
   ]);
+
+  // Sort by district name then school name to match the previous ordering.
+  managedSchools.sort((a, b) => {
+    const districtCompare = (a.district?.name ?? "").localeCompare(
+      b.district?.name ?? ""
+    );
+    if (districtCompare !== 0) return districtCompare;
+    return a.name.localeCompare(b.name);
+  });
 
   const managedSchoolIds = managedSchools.map((school) => school.id);
   const managedDistrictIds = Array.from(
     new Set(managedSchools.map((school) => school.districtId))
   );
 
-  const users = await db.user.findMany({
-    where: access.isSuperAdmin
-      ? undefined
-      : {
-          OR: [
-            {
-              memberships: {
-                some: {
-                  approved: true,
-                  team: { schoolId: { in: managedSchoolIds } },
+  // Resolve the set of users to display. For non-super-admins the original
+  // Prisma query matched users who either have an approved membership on a team
+  // in a managed school, OR a scoped role in a managed school/district. D1's
+  // relational query API can't express nested relation filters, so resolve the
+  // matching user ids with explicit lookups first.
+  let userIds: string[] | undefined;
+  if (!access.isSuperAdmin) {
+    const [membershipUserRows, scopeUserRows] = await Promise.all([
+      managedSchoolIds.length > 0
+        ? db
+            .select({ userId: teamMemberships.userId })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(
+              and(
+                eq(teamMemberships.approved, true),
+                inArray(teams.schoolId, managedSchoolIds)
+              )
+            )
+        : Promise.resolve([] as { userId: string }[]),
+      managedSchoolIds.length > 0 || managedDistrictIds.length > 0
+        ? db
+            .select({ userId: userScopeRoles.userId })
+            .from(userScopeRoles)
+            .where(
+              or(
+                managedSchoolIds.length > 0
+                  ? inArray(userScopeRoles.schoolId, managedSchoolIds)
+                  : undefined,
+                managedDistrictIds.length > 0
+                  ? inArray(userScopeRoles.districtId, managedDistrictIds)
+                  : undefined
+              )
+            )
+        : Promise.resolve([] as { userId: string }[]),
+    ]);
+
+    userIds = Array.from(
+      new Set([
+        ...membershipUserRows.map((row) => row.userId),
+        ...scopeUserRows.map((row) => row.userId),
+      ])
+    );
+  }
+
+  const users =
+    !access.isSuperAdmin && userIds && userIds.length === 0
+      ? []
+      : await db.query.users.findMany({
+          where:
+            access.isSuperAdmin || !userIds
+              ? undefined
+              : inArray(usersTable.id, userIds),
+          with: {
+            memberships: {
+              where: eq(teamMemberships.approved, true),
+              with: {
+                team: {
+                  columns: {
+                    id: true,
+                    name: true,
+                  },
                 },
               },
             },
-            {
-              scopedRoles: {
-                some: {
-                  OR: [
-                    { schoolId: { in: managedSchoolIds } },
-                    { districtId: { in: managedDistrictIds } },
-                  ],
-                },
+            scopedRoles: {
+              with: {
+                school: { columns: { id: true, name: true } },
+                program: { columns: { id: true, name: true } },
+                team: { columns: { id: true, name: true } },
               },
-            },
-          ],
-        },
-    include: {
-      memberships: {
-        include: {
-          team: {
-            select: {
-              id: true,
-              name: true,
+              orderBy: (scope, { asc }) => [asc(scope.role), asc(scope.createdAt)],
             },
           },
-        },
-        where: { approved: true },
-      },
-      scopedRoles: {
-        include: {
-          school: { select: { id: true, name: true } },
-          program: { select: { id: true, name: true } },
-          team: { select: { id: true, name: true } },
-        },
-        orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+          orderBy: (user, { asc }) => asc(user.createdAt),
+        });
 
   const scopeOptions: ScopeOption[] = managedSchools.flatMap((school) => {
     const programOptions = programs.map((program) => ({

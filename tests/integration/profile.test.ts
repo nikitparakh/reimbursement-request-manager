@@ -5,7 +5,9 @@ import {
   GET,
   PATCH,
 } from "@/app/api/me/profile/route";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { users } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import { createUser } from "../helpers/factory";
 import { callRouteJSON } from "../helpers/call-route";
@@ -18,17 +20,17 @@ describe("GET /api/me/profile", () => {
 
   it("returns the authenticated user's profile → 200", async () => {
     const user = await createUser();
-    await db.user.update({
-      where: { id: user.id },
-      data: {
+    await db
+      .update(users)
+      .set({
         mailingAddressLine1: "123 Main St",
         mailingCity: "Novi",
         mailingState: "MI",
         mailingPostalCode: "48375",
         zelleType: "email",
         zelleValue: "user@test.com",
-      },
-    });
+      })
+      .where(eq(users.id, user.id));
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
@@ -66,7 +68,9 @@ describe("PATCH /api/me/profile", () => {
     expect(status).toBe(200);
     expect((data as any).zelleType).toBe("email");
 
-    const dbUser = await db.user.findUnique({ where: { id: user.id } });
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
     expect(dbUser?.mailingCity).toBe("Novi");
     expect(dbUser?.zelleValue).toBe("payer@test.com");
   });

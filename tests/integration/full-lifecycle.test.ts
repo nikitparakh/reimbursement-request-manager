@@ -1,13 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
-import { POST as register } from "@/app/api/auth/register/route";
 import { POST as onboard } from "@/app/api/onboarding/complete/route";
 import { POST as createRequestRoute } from "@/app/api/requests/route";
 import { POST as submitRoute } from "@/app/api/requests/[requestId]/submit/route";
 import { POST as coachDecision } from "@/app/api/requests/[requestId]/coach-decision/route";
 import { POST as adminDecision } from "@/app/api/requests/[requestId]/admin-decision/route";
+import { eq, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
+import {
+  schools,
+  approvalActions,
+  auditLogs,
+  reimbursementRequests,
+} from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createUser,
@@ -29,17 +35,15 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
   });
 
   it("happy path: register → onboard → create → submit → coach approve → admin approve → paid", async () => {
-    // 1. Register user
-    const { data: regData } = await callRouteJSON(register, {
-      method: "POST",
-      body: {
-        name: "Alice User",
-        email: "alice@test.com",
-        password: "Password1",
-        policyAccepted: true,
-      },
+    // 1. Create user (registration is now handled by Clerk; provision the
+    //    app-side User row directly the way lazy provisioning would).
+    const alice = await createUser({
+      name: "Alice User",
+      email: "alice@test.com",
+      role: "USER",
+      onboardingDone: false,
     });
-    const userId = (regData as any).user.id;
+    const userId = alice.id;
 
     // Create team and coach
     const team = await createTeam({ name: "Test Team" });
@@ -52,7 +56,10 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     await createScopedRoleForTeam({ userId: coach.id, teamId: team.id, role: "COACH" });
     const admin = await createUser({ role: "SUPER_ADMIN", onboardingDone: true });
 
-    const school = await db.school.findUniqueOrThrow({ where: { id: team.schoolId } });
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
+    });
+    if (!school) throw new Error("School not found");
 
     // 2. Onboard user
     setMockUser({
@@ -140,9 +147,9 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect((paidData as any).status).toBe("PAID");
 
     // 8. Verify 4 ApprovalActions
-    const approvals = await db.approvalAction.findMany({
-      where: { requestId },
-      orderBy: { createdAt: "asc" },
+    const approvals = await db.query.approvalActions.findMany({
+      where: eq(approvalActions.requestId, requestId),
+      orderBy: asc(approvalActions.createdAt),
     });
     expect(approvals).toHaveLength(4);
     expect(approvals.map((a) => a.action)).toEqual([
@@ -153,17 +160,17 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     ]);
 
     // 9. Verify audit logs
-    const logs = await db.auditLog.findMany({
-      where: { requestId },
-      orderBy: { createdAt: "asc" },
+    const logs = await db.query.auditLogs.findMany({
+      where: eq(auditLogs.requestId, requestId),
+      orderBy: asc(auditLogs.createdAt),
     });
     expect(logs.length).toBeGreaterThanOrEqual(4);
 
     // Verify final total reflects line items (75 + 25 = 100)
-    const finalReq = await db.reimbursementRequest.findUnique({
-      where: { id: requestId },
+    const finalReq = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, requestId),
     });
-    expect(Number(finalReq!.requestedTotal)).toBe(100);
+    expect(finalReq!.requestedTotal).toBe(100);
   });
 
   it("rejection path: submit → coach rejects", async () => {
@@ -205,9 +212,9 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect((data as any).status).toBe("COACH_REJECTED");
 
     // Verify rejection ApprovalAction
-    const approvals = await db.approvalAction.findMany({
-      where: { requestId: req.id },
-      orderBy: { createdAt: "asc" },
+    const approvals = await db.query.approvalActions.findMany({
+      where: eq(approvalActions.requestId, req.id),
+      orderBy: asc(approvalActions.createdAt),
     });
     expect(approvals).toHaveLength(2);
     expect(approvals[1].action).toBe("REJECT");
@@ -219,9 +226,10 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     const coach = await createUser({ role: "USER" });
     const schoolAdmin = await createUser({ role: "USER" });
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({
-      where: { id: team.schoolId },
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
     });
+    if (!school) throw new Error("School not found");
 
     await createMembership({
       userId: user.id,
@@ -325,9 +333,9 @@ describe("Full Lifecycle: DRAFT → PAID", () => {
     expect((data as any).status).toBe("ADMIN_REJECTED");
 
     // Verify 3 ApprovalActions
-    const approvals = await db.approvalAction.findMany({
-      where: { requestId: req.id },
-      orderBy: { createdAt: "asc" },
+    const approvals = await db.query.approvalActions.findMany({
+      where: eq(approvalActions.requestId, req.id),
+      orderBy: asc(approvalActions.createdAt),
     });
     expect(approvals).toHaveLength(3);
     expect(approvals.map((a) => a.action)).toEqual([

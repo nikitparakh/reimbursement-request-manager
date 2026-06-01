@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import "../helpers/auth-mock";
 import { setMockUser, clearMockSession } from "../helpers/auth-mock";
 import { db } from "@/lib/db";
+import { notifications } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createMembership,
@@ -26,12 +28,10 @@ describe("GET /api/notifications", () => {
 
   it("returns user notifications and unread count", async () => {
     const user = await createUser();
-    await db.notification.createMany({
-      data: [
-        { userId: user.id, event: "REQUEST_SUBMITTED", message: "Notif 1" },
-        { userId: user.id, event: "COACH_APPROVED", message: "Notif 2", read: true },
-      ],
-    });
+    await db.insert(notifications).values([
+      { userId: user.id, event: "REQUEST_SUBMITTED", message: "Notif 1" },
+      { userId: user.id, event: "COACH_APPROVED", message: "Notif 2", read: true },
+    ]);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
@@ -102,22 +102,20 @@ describe("GET /api/notifications", () => {
       role: "PARENT_MENTOR",
     });
 
-    await db.notification.createMany({
-      data: [
-        {
-          userId: user.id,
-          event: "COACH_APPROVED",
-          message: "Managed scope request",
-          requestId: managedRequest.id,
-        },
-        {
-          userId: user.id,
-          event: "REQUEST_SUBMITTED",
-          message: "Member scope request",
-          requestId: memberRequest.id,
-        },
-      ],
-    });
+    await db.insert(notifications).values([
+      {
+        userId: user.id,
+        event: "COACH_APPROVED",
+        message: "Managed scope request",
+        requestId: managedRequest.id,
+      },
+      {
+        userId: user.id,
+        event: "REQUEST_SUBMITTED",
+        message: "Member scope request",
+        requestId: memberRequest.id,
+      },
+    ]);
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
@@ -171,13 +169,11 @@ describe("GET /api/notifications", () => {
       programId: program.id,
     });
 
-    await db.notification.create({
-      data: {
-        userId: user.id,
-        event: "REQUEST_SUBMITTED",
-        message: "Submitted request awaiting initial review",
-        requestId: request.id,
-      },
+    await db.insert(notifications).values({
+      userId: user.id,
+      event: "REQUEST_SUBMITTED",
+      message: "Submitted request awaiting initial review",
+      requestId: request.id,
     });
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
@@ -213,9 +209,10 @@ describe("PATCH /api/notifications/[id]/read", () => {
 
   it("marks notification as read → 200", async () => {
     const user = await createUser();
-    const notif = await db.notification.create({
-      data: { userId: user.id, event: "REQUEST_SUBMITTED", message: "Test" },
-    });
+    const [notif] = await db
+      .insert(notifications)
+      .values({ userId: user.id, event: "REQUEST_SUBMITTED", message: "Test" })
+      .returning();
 
     setMockUser({ id: user.id, email: user.email, role: "USER" });
 
@@ -228,16 +225,19 @@ describe("PATCH /api/notifications/[id]/read", () => {
     expect(status).toBe(200);
     expect((data as { read: boolean }).read).toBe(true);
 
-    const updated = await db.notification.findUnique({ where: { id: notif.id } });
+    const updated = await db.query.notifications.findFirst({
+      where: eq(notifications.id, notif.id),
+    });
     expect(updated!.read).toBe(true);
   });
 
   it("other user's notification → 404", async () => {
     const user = await createUser();
     const other = await createUser();
-    const notif = await db.notification.create({
-      data: { userId: user.id, event: "REQUEST_SUBMITTED", message: "Private" },
-    });
+    const [notif] = await db
+      .insert(notifications)
+      .values({ userId: user.id, event: "REQUEST_SUBMITTED", message: "Private" })
+      .returning();
 
     setMockUser({ id: other.id, email: other.email, role: "USER" });
 

@@ -15,8 +15,13 @@ import {
   Users,
 } from "lucide-react";
 
+import { and, eq } from "drizzle-orm";
+
+import { redirect } from "next/navigation";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { districts, programs, schools, teams, users } from "@/db/schema";
 import { getCachedAccessContext } from "@/lib/access";
 import { buildManagedTeamWhere } from "@/lib/admin-scope";
 import { Badge } from "@/components/ui/badge";
@@ -130,12 +135,24 @@ export default async function HomePage() {
   }
 
   const [user, access] = await Promise.all([
-    db.user.findUnique({
-      where: { id: session.user.id },
-      select: { onboardingDone: true },
+    db.query.users.findFirst({
+      where: eq(users.id, session.user.id),
+      columns: { onboardingDone: true },
     }),
     getCachedAccessContext(session.user.id),
   ]);
+
+  // Onboarding gate: a user with no admin scope, no team membership, and no
+  // completed onboarding has nothing to do on the dashboard (and an empty
+  // navbar). Send them to /onboarding instead of stranding them here.
+  const needsOnboarding =
+    !user?.onboardingDone &&
+    !access.isAdmin &&
+    !access.isCoach &&
+    !access.isParentMentor;
+  if (needsOnboarding) {
+    redirect("/onboarding");
+  }
 
   let adminPrograms: Array<{
     id: string;
@@ -153,36 +170,24 @@ export default async function HomePage() {
   }> = [];
 
   if (access.canManageTeams) {
-    const managedTeams = await db.team.findMany({
-      where: {
-        AND: [buildManagedTeamWhere(access), { active: true }],
-      },
-      select: {
-        id: true,
-        schoolId: true,
-        programId: true,
-        school: {
-          select: {
-            name: true,
-            district: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        program: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            gradeRangeLabel: true,
-            ageRangeLabel: true,
-          },
-        },
-      },
-    });
+    const managedTeams = await db
+      .select({
+        id: teams.id,
+        schoolId: teams.schoolId,
+        programId: teams.programId,
+        schoolName: schools.name,
+        districtId: districts.id,
+        districtName: districts.name,
+        programCode: programs.code,
+        programName: programs.name,
+        gradeRangeLabel: programs.gradeRangeLabel,
+        ageRangeLabel: programs.ageRangeLabel,
+      })
+      .from(teams)
+      .innerJoin(schools, eq(teams.schoolId, schools.id))
+      .innerJoin(districts, eq(schools.districtId, districts.id))
+      .innerJoin(programs, eq(teams.programId, programs.id))
+      .where(and(buildManagedTeamWhere(access), eq(teams.active, true)));
 
     const groupedPrograms = new Map<string, (typeof adminPrograms)[number]>();
 
@@ -196,17 +201,17 @@ export default async function HomePage() {
 
       groupedPrograms.set(key, {
         id: key,
-        districtId: team.school.district.id,
-        districtName: team.school.district.name,
+        districtId: team.districtId,
+        districtName: team.districtName,
         schoolId: team.schoolId,
         programId: team.programId,
-        name: team.program.name,
-        code: team.program.code,
-        gradeRangeLabel: team.program.gradeRangeLabel,
-        ageRangeLabel: team.program.ageRangeLabel,
+        name: team.programName,
+        code: team.programCode,
+        gradeRangeLabel: team.gradeRangeLabel,
+        ageRangeLabel: team.ageRangeLabel,
         teamCount: 1,
-        schoolName: team.school.name,
-        href: `/admin/teams?districtId=${team.school.district.id}&schoolId=${team.schoolId}&programId=${team.programId}`,
+        schoolName: team.schoolName,
+        href: `/admin/teams?districtId=${team.districtId}&schoolId=${team.schoolId}&programId=${team.programId}`,
       });
     }
 

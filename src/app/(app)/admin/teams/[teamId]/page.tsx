@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound, unauthorized } from "next/navigation";
 import { ArrowLeft, BanknoteArrowUp, Clock, FileText } from "lucide-react";
 
+import { asc, desc, eq, inArray } from "drizzle-orm";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { reimbursementRequests, teams } from "@/db/schema";
 import { canManageTeams, getCachedAccessContext } from "@/lib/access";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,31 +31,29 @@ export default async function AdminTeamDetailPage({
 
   const { teamId } = await params;
 
-  const team = await db.team.findUnique({
-    where: { id: teamId },
-    include: {
-      school: { include: { district: true } },
+  const team = await db.query.teams.findFirst({
+    where: eq(teams.id, teamId),
+    with: {
+      school: { with: { district: true } },
       program: true,
       memberships: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-        orderBy: [{ roleInTeam: "asc" }, { createdAt: "asc" }],
+        with: {
+          user: { columns: { id: true, name: true, email: true } },
+        },
+        orderBy: (m) => [asc(m.roleInTeam), asc(m.createdAt)],
       },
       requests: {
-        where: {
-          status: {
-            in: [
-              "COACH_APPROVED",
-              "COACH_REJECTED",
-              "ADMIN_APPROVED",
-              "ADMIN_REJECTED",
-              "PAID",
-            ],
-          },
+        where: inArray(reimbursementRequests.status, [
+          "COACH_APPROVED",
+          "COACH_REJECTED",
+          "ADMIN_APPROVED",
+          "ADMIN_REJECTED",
+          "PAID",
+        ]),
+        with: {
+          createdBy: { columns: { name: true, email: true } },
         },
-        include: {
-          createdBy: { select: { name: true, email: true } },
-        },
-        orderBy: { createdAt: "desc" },
+        orderBy: (r) => desc(r.createdAt),
       },
     },
   });

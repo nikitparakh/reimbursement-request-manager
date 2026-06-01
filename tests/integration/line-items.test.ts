@@ -7,6 +7,8 @@ import {
   DELETE,
 } from "@/app/api/requests/[requestId]/line-items/route";
 import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { reimbursementRequests, schools } from "@/db/schema";
 import { cleanDatabase } from "../helpers/db-clean";
 import {
   createUser,
@@ -83,10 +85,10 @@ describe("POST /api/requests/[requestId]/line-items (create)", () => {
     expect((data as any).description).toBe("New Item");
 
     // Verify total was recalculated (25 + 15.5 + 10 = 50.5)
-    const updated = await db.reimbursementRequest.findUnique({
-      where: { id: req.id },
+    const updated = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, req.id),
     });
-    expect(Number(updated!.requestedTotal)).toBe(50.5);
+    expect(updated!.requestedTotal).toBe(50.5);
   });
 
   it("team coach adds item → 201", async () => {
@@ -219,10 +221,10 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
     expect((data as any).description).toBe("Updated");
 
     // 100 + 15.5 = 115.5
-    const updated = await db.reimbursementRequest.findUnique({
-      where: { id: req.id },
+    const updated = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, req.id),
     });
-    expect(Number(updated!.requestedTotal)).toBe(115.5);
+    expect(updated!.requestedTotal).toBe(115.5);
   });
 
   it("coach updates → 200", async () => {
@@ -266,9 +268,10 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
   it("school admin updates a COACH_APPROVED request within scope → 200", async () => {
     const admin = await createUser();
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({
-      where: { id: team.schoolId },
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
     });
+    if (!school) throw new Error("School not found");
     await createScopedRole({
       userId: admin.id,
       role: "SCHOOL_ADMIN",
@@ -305,9 +308,10 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
   it("program admin updates a SUBMITTED request within scope → 200", async () => {
     const admin = await createUser();
     const team = await createTeam();
-    const school = await db.school.findUniqueOrThrow({
-      where: { id: team.schoolId },
+    const school = await db.query.schools.findFirst({
+      where: eq(schools.id, team.schoolId),
     });
+    if (!school) throw new Error("School not found");
     await createScopedRole({
       userId: admin.id,
       role: "PROGRAM_ADMIN",
@@ -427,10 +431,10 @@ describe("DELETE /api/requests/[requestId]/line-items", () => {
     expect((data as any).deleted).toBe(true);
 
     // Only item2 remains: 15.5
-    const updated = await db.reimbursementRequest.findUnique({
-      where: { id: req.id },
+    const updated = await db.query.reimbursementRequests.findFirst({
+      where: eq(reimbursementRequests.id, req.id),
     });
-    expect(Number(updated!.requestedTotal)).toBe(15.5);
+    expect(updated!.requestedTotal).toBe(15.5);
   });
 
   it("coach deletes → 200", async () => {

@@ -1,76 +1,93 @@
 import "dotenv/config";
 import { test, expect } from "@playwright/test";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import { eq } from "drizzle-orm";
+import * as schema from "../../src/db/schema";
+import {
+  approvalActions,
+  receiptExtractions,
+  receiptFiles,
+  receiptLineItems,
+  reimbursementRequests,
+  teams,
+  users,
+} from "../../src/db/schema";
 import {
   openPageAndExpectHeading,
   signIn,
   signOut,
 } from "./helpers";
 
-const db = new PrismaClient();
+const client = createClient({
+  url: process.env.DATABASE_URL ?? "file:./local.db",
+});
+const db = drizzle(client, { schema });
 
 async function seedLifecycleRequest(title: string) {
   const [coach, requester, team] = await Promise.all([
-    db.user.findUniqueOrThrow({ where: { email: "coach@team.org" } }),
-    db.user.findUniqueOrThrow({ where: { email: "user@team.org" } }),
-    db.team.findFirstOrThrow({ where: { name: "Frog Force 503" } }),
+    db.query.users.findFirst({ where: eq(users.email, "coach@team.org") }),
+    db.query.users.findFirst({ where: eq(users.email, "user@team.org") }),
+    db.query.teams.findFirst({ where: eq(teams.name, "Frog Force 503") }),
   ]);
+  if (!coach || !requester || !team) {
+    throw new Error("Seed prerequisites missing (run npm run db:seed first)");
+  }
 
-  const request = await db.reimbursementRequest.create({
-    data: {
+  const [request] = await db
+    .insert(reimbursementRequests)
+    .values({
       title,
       description: "Seeded for Playwright lifecycle validation",
-      requestedTotal: new Prisma.Decimal("47.83"),
+      requestedTotal: 47.83,
       status: "SUBMITTED",
       submittedAt: new Date(),
       teamId: team.id,
       createdById: requester.id,
       coachId: coach.id,
-    },
-  });
+    })
+    .returning();
 
-  const receipt = await db.receiptFile.create({
-    data: {
+  const [receipt] = await db
+    .insert(receiptFiles)
+    .values({
       requestId: request.id,
       fileName: "lifecycle-receipt.jpg",
       mimeType: "image/jpeg",
       storageUrl: "file:///playwright/lifecycle-receipt.jpg",
       parseStatus: "DONE",
-    },
-  });
+    })
+    .returning();
 
-  const extraction = await db.receiptExtraction.create({
-    data: {
+  const [extraction] = await db
+    .insert(receiptExtractions)
+    .values({
       receiptFileId: receipt.id,
       documentType: "RECEIPT",
       merchant: "Playwright Store",
-      subtotal: new Prisma.Decimal("47.83"),
-      tax: new Prisma.Decimal("3.44"),
-      total: new Prisma.Decimal("51.27"),
+      subtotal: 47.83,
+      tax: 3.44,
+      total: 51.27,
       currency: "USD",
       confidence: 0.99,
-    },
+    })
+    .returning();
+
+  await db.insert(receiptLineItems).values({
+    receiptExtractionId: extraction.id,
+    position: 0,
+    description: "Field snacks",
+    quantity: 1,
+    unitPrice: 47.83,
+    lineTotal: 47.83,
+    category: "Food",
   });
 
-  await db.receiptLineItem.create({
-    data: {
-      receiptExtractionId: extraction.id,
-      position: 0,
-      description: "Field snacks",
-      quantity: new Prisma.Decimal("1"),
-      unitPrice: new Prisma.Decimal("47.83"),
-      lineTotal: new Prisma.Decimal("47.83"),
-      category: "Food",
-    },
-  });
-
-  await db.approvalAction.create({
-    data: {
-      requestId: request.id,
-      actorId: requester.id,
-      action: "SUBMIT",
-      comment: "Submitted for review",
-    },
+  await db.insert(approvalActions).values({
+    requestId: request.id,
+    actorId: requester.id,
+    action: "SUBMIT",
+    comment: "Submitted for review",
   });
 
   return request;
@@ -78,7 +95,7 @@ async function seedLifecycleRequest(title: string) {
 
 test.describe("Full lifecycle E2E", () => {
   test.afterAll(async () => {
-    await db.$disconnect();
+    client.close();
   });
 
   test("coach approves a submitted request and admin completes payout", async ({
