@@ -59,6 +59,11 @@ jobs:
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply reimbursement-manager --remote
 
+      # Generate cloudflare-env.d.ts (gitignored) so `next build`'s type check
+      # knows the DB/R2/Queue/ASSETS binding types from wrangler.jsonc.
+      - name: Generate Cloudflare binding types
+        run: npm run cf-typegen
+
       # Build with OpenNext and deploy the app Worker (producer).
       - name: Deploy app Worker
         run: npm run deploy
