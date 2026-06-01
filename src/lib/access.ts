@@ -93,6 +93,20 @@ function matchesScopedRoleAssignment(
   assignment: ScopedRoleAssignment,
   target: AccessTarget
 ) {
+  // A program-scope with no district/school bound must NOT silently match teams
+  // across every school/district. Program and district/school are independent
+  // dimensions on a team, so a programId match is authoritative only when it is
+  // also constrained to a school/district (or a specific team) the admin owns.
+  // Treat a program-scope lacking any of those as insufficient for any action.
+  if (
+    assignment.programId &&
+    !assignment.districtId &&
+    !assignment.schoolId &&
+    !assignment.teamId
+  ) {
+    return false;
+  }
+
   if (assignment.districtId && target.districtId !== assignment.districtId) {
     return false;
   }

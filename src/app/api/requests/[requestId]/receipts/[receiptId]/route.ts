@@ -39,11 +39,20 @@ export async function DELETE(
     return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
   }
 
+  // Remove the backing blob first; if this throws we abort before deleting the
+  // DB row, so the client never sees a phantom-removed-then-restored receipt.
+  await deleteStoredObject(receipt.storageUrl).catch(() => {});
+
   await db.delete(receiptFiles).where(eq(receiptFiles.id, receiptId));
 
-  await recomputeRequestTotal(requestId);
-
-  await deleteStoredObject(receipt.storageUrl);
+  // Recompute is best-effort: the row is already gone, so a failure here must
+  // not 500 the caller (which would falsely re-show the deleted receipt). The
+  // total self-heals on the next transition/edit.
+  try {
+    await recomputeRequestTotal(requestId);
+  } catch {
+    // ignore — total reconciles on the next write
+  }
 
   return NextResponse.json({ deleted: true });
 }

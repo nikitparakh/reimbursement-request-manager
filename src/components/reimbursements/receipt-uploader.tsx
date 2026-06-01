@@ -41,6 +41,10 @@ type UploadingFile = {
   key: string;
   fileName: string;
   status: "uploading" | "uploaded" | "failed";
+  // Server-assigned receipt id, set once the POST resolves. Used to dedup the
+  // optimistic chip against the refreshed server list by id (not fileName), so
+  // an already-saved same-named receipt is never transiently hidden.
+  receiptId?: string;
 };
 
 export function ReceiptUploader({
@@ -54,7 +58,12 @@ export function ReceiptUploader({
   const router = useRouter();
 
   const visibleUploads = uploads.filter(
-    (upload) => upload.status === "uploading" || !existingReceipts.some((receipt) => receipt.fileName === upload.fileName),
+    (upload) =>
+      upload.status === "uploading" ||
+      // Once the server row for this upload has landed in existingReceipts
+      // (matched by its assigned id), drop the optimistic chip. Same-named
+      // server receipts no longer hide an in-flight upload.
+      !(upload.receiptId && existingReceipts.some((receipt) => receipt.id === upload.receiptId)),
   );
 
   async function deleteReceipt(receiptId: string) {
@@ -114,6 +123,13 @@ export function ReceiptUploader({
       }
 
       updateUpload(key, { status: "uploaded" });
+      const payload = (await response.json().catch(() => null)) as {
+        receipts?: { id: string }[];
+      } | null;
+      const receiptId = payload?.receipts?.[0]?.id;
+      if (receiptId) {
+        updateUpload(key, { receiptId });
+      }
       toast.success("Receipt uploaded");
       router.refresh();
     } catch {
@@ -132,10 +148,14 @@ export function ReceiptUploader({
     }
   }
 
-  const uploadedFileNames = new Set(visibleUploads.map((u) => u.fileName));
   const hiddenDeleteIds = new Set(hideExistingReceiptDeleteIds);
+  // Hide server receipts that are still represented by an in-flight optimistic
+  // chip (matched by the upload's assigned id), and ones the user just deleted.
+  const optimisticReceiptIds = new Set(
+    visibleUploads.map((u) => u.receiptId).filter((id): id is string => !!id),
+  );
   const serverOnly = existingReceipts.filter(
-    (r) => !uploadedFileNames.has(r.fileName) && !deletedIds.has(r.id),
+    (r) => !optimisticReceiptIds.has(r.id) && !deletedIds.has(r.id),
   );
 
   return (
@@ -206,7 +226,7 @@ export function ReceiptUploader({
       ) : null}
 
       <Card
-        className="cursor-pointer border-2 border-dashed border-border transition-colors hover:border-primary hover:bg-primary/5"
+        className="cursor-pointer border-2 border-dashed border-border transition-colors hover:border-primary hover:bg-primary/5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         onClick={() => fileInputRef.current?.click()}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

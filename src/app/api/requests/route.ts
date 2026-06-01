@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, eq, desc } from "drizzle-orm";
 import { createRequestDraft, findTeamCoach } from "@/lib/reimbursements/repository";
 import { db } from "@/lib/db";
-import { reimbursementRequests, teamMemberships } from "@/db/schema";
+import { reimbursementRequests, teamMemberships, teams } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 
 const createSchema = z.object({
@@ -50,6 +50,19 @@ export async function POST(request: Request) {
   });
   if (!membership) {
     return NextResponse.json({ error: "User is not a member of this team" }, { status: 403 });
+  }
+
+  const team = await db.query.teams.findFirst({
+    where: eq(teams.id, body.data.teamId),
+  });
+  if (!team?.active) {
+    return NextResponse.json(
+      {
+        error:
+          "This team is inactive. New requests cannot be created; in-flight requests are unaffected.",
+      },
+      { status: 409 },
+    );
   }
 
   const coachMembership = await findTeamCoach(body.data.teamId);

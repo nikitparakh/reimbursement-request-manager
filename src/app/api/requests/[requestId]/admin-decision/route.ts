@@ -48,6 +48,18 @@ export async function POST(
     );
   }
 
+  // Precondition: APPROVE/REJECT act on COACH_APPROVED; MARK_PAID acts on
+  // ADMIN_APPROVED. A stale tab acting on an already-advanced request gets a
+  // clear 409 instead of an opaque 500.
+  const requiredStatus =
+    body.data.decision === "MARK_PAID" ? "ADMIN_APPROVED" : "COACH_APPROVED";
+  if (current.status !== requiredStatus) {
+    return NextResponse.json(
+      { error: "This request has already been reviewed. Please refresh." },
+      { status: 409 }
+    );
+  }
+
   const nextStatus =
     body.data.decision === "APPROVE"
       ? "ADMIN_APPROVED"
@@ -55,35 +67,50 @@ export async function POST(
         ? "ADMIN_REJECTED"
         : "PAID";
 
-  const updated = await transitionRequestStatus({
-    requestId,
-    actorId,
-    nextStatus,
-    action: body.data.decision === "MARK_PAID" ? "MARK_PAID" : body.data.decision,
-    comment: body.data.comment,
-  });
+  let updated;
+  try {
+    updated = await transitionRequestStatus({
+      requestId,
+      actorId,
+      nextStatus,
+      action: body.data.decision === "MARK_PAID" ? "MARK_PAID" : body.data.decision,
+      comment: body.data.comment,
+    });
+  } catch {
+    // Stale/concurrent decision (STALE_TRANSITION) or invalid transition.
+    return NextResponse.json(
+      { error: "This request has already been reviewed. Please refresh." },
+      { status: 409 }
+    );
+  }
   invalidateApprovalCaches(current.teamId);
-  const [creator, actor] = await Promise.all([
-    db.query.users.findFirst({ where: eq(users.id, current.createdById) }),
-    db.query.users.findFirst({ where: eq(users.id, actorId) }),
-  ]);
-  if (creator?.email && actor?.email) {
+
+  // Notifications are non-fatal: never 500 a committed transition.
+  try {
+    const [creator, actor] = await Promise.all([
+      db.query.users.findFirst({ where: eq(users.id, current.createdById) }),
+      db.query.users.findFirst({ where: eq(users.id, actorId) }),
+    ]);
+
     const event =
       body.data.decision === "APPROVE"
         ? "ADMIN_APPROVED" as const
         : body.data.decision === "REJECT"
           ? "ADMIN_REJECTED" as const
           : "MARKED_PAID" as const;
+    const verbMap = { APPROVE: "approved", REJECT: "rejected" } as const;
     const message =
       body.data.decision === "MARK_PAID"
         ? `Reimbursement marked as paid: ${current.title}`
-        : `Admin ${body.data.decision.toLowerCase()}d reimbursement: ${current.title}`;
+        : `Admin ${verbMap[body.data.decision]} reimbursement: ${current.title}`;
     await sendNotification(event, {
       requestId,
-      actorEmail: actor.email,
-      recipients: [creator.email],
+      actorEmail: actor?.email ?? actorId,
+      recipients: [creator?.email ?? current.createdById],
       message,
     });
+  } catch {
+    // Swallow notification failures: the transition is already committed.
   }
 
   return NextResponse.json(updated);

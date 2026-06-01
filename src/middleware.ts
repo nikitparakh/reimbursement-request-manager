@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 import { POLICY_PATH } from "@/lib/policy";
 
 // Public routes that do not require an authenticated session.
@@ -19,6 +20,13 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
+
+  // Expose the request pathname to server components (the `(app)` layout reads
+  // this to enforce the onboarding/role gate once, instead of per-page). Next's
+  // server components cannot otherwise read the current pathname.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 });
 
 export const config = {

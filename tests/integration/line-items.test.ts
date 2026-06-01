@@ -242,7 +242,7 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
     expect(status).toBe(200);
   });
 
-  it("another approved parent on the same team cannot edit someone else's draft → 400", async () => {
+  it("another approved parent on the same team cannot edit someone else's draft → 404", async () => {
     const { team, req, item1 } = await setupRequestWithLineItems();
     const teammate = await createUser({ role: "USER" });
     await createMembership({
@@ -262,7 +262,10 @@ describe("PUT /api/requests/[requestId]/line-items (update)", () => {
       { requestId: req.id }
     );
 
-    expect(status).toBe(400);
+    // A bare PARENT_MENTOR who is neither owner nor coach can no longer view the
+    // request (IDOR fix), so access is denied with a 404 (existence not leaked)
+    // before any edit is attempted.
+    expect(status).toBe(404);
   });
 
   it("school admin updates a COACH_APPROVED request within scope → 200", async () => {

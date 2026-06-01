@@ -100,8 +100,15 @@ export function UserScopeManager({
         toast.success("Scoped access added");
         router.refresh();
       } else {
-        toast.error("Could not add scoped access");
+        const detail = await readErrorMessage(response, "Could not add scoped access");
+        toast.error(
+          response.status === 403
+            ? "You do not have permission to add this scoped access."
+            : detail,
+        );
       }
+    } catch {
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -124,8 +131,15 @@ export function UserScopeManager({
         setPendingRemoveId(null);
         router.refresh();
       } else {
-        toast.error("Could not remove scoped access");
+        const detail = await readErrorMessage(response, "Could not remove scoped access");
+        toast.error(
+          response.status === 403
+            ? "You do not have permission to remove this scoped access."
+            : detail,
+        );
       }
+    } catch {
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -215,4 +229,15 @@ export function UserScopeManager({
       ) : null}
     </div>
   );
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body) return fallback;
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

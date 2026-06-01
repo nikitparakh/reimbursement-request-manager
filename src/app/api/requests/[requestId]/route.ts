@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { reimbursementRequests } from "@/db/schema";
+import { reimbursementRequests, receiptFiles } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
 import { getRequestAccess } from "@/lib/reimbursements/request-access";
+import { deleteStoredObject } from "@/lib/storage";
 
 const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -108,6 +109,18 @@ export async function DELETE(
     );
   if (!requestAccess.canEditDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Delete the backing R2/local blobs before dropping the request row. Once the
+  // DB cascade removes receiptFiles we lose every storageUrl, so the objects
+  // would otherwise be orphaned forever.
+  const receipts = await db.query.receiptFiles.findMany({
+    where: eq(receiptFiles.requestId, requestId),
+    columns: { storageUrl: true },
+  });
+
+  for (const receipt of receipts) {
+    await deleteStoredObject(receipt.storageUrl).catch(() => {});
   }
 
   await db.delete(reimbursementRequests).where(eq(reimbursementRequests.id, requestId));

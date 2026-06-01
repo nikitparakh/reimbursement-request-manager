@@ -7,7 +7,7 @@ import { canManageTeams, getAccessContext } from "@/lib/access";
 import { requireUser } from "@/lib/rbac";
 
 const updateSchema = z.object({
-  name: z.string().min(2).optional(),
+  name: z.string().trim().min(2).optional(),
   shortCode: z.string().max(12).nullable().optional(),
   glAccount: z.string().max(30).nullable().optional(),
   active: z.boolean().optional(),
@@ -57,11 +57,25 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [updated] = await db
-    .update(teams)
-    .set(body.data)
-    .where(eq(teams.id, teamId))
-    .returning();
+  let updated;
+  try {
+    [updated] = await db
+      .update(teams)
+      .set(body.data)
+      .where(eq(teams.id, teamId))
+      .returning();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /UNIQUE constraint failed|SQLITE_CONSTRAINT/i.test(error.message)
+    ) {
+      return NextResponse.json(
+        { error: "That short code is already in use for this school" },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
 
   return NextResponse.json(updated);
 }

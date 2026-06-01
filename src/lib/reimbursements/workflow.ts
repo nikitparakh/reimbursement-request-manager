@@ -1,7 +1,10 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { approvalActions, auditLogs, reimbursementRequests } from "@/db/schema";
-import { assertTransition } from "@/lib/reimbursements/status";
+import {
+  assertTransition,
+  TransitionConflictError,
+} from "@/lib/reimbursements/status";
 import { aggregateReimbursableTotals } from "@/lib/parsing/aggregate";
 
 export async function transitionRequestStatus(input: {
@@ -30,29 +33,69 @@ export async function transitionRequestStatus(input: {
   });
   if (!request) throw new Error("Reimbursement request not found");
 
-  assertTransition(request.status, input.nextStatus);
+  // Capture the status we read so the write can be conditioned on it; if the
+  // request moved underneath us between the read and the write, the conditional
+  // UPDATE matches 0 rows and we surface a recognizable conflict.
+  const fromStatus = request.status;
 
-  const extractions = request.receiptFiles
-    .map((f) => f.extraction)
-    .filter((e): e is NonNullable<typeof e> => Boolean(e));
-  const requestedTotal =
-    extractions.length > 0
-      ? aggregateReimbursableTotals(extractions)
-      : Number(request.requestedTotal);
+  assertTransition(fromStatus, input.nextStatus);
 
-  const submittedAt =
-    input.nextStatus === "SUBMITTED" ? new Date() : request.submittedAt;
+  // The reimbursable total is pinned at submission time. Recompute it only up
+  // to (and including) the SUBMITTED transition; never re-derive it on
+  // COACH_APPROVED/ADMIN_APPROVED/COACH_REJECTED/ADMIN_REJECTED/PAID/DRAFT so
+  // the amount that is reviewed and finally PAID matches what was submitted.
+  const recomputeTotal = input.nextStatus === "SUBMITTED";
+  const requestedTotal = recomputeTotal
+    ? (() => {
+        const extractions = request.receiptFiles
+          .map((f) => f.extraction)
+          .filter((e): e is NonNullable<typeof e> => Boolean(e));
+        return extractions.length > 0
+          ? aggregateReimbursableTotals(extractions)
+          : Number(request.requestedTotal);
+      })()
+    : Number(request.requestedTotal);
 
-  const [updatedRows] = await db.batch([
-    db
-      .update(reimbursementRequests)
-      .set({
-        status: input.nextStatus,
-        requestedTotal: Number(requestedTotal.toFixed(2)),
-        submittedAt,
-      })
-      .where(eq(reimbursementRequests.id, request.id))
-      .returning(),
+  // Set submittedAt the first time the request becomes SUBMITTED; preserve an
+  // earlier submittedAt on resubmit. Clear it when the request is reopened to
+  // DRAFT so a stale submission time does not leak into the PDF/inbox.
+  let submittedAt = request.submittedAt;
+  if (input.nextStatus === "SUBMITTED") {
+    submittedAt = request.submittedAt ?? new Date();
+  } else if (input.nextStatus === "DRAFT") {
+    submittedAt = null;
+  }
+
+  const updatedRows = await db
+    .update(reimbursementRequests)
+    .set({
+      status: input.nextStatus,
+      requestedTotal: Number(requestedTotal.toFixed(2)),
+      submittedAt,
+    })
+    .where(
+      and(
+        eq(reimbursementRequests.id, request.id),
+        eq(reimbursementRequests.status, fromStatus),
+      ),
+    )
+    .returning();
+
+  // The conditional UPDATE above is an atomic compare-and-swap on the
+  // from-status. If it matched no rows, the request's status changed between our
+  // read and write (concurrent decision / lost-update race): abort WITHOUT
+  // writing the approvalAction/auditLog rows. A zero-row UPDATE is not an error,
+  // so folding these inserts into the same db.batch() would still COMMIT them on
+  // D1 and record a transition that never happened. Gate them behind the winning
+  // update instead — only the racer whose UPDATE matched gets to log side effects.
+  if (updatedRows.length === 0) {
+    throw new TransitionConflictError(
+      "STALE_TRANSITION",
+      `Request ${request.id} was no longer in status ${fromStatus}`,
+    );
+  }
+
+  await db.batch([
     db.insert(approvalActions).values({
       requestId: request.id,
       actorId: input.actorId,
@@ -63,9 +106,9 @@ export async function transitionRequestStatus(input: {
       actorId: input.actorId,
       requestId: request.id,
       eventType: "REQUEST_STATUS_UPDATED",
-      message: `Request moved from ${request.status} to ${input.nextStatus}`,
+      message: `Request moved from ${fromStatus} to ${input.nextStatus}`,
       metadata: {
-        from: request.status,
+        from: fromStatus,
         to: input.nextStatus,
         action: input.action,
         comment: input.comment ?? null,

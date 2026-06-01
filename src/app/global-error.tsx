@@ -34,7 +34,7 @@ export default function GlobalError({
               </div>
               <CardTitle className="text-xl">Application error</CardTitle>
               <CardDescription>
-                {error.message || "Something went wrong loading the page."}
+                Something went wrong loading the page.
               </CardDescription>
             </CardHeader>
             {error.digest ? (

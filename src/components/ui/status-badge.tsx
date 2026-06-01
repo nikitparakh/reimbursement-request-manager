@@ -1,8 +1,13 @@
+import type { RequestStatus } from "@/db/schema"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
+// Primarily a request-workflow status, but the badge is also reused for roles,
+// parse statuses, and free-form labels (e.g. "5 pending"). `RequestStatus` gives
+// autocomplete + exhaustiveness on the workflow states while `(string & {})`
+// keeps the existing non-workflow usages valid.
 type StatusBadgeProps = {
-  status: string
+  status: RequestStatus | (string & {})
   className?: string
 }
 
@@ -38,7 +43,7 @@ const STATUS_VARIANTS: Record<string, StatusConfig> = {
   ADMIN_APPROVED: {
     variant: "outline",
     className:
-      "border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+      "border-teal-300 bg-teal-100 text-teal-900 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-100",
   },
   ADMIN_REJECTED: {
     variant: "outline",

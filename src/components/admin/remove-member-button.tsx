@@ -42,8 +42,15 @@ export function RemoveMemberButton({
         setOpen(false);
         router.refresh();
       } else {
-        toast.error("Could not remove member");
+        const detail = await readErrorMessage(res, "Could not remove member");
+        toast.error(
+          res.status === 403
+            ? "You do not have permission to remove this member."
+            : detail,
+        );
       }
+    } catch {
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -88,4 +95,15 @@ export function RemoveMemberButton({
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body) return fallback;
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

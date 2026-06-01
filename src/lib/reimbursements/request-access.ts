@@ -25,6 +25,14 @@ type RequestAccess = {
   isReimbursementAdmin: boolean;
   isCoach: boolean;
   isTeamMember: boolean;
+  /**
+   * True when the current actor is NOT the request owner. Non-owners (coach /
+   * admin) acting on line items must be treated as soft-exclusions (set
+   * `excludedAt`/`excludedById`) rather than hard deletes; only the owner may
+   * hard-delete their own draft line items. The line-items route branches on
+   * this flag.
+   */
+  isReviewerExclusion: boolean;
   canView: boolean;
   canEditDraft: boolean;
   canEditLineItems: boolean;
@@ -104,7 +112,8 @@ export async function getRequestAccess(userId: string, requestId: string) {
     isReimbursementAdmin,
     isCoach,
     isTeamMember,
-    canView: isOwner || isReimbursementAdmin || isTeamMember,
+    isReviewerExclusion: !isOwner,
+    canView: isOwner || isReimbursementAdmin || isCoach,
     canEditDraft:
       request.status === "DRAFT" && (isOwner || isCoach || isReimbursementAdmin),
     canEditLineItems,
@@ -113,7 +122,7 @@ export async function getRequestAccess(userId: string, requestId: string) {
       (request.status === "COACH_REJECTED" ||
         request.status === "ADMIN_REJECTED") &&
       (isOwner || isCoach || isReimbursementAdmin),
-    canDownloadPdf: isOwner || isReimbursementAdmin || isTeamMember,
+    canDownloadPdf: isOwner || isReimbursementAdmin || isCoach,
     redirectUrl: isReimbursementAdmin
       ? "/admin/requests"
       : isCoach

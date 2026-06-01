@@ -133,10 +133,14 @@ describe("GET /api/notifications", () => {
       typed.notifications.find((notification) => notification.message === "Managed scope request")
         ?.requestHref
     ).toBe(`/admin/requests/${managedRequest.id}`);
+    // A bare PARENT_MENTOR who neither owns the request nor coaches the team can
+    // no longer view another member's request (IDOR fix), so the notification is
+    // rendered non-clickable (null href) rather than deep-linking to a page that
+    // would notFound().
     expect(
       typed.notifications.find((notification) => notification.message === "Member scope request")
         ?.requestHref
-    ).toBe(`/user/requests/${memberRequest.id}`);
+    ).toBeNull();
   });
 
   it("keeps submitted-request notifications on the user detail route for dual-role coach admins", async () => {

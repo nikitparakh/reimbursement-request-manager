@@ -261,6 +261,20 @@ describe("DELETE /api/admin/teams/[teamId]/members/[membershipId]", () => {
       role: "COACH",
     });
 
+    // A team must always retain at least one coach, so seed a second coach that
+    // survives the removal (otherwise the last-coach guard returns 409).
+    const otherCoach = await createUser({ role: "USER" });
+    await createMembership({
+      userId: otherCoach.id,
+      teamId: team.id,
+      roleInTeam: "COACH",
+    });
+    await createScopedRoleForTeam({
+      userId: otherCoach.id,
+      teamId: team.id,
+      role: "COACH",
+    });
+
     setMockUser({ id: admin.id, email: admin.email, role: "SUPER_ADMIN" });
 
     const { status, data } = await callRouteJSON(

@@ -158,7 +158,7 @@ describe("GET /api/requests/[requestId]", () => {
     expect((data as any).id).toBe(req.id);
   });
 
-  it("team member (non-creator) views → 200", async () => {
+  it("team member (non-creator, non-coach) cannot view → 404", async () => {
     const user = await createUser({ role: "USER" });
     const teammate = await createUser({ role: "USER" });
     const team = await createTeam();
@@ -179,7 +179,9 @@ describe("GET /api/requests/[requestId]", () => {
       {},
       { requestId: req.id }
     );
-    expect(status).toBe(200);
+    // IDOR fix: a bare PARENT_MENTOR may not read another member's request, and
+    // existence is not leaked (404, not 403).
+    expect(status).toBe(404);
   });
 
   it("non-team-member → 404", async () => {

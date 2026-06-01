@@ -37,11 +37,12 @@ async function recalculateRequestTotal(requestId: string) {
 
 const updateSchema = z.object({
   lineItemId: z.string(),
-  description: z.string().optional(),
-  quantity: z.number().nullable().optional(),
-  unitPrice: z.number().nullable().optional(),
-  lineTotal: z.number().nullable().optional(),
-  category: z.string().nullable().optional(),
+  description: z.string().max(500).optional(),
+  quantity: z.number().int().nonnegative().nullable().optional(),
+  unitPrice: z.number().finite().nonnegative().nullable().optional(),
+  // lineTotal may be negative to support discount/credit line items.
+  lineTotal: z.number().finite().nullable().optional(),
+  category: z.string().max(200).nullable().optional(),
   excluded: z.boolean().optional(),
 });
 
@@ -101,11 +102,12 @@ export async function PUT(
 
 const createSchema = z.object({
   receiptExtractionId: z.string(),
-  description: z.string(),
-  quantity: z.number().nullable().optional(),
-  unitPrice: z.number().nullable().optional(),
-  lineTotal: z.number().nullable().optional(),
-  category: z.string().nullable().optional(),
+  description: z.string().max(500),
+  quantity: z.number().int().nonnegative().nullable().optional(),
+  unitPrice: z.number().finite().nonnegative().nullable().optional(),
+  // lineTotal may be negative to support discount/credit line items.
+  lineTotal: z.number().finite().nullable().optional(),
+  category: z.string().max(200).nullable().optional(),
 });
 
 export async function POST(
@@ -200,9 +202,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
-  const isReviewerExclusion =
-    (requestAccess.isCoach || requestAccess.isReimbursementAdmin) &&
-    requestAccess.request.status !== "DRAFT";
+  // Non-owners (coach/admin) must always soft-exclude with an audit trail
+  // (excludedAt/excludedById). Hard delete is reserved for the owner editing
+  // their own DRAFT, so a coach editing a DRAFT never silently destroys an
+  // owner's line item.
+  const isReviewerExclusion = !requestAccess.isOwner;
 
   if (isReviewerExclusion) {
     await db

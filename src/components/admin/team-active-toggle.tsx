@@ -28,8 +28,15 @@ export function TeamActiveToggle({ teamId, active }: TeamActiveToggleProps) {
         toast.success(next ? "Team activated" : "Team deactivated");
         router.refresh();
       } else {
-        toast.error("Could not update team status");
+        const detail = await readErrorMessage(res, "Could not update team status");
+        toast.error(
+          res.status === 403
+            ? "You do not have permission to change this team's status."
+            : detail,
+        );
       }
+    } catch {
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -46,4 +53,15 @@ export function TeamActiveToggle({ teamId, active }: TeamActiveToggleProps) {
       }}
     />
   );
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body) return fallback;
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

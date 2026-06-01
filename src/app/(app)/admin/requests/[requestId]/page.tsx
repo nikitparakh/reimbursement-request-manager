@@ -25,6 +25,7 @@ import {
 } from "@/lib/access";
 
 const ADMIN_VISIBLE_STATUSES = [
+  "SUBMITTED",
   "COACH_APPROVED",
   "COACH_REJECTED",
   "ADMIN_APPROVED",
@@ -112,7 +113,18 @@ export default async function AdminRequestDetailPage({
   const receipts = serializeReceipts(request.receiptFiles);
 
   const isAdminApproved = status === "ADMIN_APPROVED";
-  const canDecide = status === "COACH_APPROVED" || status === "ADMIN_APPROVED";
+  // Policy: an admin can act on SUBMITTED requests here just as they can from
+  // /user/requests/[id] — the coach-decision API independently authorizes
+  // admins. SUBMITTED decisions route through coach-decision (COACH_* targets);
+  // COACH_APPROVED / ADMIN_APPROVED route through admin-decision.
+  const isSubmitted = status === "SUBMITTED";
+  const canDecide =
+    isSubmitted ||
+    status === "COACH_APPROVED" ||
+    status === "ADMIN_APPROVED";
+  const decisionEndpoint = isSubmitted
+    ? `/api/requests/${request.id}/coach-decision`
+    : `/api/requests/${request.id}/admin-decision`;
 
   return (
     <LiveTotalProvider initialTotal={Number(request.requestedTotal)}>
@@ -190,6 +202,7 @@ export default async function AdminRequestDetailPage({
             <ExtractionReview
               receipts={receipts}
               parseStatuses={Object.fromEntries(request.receiptFiles.map((f) => [f.id, f.parseStatus]))}
+              requestId={request.id}
             />
           )}
         </CardContent>
@@ -203,7 +216,7 @@ export default async function AdminRequestDetailPage({
           <CardFooter>
             <ApprovalDecision
               requestId={request.id}
-              endpoint={`/api/requests/${request.id}/admin-decision`}
+              endpoint={decisionEndpoint}
               showApproveReject={!isAdminApproved}
               allowMarkPaid={isAdminApproved}
             />

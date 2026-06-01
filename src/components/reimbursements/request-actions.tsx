@@ -43,6 +43,7 @@ export function RequestActions({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const receiptEditorDeleteIds = receiptsWithExtractions
     .filter((receipt) => receipt.extraction)
@@ -52,6 +53,10 @@ export function RequestActions({
     setIsParsing(true);
 
     const MAX_RETRIES = 2;
+    // Overall deadline so we never spin indefinitely (or claim "15–60s" then
+    // hang for minutes). After this we stop, refresh, and let the page-level
+    // polling/error UI take over.
+    const deadline = Date.now() + 90_000;
 
     for (let retry = 0; retry <= MAX_RETRIES; retry++) {
       try {
@@ -67,8 +72,8 @@ export function RequestActions({
           return;
         }
 
-        // Poll for parsing completion — 60 attempts × 3s = 3 minutes timeout
-        for (let attempt = 0; attempt < 60; attempt++) {
+        // Poll for parsing completion until the shared deadline.
+        while (Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 3000));
 
           const statusRes = await fetch(`/api/requests/${requestId}`, { cache: "no-store" });
@@ -86,14 +91,20 @@ export function RequestActions({
               await new Promise((resolve) => setTimeout(resolve, 1000));
               break;
             }
+            if (hasFailed) {
+              toast.error(
+                "We couldn't read one or more receipts. Open the receipt to retry parsing.",
+              );
+            }
             setIsParsing(false);
             router.refresh();
             return;
           }
         }
 
-        if (retry < MAX_RETRIES) continue;
+        if (retry < MAX_RETRIES && Date.now() < deadline) continue;
 
+        // Deadline reached while still processing — stop spinning and refresh.
         setIsParsing(false);
         router.refresh();
         return;
@@ -110,25 +121,24 @@ export function RequestActions({
   }
 
   async function submit() {
-    const response = await fetch(`/api/requests/${requestId}/submit`, { method: "POST" });
-    if (!response.ok) {
-      const body = await response.text();
-      let errorText = "Request failed.";
-      if (body) {
-        try {
-          const payload = JSON.parse(body) as { error?: string };
-          errorText = payload.error ?? errorText;
-        } catch {
-          errorText = body;
-        }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/requests/${requestId}/submit`, { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Failed to submit request. Please try again.");
+        setIsSubmitting(false);
+        return;
       }
-      toast.error(errorText);
-      return;
+      toast.success(
+        submitToAdmin ? "Submitted to admin successfully." : "Submitted to coach successfully.",
+      );
+      router.push(redirectUrl);
+    } catch {
+      toast.error("Failed to submit request. Please try again.");
+      setIsSubmitting(false);
     }
-    toast.success(
-      submitToAdmin ? "Submitted to admin successfully." : "Submitted to coach successfully.",
-    );
-    router.push(redirectUrl);
   }
 
   async function confirmDelete() {
@@ -180,7 +190,7 @@ export function RequestActions({
               <div>
                 <p className="text-sm font-medium text-foreground">Processing receipts...</p>
                 <p className="text-xs text-muted-foreground">
-                  This usually takes 15–60 seconds. The page will update automatically.
+                  This usually takes under a minute. The page will update automatically.
                 </p>
               </div>
             </div>
@@ -189,7 +199,12 @@ export function RequestActions({
       )}
 
       {hasExtractions && !hasUnparsedReceipts && canSubmit && (
-        <Button onClick={() => void submit()}>
+        <Button
+          onClick={() => void submit()}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+        >
           {submitToAdmin ? "Submit to Admin" : "Submit to Coach"}
         </Button>
       )}

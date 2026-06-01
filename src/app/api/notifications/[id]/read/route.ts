@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { notifications } from "@/db/schema";
 import { requireUser } from "@/lib/rbac";
@@ -24,10 +24,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // IDOR guard: scope the write to the caller's own notification so a user can
+  // only ever mark THEIR OWN notification read, even under a concurrent change.
   const [updated] = await db
     .update(notifications)
     .set({ read: true })
-    .where(eq(notifications.id, id))
+    .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
     .returning();
 
   return NextResponse.json(updated);

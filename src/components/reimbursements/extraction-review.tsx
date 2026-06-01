@@ -2,8 +2,11 @@
 
 import { Fragment, useState } from "react";
 
-import { MessageCircle } from "lucide-react";
+import { AlertTriangle, Loader2, MessageCircle, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CommentIcon } from "@/components/reimbursements/line-item-comments";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,11 +33,34 @@ function parseNum(value: string | null): number {
 export function ExtractionReview({
   receipts,
   parseStatuses,
+  requestId,
 }: {
   receipts: SerializedReceipt[];
   parseStatuses?: Record<string, string>;
+  requestId?: string;
 }) {
+  const router = useRouter();
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [retrying, setRetrying] = useState(false);
+
+  async function retryParse() {
+    if (!requestId || retrying) return;
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/requests/${requestId}/parse`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Failed to retry parsing.");
+        return;
+      }
+      toast.success("Retrying parsing…");
+      router.refresh();
+    } catch {
+      toast.error("Failed to retry parsing. Please try again.");
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   function toggleComments(itemId: string) {
     setExpandedComments((prev) => {
@@ -60,6 +86,7 @@ export function ExtractionReview({
         const tax = inferTax(ext ? parseNum(ext.tax) : 0, ext ? parseNum(ext.total) : 0, lineItemsSum + excludedSum);
         const receiptTotal = lineItemsSum;
         const status = parseStatuses?.[receipt.id];
+        const hasFailed = status === "FAILED";
 
         return (
           <Card key={receipt.id}>
@@ -67,7 +94,40 @@ export function ExtractionReview({
               <span className="text-sm font-medium text-foreground">{receipt.fileName}</span>
               {status ? <StatusBadge status={status} /> : null}
             </CardHeader>
-            {ext ? (
+            {hasFailed ? (
+              <CardContent>
+                <div className="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium text-foreground">
+                        We couldn&apos;t read this receipt
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Parsing failed. Try again, or remove and re-upload the file if it keeps failing.
+                      </p>
+                    </div>
+                  </div>
+                  {requestId ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={retrying}
+                      onClick={() => void retryParse()}
+                    >
+                      {retrying ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                      ) : (
+                        <RotateCcw className="size-4" aria-hidden />
+                      )}
+                      Retry parsing
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            ) : ext ? (
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
                   <div>

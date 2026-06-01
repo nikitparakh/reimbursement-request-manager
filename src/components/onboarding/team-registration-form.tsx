@@ -100,6 +100,12 @@ export function TeamRegistrationForm({
   const programId = useWatch({ control: form.control, name: "programId", defaultValue: initial.programId });
   const selectedProgram = programs.find((p) => p.id === programId);
 
+  // A registration request requires a district (with a school) and a program.
+  // When the catalog is empty the dropdowns are disabled, so Submit must be
+  // disabled too and an empty-state shown instead of a permanently-blocked form.
+  const hasCatalog = districts.length > 0 && programs.length > 0;
+  const canSubmit = hasCatalog && schools.length > 0;
+
   async function onSubmit(data: TeamRegistrationFormValues) {
     const payload = {
       districtId: data.districtId,
@@ -119,7 +125,8 @@ export function TeamRegistrationForm({
     });
 
     if (!response.ok) {
-      toast.error("Unable to send team registration request.");
+      const errorMessage = await readErrorMessage(response);
+      toast.error(errorMessage);
       return;
     }
 
@@ -137,6 +144,12 @@ export function TeamRegistrationForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {!hasCatalog ? (
+          <Alert>
+            No districts or programs are available yet. Please check back once a
+            school admin has set them up, or contact your administrator.
+          </Alert>
+        ) : null}
         {submittedTeam ? (
           <Alert variant="success">
             Request to create <span className="font-medium">{submittedTeam}</span> was
@@ -324,10 +337,27 @@ export function TeamRegistrationForm({
           )}
         />
 
-        <Button variant="secondary" type="submit" loading={form.formState.isSubmitting}>
+        <Button
+          variant="secondary"
+          type="submit"
+          loading={form.formState.isSubmitting}
+          disabled={!canSubmit}
+        >
           Submit Request
         </Button>
       </form>
     </Form>
   );
+}
+
+async function readErrorMessage(response: Response) {
+  const fallback = "Unable to send team registration request.";
+  const body = await response.text();
+  if (!body) return fallback;
+  try {
+    const payload = JSON.parse(body) as { error?: string };
+    return typeof payload.error === "string" ? payload.error : fallback;
+  } catch {
+    return fallback;
+  }
 }
